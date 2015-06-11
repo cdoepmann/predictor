@@ -1,0 +1,6 @@
+*.pcap
+*.tr
+*.log
+*.pyc
+*.bak
+**/*.dat
