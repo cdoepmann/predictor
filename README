@@ -1,3 +1,16 @@
+Please note, that this ns-3 fork implements a module to simulate the
+Tor network. In addition, it implements an experimental transport
+protocol, namely BackTap: Backpressure-based Transport Protocol.
+
+Examples are included in the repository. We suggest to use the Network
+Simulation Cradle (NSC, http://research.wand.net.nz/software/nsc.php)
+for simulations with real world network stacks.
+
+Contact:   Florian Tschorsch
+           tschorsch@informatik.hu-berlin.de
+
+
+
 
     The Network Simulator, Version 3
     --------------------------------
