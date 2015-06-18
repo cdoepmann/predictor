@@ -32,38 +32,40 @@ TorBaseApp::GetTypeId (void)
 }
 
 
-TorBaseApp::TorBaseApp()
+TorBaseApp::TorBaseApp ()
 {
   NS_LOG_FUNCTION (this);
 }
 
-TorBaseApp::~TorBaseApp()
+TorBaseApp::~TorBaseApp ()
 {
   NS_LOG_FUNCTION (this);
 }
 
-void TorBaseApp::StartApplication (void)
+void
+TorBaseApp::StartApplication (void)
 {
   NS_LOG_FUNCTION (this);
 
   m_id = GetNode ()->GetId ();
   m_ip = GetNode ()->GetObject<Ipv4> ()->GetAddress (1,0).GetLocal ();
 
-  m_readbucket = TokenBucket(m_rate,m_burst,m_refilltime);
-  m_writebucket = TokenBucket(m_rate,m_burst,m_refilltime);
+  m_readbucket = TokenBucket (m_rate,m_burst,m_refilltime);
+  m_writebucket = TokenBucket (m_rate,m_burst,m_refilltime);
 
   Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
   rng->SetAttribute ("Min", DoubleValue (0.0));
-  rng->SetAttribute ("Max", DoubleValue (m_refilltime.GetSeconds()));
-  Time offset = Seconds (rng->GetValue());
+  rng->SetAttribute ("Max", DoubleValue (m_refilltime.GetSeconds ()));
+  Time offset = Seconds (rng->GetValue ());
 
-  m_readbucket.StartBucket(offset);
-  m_writebucket.StartBucket(offset);
+  m_readbucket.StartBucket (offset);
+  m_writebucket.StartBucket (offset);
 
-  NS_LOG_INFO ("StartApplication " << GetNodeName() << " ip=" << m_ip << " refillOffset=" << offset.GetSeconds ());
+  NS_LOG_INFO ("StartApplication " << GetNodeName () << " ip=" << m_ip << " refillOffset=" << offset.GetSeconds ());
 }
 
-void TorBaseApp::StopApplication (void)
+void
+TorBaseApp::StopApplication (void)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -77,14 +79,14 @@ TorBaseApp::DoDispose (void)
 void
 TorBaseApp::AddCircuit (int id, Ipv4Address n_ip, int n_conn_type, Ipv4Address p_ip, int p_conn_type)
 {
-  NS_LOG_FUNCTION(this);
+  NS_LOG_FUNCTION (this);
 }
 
 void
 TorBaseApp::AddCircuit (int circ_id, Ipv4Address n_ip, int n_conn_type, Ipv4Address p_ip, int p_conn_type,
-      Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
+                        Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
 {
-  NS_LOG_FUNCTION(this);
+  NS_LOG_FUNCTION (this);
 }
 
 void

@@ -10,7 +10,8 @@
 
 namespace ns3 {
 
-class RequestHeader : public Header {
+class RequestHeader : public Header
+{
 public:
   RequestHeader ();
   // ~RequestHeader ();
@@ -30,9 +31,10 @@ private:
 };
 
 
-class PseudoSocket : public Socket {
+class PseudoSocket : public Socket
+{
 public:
-  PseudoSocket();
+  PseudoSocket ();
   // ~PseudoSocket();
   // static TypeId GetTypeId (void);
 
@@ -60,9 +62,10 @@ public:
 };
 
 
-class PseudoSinkSocket : public PseudoSocket {
+class PseudoSinkSocket : public PseudoSocket
+{
 public:
-  PseudoSinkSocket();
+  PseudoSinkSocket ();
   // ~PseudoSinkSocket();
   // static TypeId GetTypeId (void);
 
@@ -71,9 +74,10 @@ public:
 
 };
 
-class PseudoBulkSocket : public PseudoSinkSocket {
+class PseudoBulkSocket : public PseudoSinkSocket
+{
 public:
-  PseudoBulkSocket();
+  PseudoBulkSocket ();
   // ~PseudoBulkSocket();
   // static TypeId GetTypeId (void);
 
@@ -83,14 +87,15 @@ public:
 
 
 
-class PseudoServerSocket : public PseudoSocket {
+class PseudoServerSocket : public PseudoSocket
+{
 public:
-  PseudoServerSocket();
+  PseudoServerSocket ();
 
-  uint32_t GetTxAvailable() const;
-  uint32_t GetRxAvailable() const;
+  uint32_t GetTxAvailable () const;
+  uint32_t GetRxAvailable () const;
   int Send (Ptr<Packet> p, uint32_t flags);
-  Ptr<Packet> Recv(uint32_t maxSize, uint32_t flags);
+  Ptr<Packet> Recv (uint32_t maxSize, uint32_t flags);
 private:
   uint32_t m_leftToSend;
   uint32_t m_leftToRead;
@@ -98,25 +103,26 @@ private:
 };
 
 
-class PseudoClientSocket : public PseudoSocket {
+class PseudoClientSocket : public PseudoSocket
+{
 public:
-  PseudoClientSocket();
-  PseudoClientSocket(Ptr<RandomVariableStream> requestStream, Ptr<RandomVariableStream> thinkStream);
+  PseudoClientSocket ();
+  PseudoClientSocket (Ptr<RandomVariableStream> requestStream, Ptr<RandomVariableStream> thinkStream);
 
-  uint32_t GetTxAvailable() const;
-  uint32_t GetRxAvailable() const;
+  uint32_t GetTxAvailable () const;
+  uint32_t GetRxAvailable () const;
   int Send (Ptr<Packet> p, uint32_t flags);
-  Ptr<Packet> Recv(uint32_t maxSize, uint32_t flags);
+  Ptr<Packet> Recv (uint32_t maxSize, uint32_t flags);
 
-  void SetRequestStream(Ptr<RandomVariableStream>);
-  void SetThinkStream(Ptr<RandomVariableStream>);
+  void SetRequestStream (Ptr<RandomVariableStream>);
+  void SetThinkStream (Ptr<RandomVariableStream>);
 
-  void SetTtfbCallback(void (*)(int, double, std::string), int, std::string);
-  void SetTtlbCallback(void (*)(int, double, std::string), int, std::string);
+  void SetTtfbCallback (void (*)(int, double, std::string), int, std::string);
+  void SetTtlbCallback (void (*)(int, double, std::string), int, std::string);
 
 private:
-  void request_page();
-  uint32_t roundUp(uint32_t,uint32_t);
+  void RequestPage ();
+  uint32_t RoundUp (uint32_t,uint32_t);
   int m_leftToRead;
   int m_requestSize;
   int m_leftToSend;

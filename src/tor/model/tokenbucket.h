@@ -8,15 +8,16 @@
 namespace ns3 {
 
 
-class TokenBucket {
+class TokenBucket
+{
 public:
-  TokenBucket();
-  TokenBucket(DataRate,DataRate,Time);
-  ~TokenBucket();
+  TokenBucket ();
+  TokenBucket (DataRate,DataRate,Time);
+  ~TokenBucket ();
 
-  void StartBucket(Time = Seconds(0));
-  void SetRefilledCallback(Callback<void,int64_t>);
-  uint32_t GetSize();
+  void StartBucket (Time = Seconds (0));
+  void SetRefilledCallback (Callback<void,int64_t>);
+  uint32_t GetSize ();
   void Decrement (uint32_t);
 
 private:

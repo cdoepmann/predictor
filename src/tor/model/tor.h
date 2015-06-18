@@ -38,51 +38,44 @@ class Connection;
 class TorApp;
 
 
-class Circuit : public SimpleRefCount<Circuit> {
+class Circuit : public SimpleRefCount<Circuit>
+{
 public:
-  Circuit(uint32_t, Ptr<Connection>, Ptr<Connection>);
-  ~Circuit();
+  Circuit (uint32_t, Ptr<Connection>, Ptr<Connection>);
+  ~Circuit ();
+  void DoDispose ();
 
-  Ptr<Packet> pop_cell(CellDirection);
-  void push_cell(Ptr<Packet>, CellDirection);
+  Ptr<Packet> PopCell (CellDirection);
+  void PushCell (Ptr<Packet>, CellDirection);
+  std::queue<Ptr<Packet> >* GetQueue (CellDirection);
+  uint32_t GetQueueSize (CellDirection);
+  uint32_t SendCell (CellDirection);
 
-  std::queue<Ptr<Packet> >* get_queue(CellDirection);
+  Ptr<Connection> GetConnection (CellDirection);
+  Ptr<Connection> GetOppositeConnection (CellDirection);
+  Ptr<Connection> GetOppositeConnection (Ptr<Connection>);
+  CellDirection GetDirection (Ptr<Connection>);
+  CellDirection GetOppositeDirection (Ptr<Connection>);
+  CellDirection GetOppositeDirection (CellDirection);
 
-  Ptr<Connection> get_connection(CellDirection);
-  Ptr<Connection> get_opposite_connection(CellDirection);
-  Ptr<Connection> get_opposite_connection(Ptr<Connection>);
+  Ptr<Circuit> GetNextCirc (Ptr<Connection>);
+  void SetNextCirc (Ptr<Connection>, Ptr<Circuit>);
 
-  CellDirection get_direction(Ptr<Connection>);
-  CellDirection get_opposite_direction(Ptr<Connection>);
-  CellDirection get_opposite_direction(CellDirection);
+  uint32_t GetId ();
+  uint32_t GetStatsBytesRead (CellDirection);
+  uint32_t GetStatsBytesWritten (CellDirection);
+  void IncStatsBytes (CellDirection,uint32_t,uint32_t);
+  void ResetStatsBytes ();
 
-  Ptr<Circuit> get_next_circ(Ptr<Connection>);
-  void set_next_circ(Ptr<Connection>, Ptr<Circuit>);
-
-  uint32_t get_queue_size(CellDirection);
-
-  uint32_t get_id();
-
-  uint32_t get_stats_bytes_read(CellDirection);
-  uint32_t get_stats_bytes_written(CellDirection);
-  void inc_stats_bytes(CellDirection,uint32_t,uint32_t);
-  void reset_stats_bytes();
-
-  uint32_t get_package_window();
-  void inc_package_window();
-
-  uint32_t get_deliver_window();
-  void inc_deliver_window();
-
-  void DoDispose();
-
-  uint32_t send_cell(CellDirection);
+  uint32_t GetPackageWindow ();
+  void IncPackageWindow ();
+  uint32_t GetDeliverWindow ();
+  void IncDeliverWindow ();
 
 private:
-  Ptr<Packet> pop_queue(std::queue<Ptr<Packet> >*);
-
-  bool is_relay_sendme(Ptr<Packet>);
-  Ptr<Packet> create_sendme_cell();
+  Ptr<Packet> PopQueue (std::queue<Ptr<Packet> >*);
+  bool IsSendme (Ptr<Packet>);
+  Ptr<Packet> CreateSendme ();
 
   int circ_id;
 
@@ -117,38 +110,34 @@ private:
 
 
 
-class Connection : public SimpleRefCount<Connection> {
+class Connection : public SimpleRefCount<Connection>
+{
 public:
+  Connection (TorApp*, Ipv4Address, int);
+  ~Connection ();
 
-  Connection(TorApp*, Ipv4Address, int);
-  ~Connection();
+  Ptr<Circuit> GetActiveCircuits ();
+  void SetActiveCircuits (Ptr<Circuit>);
+  uint8_t GetType ();
+  uint32_t Read (std::vector<Ptr<Packet> >*, uint32_t);
+  uint32_t Write (uint32_t);
+  void ScheduleWrite (Time = Seconds (0));
+  void ScheduleRead (Time = Seconds (0));
+  bool IsBlocked ();
+  void SetBlocked (bool);
+  Ptr<Socket> GetSocket ();
+  void SetSocket (Ptr<Socket>);
+  Ipv4Address GetRemote ();
+  uint32_t GetOutbufSize ();
+  uint32_t GetInbufSize ();
 
-  Ptr<Circuit> get_active_circuits();
-  void set_active_circuits(Ptr<Circuit>);
+  void SetRandomVariableStreams (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>);
+  Ptr<RandomVariableStream> GetRequestStream ();
+  Ptr<RandomVariableStream> GetThinkStream ();
 
-  uint8_t get_type();
-  bool is_blocked();
-  void set_blocked(bool);
-  uint32_t read(std::vector<Ptr<Packet> >*, uint32_t);
-  uint32_t write(uint32_t);
-
-  Ptr<Socket> get_socket();
-  void set_socket(Ptr<Socket>);
-  Ipv4Address get_remote();
-
-  uint32_t get_outbuf_size();
-  uint32_t get_inbuf_size();
-
-  void schedule_write(Time = Seconds(0));
-  void schedule_read(Time = Seconds(0));
-
-  void SetRandomVariableStreams(Ptr<RandomVariableStream>, Ptr<RandomVariableStream>);
-  Ptr<RandomVariableStream> GetRequestStream();
-  Ptr<RandomVariableStream> GetThinkStream();
-
-  void SetTtfbCallback(void (*)(int, double, std::string), int, std::string="");
-  void SetTtlbCallback(void (*)(int, double, std::string), int, std::string="");
-  void RegisterCallbacks();
+  void SetTtfbCallback (void (*)(int, double, std::string), int, std::string = "");
+  void SetTtlbCallback (void (*)(int, double, std::string), int, std::string = "");
+  void RegisterCallbacks ();
 private:
   TorApp* torapp;
   Ipv4Address remote;
@@ -193,7 +182,7 @@ public:
   virtual void StartApplication (void);
   virtual void StopApplication (void);
 
-  Ptr<Circuit> GetCircuit(uint32_t circid);
+  Ptr<Circuit> GetCircuit (uint32_t circid);
 
   virtual Ptr<Connection> AddConnection (Ipv4Address, int);
   void AddActiveCircuit (Ptr<Connection>, Ptr<Circuit>);
@@ -201,20 +190,18 @@ public:
 // private:
   void HandleAccept (Ptr<Socket>, const Address& from);
 
-  virtual void conn_read_callback (Ptr<Socket>);
-  virtual void conn_write_callback (Ptr<Socket>, uint32_t);
-  void package_relay_cell (Ptr<Connection> conn, Ptr<Packet> data);
-  void package_relay_cell_impl (int, Ptr<Packet>);
-  void receive_relay_cell (Ptr<Connection> conn, Ptr<Packet> cell);
-  void append_cell_to_circuit_queue (Ptr<Circuit> circ, Ptr<Packet> cell, CellDirection direction);
-  Ptr<Circuit> lookup_circuit_from_cell (Ptr<Packet>);
-
-  void refill_read_callback (int64_t);
-  void refill_write_callback (int64_t);
-  void global_buckets_decrement (uint32_t num_read, uint32_t num_written);
-  uint32_t round_robin (int base, int64_t bucket);
-
-  Ptr<Connection> lookup_conn (Ptr<Socket>);
+  virtual void ConnReadCallback (Ptr<Socket>);
+  virtual void ConnWriteCallback (Ptr<Socket>, uint32_t);
+  void PackageRelayCell (Ptr<Connection> conn, Ptr<Packet> data);
+  void PackageRelayCellImpl (int, Ptr<Packet>);
+  void ReceiveRelayCell (Ptr<Connection> conn, Ptr<Packet> cell);
+  void AppendCellToCircuitQueue (Ptr<Circuit> circ, Ptr<Packet> cell, CellDirection direction);
+  Ptr<Circuit> LookupCircuitFromCell (Ptr<Packet>);
+  void RefillReadCallback (int64_t);
+  void RefillWriteCallback (int64_t);
+  void GlobalBucketsDecrement (uint32_t num_read, uint32_t num_written);
+  uint32_t RoundRobin (int base, int64_t bucket);
+  Ptr<Connection> LookupConn (Ptr<Socket>);
 
   Ptr<Socket> listen_socket;
   std::vector<Ptr<Connection> > connections;

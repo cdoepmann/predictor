@@ -7,12 +7,12 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("TokenBucket");
 
-TokenBucket::TokenBucket()
+TokenBucket::TokenBucket ()
 {
   NS_LOG_FUNCTION (this);
 }
 
-TokenBucket::TokenBucket(DataRate rate, DataRate burst, Time refilltime)
+TokenBucket::TokenBucket (DataRate rate, DataRate burst, Time refilltime)
 {
   NS_LOG_FUNCTION (this);
   m_rate = rate;
@@ -20,7 +20,7 @@ TokenBucket::TokenBucket(DataRate rate, DataRate burst, Time refilltime)
   m_refilltime = refilltime;
 }
 
-TokenBucket::~TokenBucket()
+TokenBucket::~TokenBucket ()
 {
   NS_LOG_FUNCTION (this);
   Simulator::Remove (m_refillevent);
@@ -35,15 +35,17 @@ TokenBucket::SetRefilledCallback (Callback<void,int64_t> cb)
 void
 TokenBucket::StartBucket (Time offset)
 {
-  m_bucket = m_burst.GetBitRate() / 8;
-  m_refillevent = Simulator::Schedule(offset,&TokenBucket::Refill, this);
+  m_bucket = m_burst.GetBitRate () / 8;
+  m_refillevent = Simulator::Schedule (offset,&TokenBucket::Refill, this);
 }
 
 uint32_t
 TokenBucket::GetSize ()
 {
   if (m_bucket <= 0)
-    return 0;
+    {
+      return 0;
+    }
   return m_bucket;
 }
 
@@ -59,16 +61,18 @@ TokenBucket::Refill ()
   int64_t prev_bucket = m_bucket;
   int64_t rate = m_rate.GetBitRate () / 8;
   int64_t burst = m_burst.GetBitRate () / 8;
-  m_bucket += rate * m_refilltime.GetSeconds();
-  if (burst < m_bucket) {
-    m_bucket = burst;
-  }
+  m_bucket += rate * m_refilltime.GetSeconds ();
+  if (burst < m_bucket)
+    {
+      m_bucket = burst;
+    }
 
-  if (!m_refilled.IsNull ()) {
-    m_refilled(prev_bucket);
-  }
+  if (!m_refilled.IsNull ())
+    {
+      m_refilled (prev_bucket);
+    }
 
-  m_refillevent = Simulator::Schedule(m_refilltime,&TokenBucket::Refill, this);
+  m_refillevent = Simulator::Schedule (m_refilltime,&TokenBucket::Refill, this);
 }
 
 } //namespace ns3

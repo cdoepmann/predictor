@@ -38,7 +38,6 @@ public:
     void EnablePcap(bool);
     void EnableNscStack(bool,string="cubic");
     void SetTorAppType(string);
-
     void BuildTopology();
     void PrintCircuits();
 

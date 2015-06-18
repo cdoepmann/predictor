@@ -12,15 +12,18 @@ namespace ns3 {
 /** Used to indicate which way a cell is going on a circuit.
   * Inbound = cell is moving torwards the client
   * Outbound = cell is moving away from the client */
-enum CellDirection {INBOUND, OUTBOUND};
+enum CellDirection
+{
+  INBOUND, OUTBOUND
+};
 
 // TODO private
 class TorBaseApp : public Application
 {
 public:
   static TypeId GetTypeId (void);
-  TorBaseApp();
-  virtual ~TorBaseApp();
+  TorBaseApp ();
+  virtual ~TorBaseApp ();
 
   virtual void StartApplication (void);
   virtual void StopApplication (void);

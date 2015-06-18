@@ -7,12 +7,8 @@ using namespace ns3;
 using namespace std;
 NS_LOG_COMPONENT_DEFINE ("TorExample");
 
-void stats_callback_bktap(PathHelper*, Time);
-void stats_callback_vanilla(PathHelper*, Time);
-void register_callbacks_vanilla(PathHelper*);
-void register_callbacks_bktap(PathHelper*);
-void ttfb_callback(int, double, std::string);
-void ttlb_callback(int, double, std::string);
+void StatsCallbackBktap(PathHelper*, Time);
+void StatsCallbackVanilla(PathHelper*, Time);
 
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
@@ -82,9 +78,9 @@ int main (int argc, char *argv[]) {
     Simulator::Stop (simTime);
 
     if (vanilla) {
-        Simulator::Schedule(Seconds(0), &stats_callback_vanilla, &ph, simTime);
+        Simulator::Schedule(Seconds(0), &StatsCallbackVanilla, &ph, simTime);
     } else {
-        Simulator::Schedule(Seconds(0), &stats_callback_bktap, &ph, simTime);
+        Simulator::Schedule(Seconds(0), &StatsCallbackBktap, &ph, simTime);
     }
 
     NS_LOG_INFO("start simulation");
@@ -98,7 +94,7 @@ int main (int argc, char *argv[]) {
 
 
 /* example of (cumulative) i/o stats */
-void stats_callback_bktap(PathHelper* ph, Time simTime) {
+void StatsCallbackBktap(PathHelper* ph, Time simTime) {
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
     for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
@@ -107,19 +103,19 @@ void stats_callback_bktap(PathHelper* ph, Time simTime) {
       Ptr<BktapCircuit> proxyCirc = proxyApp->circuits[*id];
       Ptr<BktapCircuit> exitCirc = exitApp->circuits[*id];
       cout << exitCirc->GetBytesRead(INBOUND) << " " << proxyCirc->GetBytesWritten(INBOUND) << " ";
-      // cout << proxyCirc->get_stats_bytes_read(OUTBOUND) << " " << exitCirc->get_stats_bytes_written(OUTBOUND) << " ";
-      // proxyCirc->reset_stats_bytes(); exitCirc->reset_stats_bytes();
+      // cout << proxyCirc->GetBytesRead(OUTBOUND) << " " << exitCirc->GetBytesWritten(OUTBOUND) << " ";
+      // proxyCirc->ResetStats(); exitCirc->ResetStats();
     }
     cout << endl;
 
     Time resolution = MilliSeconds(10);
     if (Simulator::Now()+resolution < simTime)
-        Simulator::Schedule(resolution, &stats_callback_bktap, ph, simTime);
+        Simulator::Schedule(resolution, &StatsCallbackBktap, ph, simTime);
 }
 
 
 /* example of (cumulative) i/o stats */
-void stats_callback_vanilla(PathHelper* ph, Time simTime) {
+void StatsCallbackVanilla(PathHelper* ph, Time simTime) {
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
     for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
@@ -127,13 +123,13 @@ void stats_callback_vanilla(PathHelper* ph, Time simTime) {
       Ptr<TorApp> exitApp = ph->GetExitApp(*id)->GetObject<TorApp> ();
       Ptr<Circuit> proxyCirc = proxyApp->circuits[*id];
       Ptr<Circuit> exitCirc = exitApp->circuits[*id];
-      cout << exitCirc->get_stats_bytes_read(INBOUND) << " " << proxyCirc->get_stats_bytes_written(INBOUND) << " ";
-      // cout << proxyCirc->get_stats_bytes_read(OUTBOUND) << " " << exitCirc->get_stats_bytes_written(OUTBOUND) << " ";
-      // proxyCirc->reset_stats_bytes(); exitCirc->reset_stats_bytes();
+      cout << exitCirc->GetStatsBytesRead(INBOUND) << " " << proxyCirc->GetStatsBytesWritten(INBOUND) << " ";
+      // cout << proxyCirc->GetStatsBytesRead(OUTBOUND) << " " << exitCirc->GetStatsBytesWritten(OUTBOUND) << " ";
+      // proxyCirc->ResetStatsBytes(); exitCirc->ResetStatsBytes();
     }
     cout << endl;
 
     Time resolution = MilliSeconds(10);
     if (Simulator::Now()+resolution < simTime)
-        Simulator::Schedule(resolution, &stats_callback_vanilla, ph, simTime);
+        Simulator::Schedule(resolution, &StatsCallbackVanilla, ph, simTime);
 }
