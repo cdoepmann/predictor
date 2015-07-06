@@ -440,17 +440,32 @@ NscTcpSocketImpl::Recv (uint32_t maxSize, uint32_t flags)
       m_errno = ERROR_AGAIN;
       return 0;
     }
-  Ptr<Packet> p = m_deliveryQueue.front ();
-  if (p->GetSize () <= maxSize)
+
+  Ptr<Packet> p = Create<Packet> (0);
+  SocketAddressTag tag;
+  if (m_deliveryQueue.front ()->PeekPacketTag (tag))
     {
-      m_deliveryQueue.pop ();
-      m_rxAvailable -= p->GetSize ();
+      p->AddPacketTag (tag);
     }
-  else
+
+  while (p->GetSize () < maxSize && m_deliveryQueue.size() > 0)
     {
-      m_errno = ERROR_AGAIN;
-      p = 0;
+      Ptr<Packet> tmp;
+      uint32_t diff = maxSize-p->GetSize ();
+      if (diff <  m_deliveryQueue.front ()->GetSize())
+        {
+          tmp = m_deliveryQueue.front ()->CreateFragment (0,diff);
+          m_deliveryQueue.front ()->RemoveAtStart (tmp->GetSize ());
+        }
+      else
+        {
+          tmp = m_deliveryQueue.front ();
+          m_deliveryQueue.pop ();
+        }
+      m_rxAvailable -= tmp->GetSize ();
+      p->AddAtEnd (tmp);
     }
+
   return p;
 }
 
