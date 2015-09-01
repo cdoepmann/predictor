@@ -7,8 +7,8 @@ using namespace ns3;
 using namespace std;
 NS_LOG_COMPONENT_DEFINE ("TorExample");
 
-void StatsCallbackBktap(PathHelper*, Time);
-void StatsCallbackVanilla(PathHelper*, Time);
+void StatsCallbackBktap(TorStarHelper*, Time);
+void StatsCallbackVanilla(TorStarHelper*, Time);
 
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
@@ -40,7 +40,7 @@ int main (int argc, char *argv[]) {
 
     NS_LOG_INFO("setup topology");
 
-    PathHelper ph;
+    TorStarHelper ph;
     if (!vanilla) {
         ph.SetTorAppType("ns3::TorBktapApp");
     }
@@ -94,7 +94,7 @@ int main (int argc, char *argv[]) {
 
 
 /* example of (cumulative) i/o stats */
-void StatsCallbackBktap(PathHelper* ph, Time simTime) {
+void StatsCallbackBktap(TorStarHelper* ph, Time simTime) {
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
     for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
@@ -115,7 +115,7 @@ void StatsCallbackBktap(PathHelper* ph, Time simTime) {
 
 
 /* example of (cumulative) i/o stats */
-void StatsCallbackVanilla(PathHelper* ph, Time simTime) {
+void StatsCallbackVanilla(TorStarHelper* ph, Time simTime) {
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
     for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {

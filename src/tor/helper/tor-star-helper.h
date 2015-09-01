@@ -1,6 +1,6 @@
 
-#ifndef PATHHELPER_H
-#define PATHHELPER_H
+#ifndef TORSTARHELPER_H
+#define TORSTARHELPER_H
 
 #include <string>
 #include <iostream>
@@ -22,11 +22,11 @@ using namespace ns3;
 
 namespace ns3 {
 
-class PathHelper
+class TorStarHelper
 {
 public:
-    PathHelper();
-    ~PathHelper();
+    TorStarHelper();
+    ~TorStarHelper();
 
     void ParseFile(string);
     void AddCircuit(int,string, string, string);

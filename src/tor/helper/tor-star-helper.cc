@@ -1,6 +1,6 @@
-#include "pathhelper.h"
+#include "tor-star-helper.h"
 
-PathHelper::PathHelper ()
+TorStarHelper::TorStarHelper ()
 {
   m_p2pHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pHelper.SetChannelAttribute ("Delay", StringValue ("20ms"));
@@ -14,7 +14,7 @@ PathHelper::PathHelper ()
   m_factory.SetTypeId ("ns3::TorApp");
 }
 
-PathHelper::~PathHelper ()
+TorStarHelper::~TorStarHelper ()
 {
   if (m_starHelper)
     {
@@ -23,7 +23,7 @@ PathHelper::~PathHelper ()
 }
 
 void
-PathHelper::AddCircuit (int id, string entryName, string middleName, string exitName)
+TorStarHelper::AddCircuit (int id, string entryName, string middleName, string exitName)
 {
   NS_ASSERT (m_circuits.find (id) == m_circuits.end ());
   CircuitDescriptor desc (id, GetProxyName (id), entryName, middleName, exitName, GetServerName (id));
@@ -46,7 +46,7 @@ PathHelper::AddCircuit (int id, string entryName, string middleName, string exit
 }
 
 void
-PathHelper::AddCircuit (int id, string entryName, string middleName, string exitName,
+TorStarHelper::AddCircuit (int id, string entryName, string middleName, string exitName,
                         Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
 {
 
@@ -72,7 +72,7 @@ PathHelper::AddCircuit (int id, string entryName, string middleName, string exit
 
 
 void
-PathHelper::AddRelay (string name)
+TorStarHelper::AddRelay (string name)
 {
   if (m_relays.find (name) == m_relays.end ())
     {
@@ -83,27 +83,27 @@ PathHelper::AddRelay (string name)
 }
 
 void
-PathHelper::AddServer (string name)
+TorStarHelper::AddServer (string name)
 {
   NS_ASSERT (m_server.find (name) == m_server.end ());
   m_server[name] = m_nSpokes++;
 }
 
 void
-PathHelper::SetRelayAttribute (string relayName, string attrName, const AttributeValue &value)
+TorStarHelper::SetRelayAttribute (string relayName, string attrName, const AttributeValue &value)
 {
   NS_ASSERT (m_relays.find (relayName) != m_relays.end ());
   GetTorApp (relayName)->SetAttribute (attrName, value);
 }
 
 void
-PathHelper::SetRtt (Time rtt)
+TorStarHelper::SetRtt (Time rtt)
 {
   m_p2pHelper.SetChannelAttribute ("Delay", TimeValue (rtt / 4.0));
 }
 
 void
-PathHelper::EnableNscStack (bool enableNscStack, string nscTcpCong)
+TorStarHelper::EnableNscStack (bool enableNscStack, string nscTcpCong)
 {
   if (enableNscStack)
     {
@@ -116,31 +116,31 @@ PathHelper::EnableNscStack (bool enableNscStack, string nscTcpCong)
 }
 
 void
-PathHelper::EnablePcap (bool enablePcap)
+TorStarHelper::EnablePcap (bool enablePcap)
 {
   m_enablePcap = enablePcap;
 }
 
 void
-PathHelper::EnableBulkSockets (bool enableBulkSockets)
+TorStarHelper::EnableBulkSockets (bool enableBulkSockets)
 {
   m_enableBulkSockets = enableBulkSockets;
 }
 
 void
-PathHelper::SetTorAppType (string type)
+TorStarHelper::SetTorAppType (string type)
 {
   m_factory.SetTypeId (type);
 }
 
 void
-PathHelper::DisableProxies (bool disableProxies)
+TorStarHelper::DisableProxies (bool disableProxies)
 {
   m_disableProxies = disableProxies;
 }
 
 void
-PathHelper::ParseFile (string filename)
+TorStarHelper::ParseFile (string filename)
 {
   ifstream f;
   f.open (filename.c_str ());
@@ -163,7 +163,7 @@ PathHelper::ParseFile (string filename)
 
 
 void
-PathHelper::BuildTopology ()
+TorStarHelper::BuildTopology ()
 {
   m_starHelper = new PointToPointStarHelper (m_nSpokes,m_p2pHelper);
 
@@ -211,7 +211,7 @@ PathHelper::BuildTopology ()
 
 
 void
-PathHelper::InstallCircuits ()
+TorStarHelper::InstallCircuits ()
 {
   Ptr<TorBaseApp> clientApp;
   Ptr<TorBaseApp> entryApp;
@@ -289,7 +289,7 @@ PathHelper::InstallCircuits ()
 
 
 Ptr<TorBaseApp>
-PathHelper::InstallTorApp (string name)
+TorStarHelper::InstallTorApp (string name)
 {
   NS_ASSERT (m_relays.find (name) != m_relays.end ());
   RelayDescriptor desc = m_relays[name];
@@ -303,39 +303,39 @@ PathHelper::InstallTorApp (string name)
 
 
 Ptr<Node>
-PathHelper::GetSpokeNode (uint32_t id)
+TorStarHelper::GetSpokeNode (uint32_t id)
 {
   return m_starHelper->GetSpokeNode (id);
 }
 
 
 ApplicationContainer
-PathHelper::GetTorAppsContainer ()
+TorStarHelper::GetTorAppsContainer ()
 {
   return m_relayApps;
 }
 
 ApplicationContainer
-PathHelper::GetServersContainer ()
+TorStarHelper::GetServersContainer ()
 {
   return m_serverApps;
 }
 
 
 Ptr<TorBaseApp>
-PathHelper::GetTorApp (string name)
+TorStarHelper::GetTorApp (string name)
 {
   return m_relays[name].tapp;
 }
 
 Ptr<Node>
-PathHelper::GetTorNode (string name)
+TorStarHelper::GetTorNode (string name)
 {
   return m_starHelper->GetSpokeNode (m_relays[name].spokeId);
 }
 
 Ptr<TorBaseApp>
-PathHelper::GetExitApp (int id)
+TorStarHelper::GetExitApp (int id)
 {
   if (m_circuits.find (id) == m_circuits.end ())
     {
@@ -346,7 +346,7 @@ PathHelper::GetExitApp (int id)
 }
 
 Ptr<TorBaseApp>
-PathHelper::GetMiddleApp (int id)
+TorStarHelper::GetMiddleApp (int id)
 {
   if (m_circuits.find (id) == m_circuits.end ())
     {
@@ -357,7 +357,7 @@ PathHelper::GetMiddleApp (int id)
 }
 
 Ptr<TorBaseApp>
-PathHelper::GetEntryApp (int id)
+TorStarHelper::GetEntryApp (int id)
 {
   if (m_circuits.find (id) == m_circuits.end ())
     {
@@ -368,7 +368,7 @@ PathHelper::GetEntryApp (int id)
 }
 
 Ptr<TorBaseApp>
-PathHelper::GetProxyApp (int id)
+TorStarHelper::GetProxyApp (int id)
 {
   if (m_circuits.find (id) == m_circuits.end ())
     {
@@ -387,7 +387,7 @@ PathHelper::GetProxyApp (int id)
 
 
 Ptr<TorBaseApp>
-PathHelper::CreateTorApp ()
+TorStarHelper::CreateTorApp ()
 {
   Ptr<TorBaseApp> tapp = m_factory.Create<TorBaseApp> ();
   NS_ASSERT (tapp);
@@ -396,7 +396,7 @@ PathHelper::CreateTorApp ()
 
 
 string
-PathHelper::GetProxyName (int id)
+TorStarHelper::GetProxyName (int id)
 {
   stringstream ss;
   ss << "proxy" << id;
@@ -405,7 +405,7 @@ PathHelper::GetProxyName (int id)
 
 
 string
-PathHelper::GetServerName (int id)
+TorStarHelper::GetServerName (int id)
 {
   stringstream ss;
   ss << "server" << id;
@@ -414,7 +414,7 @@ PathHelper::GetServerName (int id)
 
 
 void
-PathHelper::PrintCircuits ()
+TorStarHelper::PrintCircuits ()
 {
   std::map<int,CircuitDescriptor>::iterator i;
   for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
