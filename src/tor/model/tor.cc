@@ -1,4 +1,4 @@
-#define NS_LOG_APPEND_CONTEXT std::clog << Simulator::Now ().GetSeconds () << " ";
+#define NS_LOG_APPEND_CONTEXT clog << Simulator::Now ().GetSeconds () << " ";
 
 #include "ns3/log.h"
 #include "ns3/random-variable-stream.h"
@@ -37,7 +37,7 @@ TorApp::DoDispose (void)
   NS_LOG_FUNCTION (this);
   listen_socket = 0;
 
-  std::map<uint16_t,Ptr<Circuit> >::iterator i;
+  map<uint16_t,Ptr<Circuit> >::iterator i;
   for (i = circuits.begin (); i != circuits.end (); ++i)
     {
       i->second->DoDispose ();
@@ -47,68 +47,37 @@ TorApp::DoDispose (void)
   Application::DoDispose ();
 }
 
-void
-TorApp::AddCircuit (int circ_id, Ipv4Address n_ip, int n_conn_type, Ipv4Address p_ip, int p_conn_type)
-{
-  NS_LOG_FUNCTION (circ_id << p_ip << n_ip);
-
-  // ensure unique circ_i
-  NS_ASSERT (circuits[circ_id] == 0);
-
-  // ensure valid connection types
-  NS_ASSERT (n_conn_type == OR_CONN || n_conn_type == EDGE_CONN);
-  NS_ASSERT (p_conn_type == OR_CONN || p_conn_type == EDGE_CONN);
-
-  // allocate and init new circuit
-  Ptr<Connection> p_conn = AddConnection (p_ip, p_conn_type);
-  Ptr<Connection> n_conn = AddConnection (n_ip, n_conn_type);
-  Ptr<Circuit> circ = Create<Circuit> (circ_id, n_conn, p_conn);
-
-  // add to circuit list maintained by every connection
-  AddActiveCircuit (p_conn, circ);
-  AddActiveCircuit (n_conn, circ);
-
-  // add to the global list of circuits
-  circuits[circ_id] = circ;
-}
 
 void
-TorApp::AddCircuit (int circ_id, Ipv4Address n_ip, int n_conn_type, Ipv4Address p_ip, int p_conn_type,
+TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
                     Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
 {
-  NS_LOG_FUNCTION (circ_id << p_ip << n_ip);
+  TorBaseApp::AddCircuit (id, n_ip, n_conntype, p_ip, p_conntype);
 
-  // ensure unique circ_id
-  NS_ASSERT (circuits[circ_id] == 0);
-
-  // ensure valid connection types
-  NS_ASSERT (n_conn_type == OR_CONN || n_conn_type == EDGE_CONN);
-  NS_ASSERT (p_conn_type == OR_CONN || p_conn_type == EDGE_CONN);
+  // ensure unique id
+  NS_ASSERT (circuits[id] == 0);
 
   // allocate and init new circuit
-  Ptr<Connection> p_conn = AddConnection (p_ip, p_conn_type);
-  Ptr<Connection> n_conn = AddConnection (n_ip, n_conn_type);
+  Ptr<Connection> p_conn = AddConnection (p_ip, p_conntype);
+  Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
   p_conn->SetRandomVariableStreams (rng_request, rng_think);
 
-  Ptr<Circuit> circ = Create<Circuit> (circ_id, n_conn, p_conn);
+  Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn);
 
   // add to circuit list maintained by every connection
   AddActiveCircuit (p_conn, circ);
   AddActiveCircuit (n_conn, circ);
 
   // add to the global list of circuits
-  circuits[circ_id] = circ;
+  circuits[id] = circ;
 }
 
 Ptr<Connection>
-TorApp::AddConnection (Ipv4Address ip, int conn_type)
+TorApp::AddConnection (Ipv4Address ip, int conntype)
 {
-  // ensure valid connecton type
-  NS_ASSERT (conn_type == OR_CONN || conn_type == EDGE_CONN);
-
   // find existing or create new connection
   Ptr<Connection> conn;
-  std::vector<Ptr<Connection> >::iterator it;
+  vector<Ptr<Connection> >::iterator it;
   for (it = connections.begin (); it != connections.end (); ++it)
     {
       if ((*it)->GetRemote () == ip)
@@ -120,7 +89,7 @@ TorApp::AddConnection (Ipv4Address ip, int conn_type)
 
   if (!conn)
     {
-      conn = Create<Connection> (this, ip, conn_type);
+      conn = Create<Connection> (this, ip, conntype);
       connections.push_back (conn);
     }
 
@@ -169,14 +138,14 @@ TorApp::StartApplication (void)
   Ipv4Mask ipmask = Ipv4Mask ("255.0.0.0");
 
   // iterate over all neighboring connections
-  std::vector<Ptr<Connection> >::iterator it;
+  vector<Ptr<Connection> >::iterator it;
   for ( it = connections.begin (); it != connections.end (); it++ )
     {
       Ptr<Connection> conn = *it;
       NS_ASSERT (conn);
 
       // if m_ip smaller then connect to remote node
-      if (m_ip < conn->GetRemote ()  && conn->GetType () == OR_CONN)
+      if (m_ip < conn->GetRemote () && conn->SpeaksCells ())
         {
           Ptr<Socket> socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
           socket->Bind ();
@@ -187,20 +156,19 @@ TorApp::StartApplication (void)
           conn->SetSocket (socket);
         }
 
-      if (conn->GetType () == EDGE_CONN && ipmask.IsMatch (conn->GetRemote (), Ipv4Address ("127.0.0.1")) )
+      if (ipmask.IsMatch (conn->GetRemote (), Ipv4Address ("127.0.0.1")) )
         {
-          if (conn->GetActiveCircuits ()->GetDirection (conn) == OUTBOUND)
+          if (conn->GetType () == SERVEREDGE)
             {
-              // EDGE_CONN exit2server
               Ptr<Socket> socket = CreateObject<PseudoServerSocket> ();
               socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
               // socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
             }
-          else
+
+          if (conn->GetType () == PROXYEDGE)
             {
-              // EDGE_CONN proxy2client
               Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> ();
               if (conn->GetRequestStream () && conn->GetThinkStream ())
                 {
@@ -232,7 +200,7 @@ TorApp::StopApplication (void)
     }
 
   // close all connections
-  std::vector<Ptr<Connection> >::iterator it_conn;
+  vector<Ptr<Connection> >::iterator it_conn;
   for ( it_conn = connections.begin (); it_conn != connections.end (); ++it_conn )
     {
       Ptr<Connection> conn = *it_conn;
@@ -267,11 +235,11 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
       return;
     }
 
-  uint32_t base = conn->GetType () == EDGE_CONN ? CELL_PAYLOAD_SIZE : CELL_NETWORK_SIZE;
+  uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t max_read = RoundRobin (base, m_readbucket.GetSize ());
 
   // find the minimum amount of data to read safely from the socket
-  max_read = std::min (max_read, socket->GetRxAvailable ());
+  max_read = min (max_read, socket->GetRxAvailable ());
   NS_LOG_LOGIC ("Read " << max_read << "/" << socket->GetRxAvailable () << " bytes from " << conn->GetRemote ());
 
   if (max_read <= 0)
@@ -279,23 +247,23 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
       return;
     }
 
-  if (conn->GetType () == EDGE_CONN)
+  if (!conn->SpeaksCells ())
     {
-      max_read = std::min (conn->GetActiveCircuits ()->GetPackageWindow () * base,max_read);
+      max_read = min (conn->GetActiveCircuits ()->GetPackageWindow () * base,max_read);
     }
 
-  std::vector<Ptr<Packet> > packet_list;
+  vector<Ptr<Packet> > packet_list;
   uint32_t read_bytes = conn->Read (&packet_list, max_read);
 
   for (uint32_t i = 0; i < packet_list.size (); i++)
     {
-      if (conn->GetType () == EDGE_CONN)
+      if (conn->SpeaksCells ())
         {
-          PackageRelayCell (conn, packet_list[i]);
+          ReceiveRelayCell (conn, packet_list[i]);
         }
       else
         {
-          ReceiveRelayCell (conn, packet_list[i]);
+          PackageRelayCell (conn, packet_list[i]);
         }
     }
 
@@ -378,7 +346,7 @@ TorApp::AppendCellToCircuitQueue (Ptr<Circuit> circ, Ptr<Packet> cell, CellDirec
 {
   NS_ASSERT (circ);
   NS_ASSERT (cell);
-  std::queue<Ptr<Packet> > *queue = circ->GetQueue (direction);
+  queue<Ptr<Packet> > *queue = circ->GetQueue (direction);
   Ptr<Connection> conn = circ->GetConnection (direction);
   NS_ASSERT (queue);
   NS_ASSERT (conn);
@@ -400,7 +368,7 @@ TorApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   uint32_t newtx = socket->GetTxAvailable ();
 
   int written_bytes = 0;
-  uint16_t base = conn->GetType () == EDGE_CONN ? CELL_PAYLOAD_SIZE : CELL_NETWORK_SIZE;
+  uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t max_write = RoundRobin (base, m_writebucket.GetSize ());
   max_write = max_write > newtx ? newtx : max_write;
 
@@ -430,7 +398,7 @@ TorApp::HandleAccept (Ptr<Socket> s, const Address& from)
 {
   Ptr<Connection> conn;
   Ipv4Address ip = InetSocketAddress::ConvertFrom (from).GetIpv4 ();
-  std::vector<Ptr<Connection> >::iterator it;
+  vector<Ptr<Connection> >::iterator it;
   for (it = connections.begin (); it != connections.end (); ++it)
     {
       if ((*it)->GetRemote () == ip && !(*it)->GetSocket () )
@@ -453,7 +421,7 @@ TorApp::HandleAccept (Ptr<Socket> s, const Address& from)
 Ptr<Connection>
 TorApp::LookupConn (Ptr<Socket> socket)
 {
-  std::vector<Ptr<Connection> >::iterator it;
+  vector<Ptr<Connection> >::iterator it;
   for ( it = connections.begin (); it != connections.end (); it++ )
     {
       NS_ASSERT (*it);
@@ -473,7 +441,7 @@ TorApp::RefillReadCallback (int64_t prev_read_bucket)
   Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
   if (prev_read_bucket <= 0 && m_readbucket.GetSize () > 0)
     {
-      std::vector<Ptr<Connection> >::iterator it;
+      vector<Ptr<Connection> >::iterator it;
       for ( it = connections.begin (); it != connections.end (); ++it )
         {
           Ptr<Connection> conn = *it;
@@ -490,7 +458,7 @@ TorApp::RefillWriteCallback (int64_t prev_write_bucket)
 
   if (prev_write_bucket <= 0 && m_writebucket.GetSize () > 0)
     {
-      std::vector<Ptr<Connection> >::iterator it;
+      vector<Ptr<Connection> >::iterator it;
       for ( it = connections.begin (); it != connections.end (); ++it )
         {
           Ptr<Connection> conn = *it;
@@ -550,8 +518,8 @@ Circuit::Circuit (uint32_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_co
 {
   this->circ_id = circ_id;
 
-  this->p_cellQ = new std::queue<Ptr<Packet> >;
-  this->n_cellQ = new std::queue<Ptr<Packet> >;
+  this->p_cellQ = new queue<Ptr<Packet> >;
+  this->n_cellQ = new queue<Ptr<Packet> >;
 
   this->deliver_window = CIRCWINDOW_START;
   this->package_window = CIRCWINDOW_START;
@@ -587,7 +555,7 @@ Circuit::DoDispose ()
 
 
 Ptr<Packet>
-Circuit::PopQueue (std::queue<Ptr<Packet> > *queue)
+Circuit::PopQueue (queue<Ptr<Packet> > *queue)
 {
   if (queue->size () > 0)
     {
@@ -623,7 +591,8 @@ Circuit::PopCell (CellDirection direction)
       /* handle sending sendme cells here (instead of in PushCell) because
        * otherwise short circuits could have more than a window-ful of cells
        * in-flight. Regular circuits will not be affected by this. */
-      if (GetConnection (direction)->GetType () == EDGE_CONN)
+      Ptr<Connection> conn = GetConnection (direction);
+      if (!conn->SpeaksCells ())
         {
           deliver_window--;
           if (deliver_window <= CIRCWINDOW_START - CIRCWINDOW_INCREMENT)
@@ -649,7 +618,7 @@ Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
       Ptr<Connection> conn = GetConnection (direction);
       Ptr<Connection> opp_conn = GetOppositeConnection (direction);
 
-      if (opp_conn->GetType () == EDGE_CONN)
+      if (!opp_conn->SpeaksCells ())
         {
           // new packaged cell
           package_window--;
@@ -660,7 +629,7 @@ Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
             }
         }
 
-      if (conn->GetType () == EDGE_CONN)
+      if (!conn->SpeaksCells ())
         {
           // delivery
           if (IsSendme (cell))
@@ -843,7 +812,7 @@ Circuit::CreateSendme ()
 }
 
 
-std::queue<Ptr<Packet> >*
+queue<Ptr<Packet> >*
 Circuit::GetQueue (CellDirection direction)
 {
   if (direction == OUTBOUND)
@@ -956,7 +925,7 @@ Circuit::IncDeliverWindow ()
 uint32_t
 Circuit::SendCell (CellDirection direction)
 {
-  std::queue<Ptr<Packet> >* cellQ = GetQueue (direction);
+  queue<Ptr<Packet> >* cellQ = GetQueue (direction);
   if (cellQ->size () <= 0)
     {
       return 0;
@@ -979,23 +948,23 @@ Circuit::SendCell (CellDirection direction)
 
 
 
-Connection::Connection (TorApp* torapp, Ipv4Address ip, int conn_type)
+Connection::Connection (TorApp* torapp, Ipv4Address ip, int conntype)
 {
   this->torapp = torapp;
   this->remote = ip;
-  this->socket = 0;
   this->inbuf.size = 0;
   this->outbuf.size = 0;
-  this->conn_type = conn_type;
   this->reading_blocked = 0;
   this->active_circuits = 0;
-  this->m_rng_request = 0;
-  this->m_rng_think = 0;
 
-  this->m_ttfb_id = -1;
-  this->m_ttlb_id = -1;
-  this->m_ttfb_callback = 0;
-  this->m_ttlb_callback = 0;
+  m_socket = 0;
+  m_conntype = conntype;
+  m_rng_request = 0;
+  m_rng_think = 0;
+  m_ttfb_id = -1;
+  m_ttlb_id = -1;
+  m_ttfb_callback = 0;
+  m_ttlb_callback = 0;
 }
 
 
@@ -1007,58 +976,64 @@ Connection::~Connection ()
 Ptr<Circuit>
 Connection::GetActiveCircuits ()
 {
-  return this->active_circuits;
+  return active_circuits;
 }
 
 void
 Connection::SetActiveCircuits (Ptr<Circuit> circ)
 {
-  this->active_circuits = circ;
+  active_circuits = circ;
 }
 
 
 uint8_t
 Connection::GetType ()
 {
-  return this->conn_type;
+  return m_conntype;
+}
+
+bool
+Connection::SpeaksCells ()
+{
+  return m_conntype == RELAYEDGE;
 }
 
 bool
 Connection::IsBlocked ()
 {
-  return this->reading_blocked;
+  return reading_blocked;
 }
 
 void
 Connection::SetBlocked (bool b)
 {
-  this->reading_blocked = b;
+  reading_blocked = b;
 }
 
 
 Ptr<Socket>
 Connection::GetSocket ()
 {
-  return this->socket;
+  return m_socket;
 }
 
 void
 Connection::SetSocket (Ptr<Socket> socket)
 {
-  this->socket = socket;
+  m_socket = socket;
 }
 
 Ipv4Address
 Connection::GetRemote ()
 {
-  return this->remote;
+  return remote;
 }
 
 
 
 
 uint32_t
-Connection::Read (std::vector<Ptr<Packet> >* packet_list, uint32_t max_read)
+Connection::Read (vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 {
   if (reading_blocked)
     {
@@ -1067,9 +1042,9 @@ Connection::Read (std::vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 
   uint8_t raw_data[max_read + this->inbuf.size];
   memcpy (raw_data, this->inbuf.data, this->inbuf.size);
-  int read_bytes = socket->Recv (&raw_data[this->inbuf.size], max_read, 0);
+  int read_bytes = m_socket->Recv (&raw_data[this->inbuf.size], max_read, 0);
 
-  uint32_t base = conn_type == EDGE_CONN ? CELL_PAYLOAD_SIZE : CELL_NETWORK_SIZE;
+  uint32_t base = SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t datasize = read_bytes + inbuf.size;
   uint32_t leftover = datasize % base;
   int num_packages = datasize / base;
@@ -1093,7 +1068,7 @@ Connection::Read (std::vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 uint32_t
 Connection::Write (uint32_t max_write)
 {
-  uint32_t base = this->conn_type == EDGE_CONN ? CELL_PAYLOAD_SIZE : CELL_NETWORK_SIZE;
+  uint32_t base = SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint8_t raw_data[outbuf.size + (max_write / base + 1) * base];
   memcpy (raw_data, outbuf.data, outbuf.size);
   uint32_t datasize = outbuf.size;
@@ -1121,8 +1096,7 @@ Connection::Write (uint32_t max_write)
           flushed_some = true;
         }
 
-      NS_ASSERT (circ->GetNextCirc (this));
-      this->SetActiveCircuits (circ->GetNextCirc (this));
+      SetActiveCircuits (circ->GetNextCirc (this));
 
       if (GetActiveCircuits () == start_circ)
         {
@@ -1135,14 +1109,14 @@ Connection::Write (uint32_t max_write)
     }
 
   // send data
-  max_write = std::min (max_write, datasize);
+  max_write = min (max_write, datasize);
   if (max_write > 0)
     {
-      written_bytes = socket->Send (raw_data, max_write, 0);
+      written_bytes = m_socket->Send (raw_data, max_write, 0);
     }
 
   /* save leftover for next time */
-  written_bytes = std::max (written_bytes,0);
+  written_bytes = max (written_bytes,0);
   uint32_t leftover = datasize - written_bytes;
   memcpy (outbuf.data, &raw_data[datasize - leftover], leftover);
   outbuf.size = leftover;
@@ -1154,18 +1128,18 @@ Connection::Write (uint32_t max_write)
 void
 Connection::ScheduleWrite (Time delay)
 {
-  if (socket && write_event.IsExpired ())
+  if (m_socket && write_event.IsExpired ())
     {
-      write_event = Simulator::Schedule (delay, &TorApp::ConnWriteCallback, torapp, socket, socket->GetTxAvailable ());
+      write_event = Simulator::Schedule (delay, &TorApp::ConnWriteCallback, torapp, m_socket, m_socket->GetTxAvailable ());
     }
 }
 
 void
 Connection::ScheduleRead (Time delay)
 {
-  if (socket && read_event.IsExpired ())
+  if (m_socket && read_event.IsExpired ())
     {
-      read_event = Simulator::Schedule (delay, &TorApp::ConnReadCallback, torapp, socket);
+      read_event = Simulator::Schedule (delay, &TorApp::ConnReadCallback, torapp, m_socket);
     }
 }
 
@@ -1220,7 +1194,7 @@ Connection::SetTtlbCallback (void (*ttlb)(int, double, string), int id, string d
 void
 Connection::RegisterCallbacks ()
 {
-  if (conn_type == EDGE_CONN)
+  if (!SpeaksCells ())
     {
       Ptr<PseudoClientSocket> csock = GetSocket ()->GetObject<PseudoClientSocket> ();
       if (csock)

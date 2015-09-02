@@ -2,11 +2,6 @@
 #ifndef TORSTARHELPER_H
 #define TORSTARHELPER_H
 
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <vector>
-
 #include "ns3/core-module.h"
 #include "ns3/applications-module.h"
 #include "ns3/network-module.h"
@@ -15,10 +10,6 @@
 #include "ns3/point-to-point-star.h"
 #include "ns3/global-route-manager.h"
 #include "ns3/tor-module.h"
-
-using namespace std;
-using namespace ns3;
-
 
 namespace ns3 {
 

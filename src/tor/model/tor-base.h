@@ -7,6 +7,15 @@
 
 #include "tokenbucket.h"
 
+#define RELAYEDGE 0 // aka speaks cells
+#define PROXYEDGE 2
+#define SERVEREDGE 3
+
+#define CELL_PAYLOAD_SIZE 498
+
+using namespace std;
+using namespace ns3;
+
 namespace ns3 {
 
 /** Used to indicate which way a cell is going on a circuit.
@@ -29,14 +38,13 @@ public:
   virtual void StopApplication (void);
   virtual void DoDispose (void);
 
-  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int);
-  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int, Ptr<RandomVariableStream>, Ptr<RandomVariableStream>);
+  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int, Ptr<RandomVariableStream> rng_request=0, Ptr<RandomVariableStream> rng_think=0);
 
   virtual void SetNodeName (std::string);
   virtual std::string GetNodeName (void);
 
   uint32_t m_id;
-  std::string m_name;
+  string m_name;
   Ipv4Address m_ip;
   Address m_local;
   DataRate m_rate;

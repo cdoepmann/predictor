@@ -77,16 +77,14 @@ TorBaseApp::DoDispose (void)
 }
 
 void
-TorBaseApp::AddCircuit (int id, Ipv4Address n_ip, int n_conn_type, Ipv4Address p_ip, int p_conn_type)
-{
-  NS_LOG_FUNCTION (this);
-}
-
-void
-TorBaseApp::AddCircuit (int circ_id, Ipv4Address n_ip, int n_conn_type, Ipv4Address p_ip, int p_conn_type,
+TorBaseApp::AddCircuit (int circ_id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
                         Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
 {
   NS_LOG_FUNCTION (this);
+
+  // ensure valid connection types
+  NS_ASSERT (n_conntype == RELAYEDGE || n_conntype == PROXYEDGE || n_conntype == SERVEREDGE);
+  NS_ASSERT (p_conntype == RELAYEDGE || p_conntype == PROXYEDGE || p_conntype == SERVEREDGE);
 }
 
 void

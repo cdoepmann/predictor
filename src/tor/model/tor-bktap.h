@@ -16,14 +16,6 @@
 
 namespace ns3 {
 
-#define OR_CONN 0
-#define EDGE_CONN 1
-#define PROXYEDGE 2
-#define SERVEREDGE 3
-
-#define CELL_PAYLOAD_SIZE 498
-
-
 class BktapCircuit;
 class UdpChannel;
 
@@ -57,7 +49,7 @@ public:
   }
 
   void
-  Print (std::ostream &os) const
+  Print (ostream &os) const
   {
     os << "id=" << circId;
   }
@@ -123,7 +115,7 @@ public:
   }
 
   void
-  Print (std::ostream &os) const
+  Print (ostream &os) const
   {
     os << "id=" << circId;
     os << " seq=" << seq;
@@ -201,7 +193,7 @@ public:
   }
 
   void
-  Print (std::ostream &os) const
+  Print (ostream &os) const
   {
     os << "id=" << circId;
     os << " ack=" << ack << " fwd=" << fwd;
@@ -249,8 +241,8 @@ public:
 class SimpleRttEstimator
 {
 public:
-  std::map< uint32_t,Time > rttHistory;
-  std::set<uint32_t> retx;
+  map< uint32_t,Time > rttHistory;
+  set<uint32_t> retx;
   Time estimatedRtt;
   Time devRtt;
   Time currentRtt;
@@ -317,8 +309,8 @@ public:
             estimatedRtt = rtt;
           }
 
-        baseRtt = std::min (baseRtt,rtt);
-        currentRtt = std::min (rtt,currentRtt);
+        baseRtt = min (baseRtt,rtt);
+        currentRtt = min (rtt,currentRtt);
         ++cntRtt;
       }
   }
@@ -358,9 +350,9 @@ public:
   uint32_t virtHeadSeq;
   uint32_t begRttSeq;
   uint32_t dupackcnt;
-  std::map< uint32_t, Ptr<Packet> > cellMap;
+  map< uint32_t, Ptr<Packet> > cellMap;
 
-  std::queue<Ptr<Packet> > ackq;
+  queue<Ptr<Packet> > ackq;
 
   SimpleRttEstimator virtRtt;
   SimpleRttEstimator actRtt;
@@ -486,15 +478,13 @@ public:
   UdpChannel (Address,int);
 
   void SetSocket (Ptr<Socket>);
-  bool IsOr ();
-  bool IsEdge ();
-  bool IsServerEdge ();
-  bool IsProxyEdge ();
+  uint8_t GetType ();
+  bool SpeaksCells ();
 
   Ptr<Socket> m_socket;
   Address m_remote;
-  int m_conntype;
-  std::list<Ptr<BktapCircuit> > circuits;
+  uint8_t m_conntype;
+  list<Ptr<BktapCircuit> > circuits;
   SimpleRttEstimator rttEstimator;
 
   Ptr<RandomVariableStream> m_rng_request;
@@ -503,15 +493,15 @@ public:
   Ptr<RandomVariableStream> GetRequestStream ();
   Ptr<RandomVariableStream> GetThinkStream ();
 
-  void SetTtfbCallback (void (*)(int, double, std::string), int, std::string = "");
-  void SetTtlbCallback (void (*)(int, double, std::string), int, std::string = "");
+  void SetTtfbCallback (void (*)(int, double, string), int, string = "");
+  void SetTtlbCallback (void (*)(int, double, string), int, string = "");
   void RegisterCallbacks ();
-  void (*m_ttfb_callback)(int, double, std::string);
-  void (*m_ttlb_callback)(int, double, std::string);
+  void (*m_ttfb_callback)(int, double, string);
+  void (*m_ttlb_callback)(int, double, string);
   int m_ttfb_id;
   int m_ttlb_id;
-  std::string m_ttfb_desc;
-  std::string m_ttlb_desc;
+  string m_ttfb_desc;
+  string m_ttlb_desc;
 };
 
 
@@ -576,17 +566,17 @@ public:
 
 
   Ptr<UdpChannel> AddChannel (Address, int);
-  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int);
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-                           Ptr<RandomVariableStream>, Ptr<RandomVariableStream>);
+                           Ptr<RandomVariableStream> rng_request=0,
+                           Ptr<RandomVariableStream> rng_think=0);
   Ptr<BktapCircuit> GetCircuit (uint32_t);
   Ptr<BktapCircuit> GetNextCircuit ();
 
   Ptr<Socket> m_socket;
 
-  std::map<Address,Ptr<UdpChannel> > channels;
-  std::map<uint16_t,Ptr<BktapCircuit> > circuits;
-  std::map<uint16_t,Ptr<BktapCircuit> >::iterator circit;
+  map<Address,Ptr<UdpChannel> > channels;
+  map<uint16_t,Ptr<BktapCircuit> > circuits;
+  map<uint16_t,Ptr<BktapCircuit> >::iterator circit;
 
   void ReadCallback (Ptr<Socket>);
   uint32_t ReadFromEdge (Ptr<Socket>);

@@ -124,9 +124,9 @@ TorDumbbellHelper::ParseFile (string filename, uint32_t m, double bulkFraction)
   set<uint32_t> chosenCircuits;
   if (m > 0)
     {
-      std::string line;
+      string line;
       uint32_t n;
-      for (n = 0; std::getline (f, line); ++n)
+      for (n = 0; getline (f, line); ++n)
         {
         }
       NS_ASSERT (m <= n);
@@ -189,7 +189,7 @@ TorDumbbellHelper::BuildTopology ()
   //use the linux protocol stack for the spokes
   if (m_nscTcpCong.size () > 0)
     {
-      std::string nscStack = "liblinux2.6.26.so";
+      string nscStack = "liblinux2.6.26.so";
       m_stackHelper.SetTcp ("ns3::NscTcpL4Protocol","Library",StringValue (nscStack));
       if (m_nscTcpCong != "cubic")
         {
@@ -228,7 +228,7 @@ TorDumbbellHelper::InstallCircuits ()
 
   Ipv4AddressHelper ipHelper = Ipv4AddressHelper ("127.0.0.0", "255.0.0.0");
 
-  std::map<int,CircuitDescriptor>::iterator i;
+  map<int,CircuitDescriptor>::iterator i;
   for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
     {
       CircuitDescriptor desc = i->second;
@@ -252,16 +252,16 @@ TorDumbbellHelper::InstallCircuits ()
       Ipv4Address exitAddress   = GetIp (desc.exit ());
       Ipv4Address pseudoServerAddress = ipHelper.NewAddress ();
 
-      exitApp->AddCircuit (desc.id, pseudoServerAddress, EDGE_CONN, middleAddress, OR_CONN);
-      middleApp->AddCircuit (desc.id, exitAddress, OR_CONN, entryAddress, OR_CONN);
+      exitApp->AddCircuit (desc.id, pseudoServerAddress, SERVEREDGE, middleAddress, RELAYEDGE);
+      middleApp->AddCircuit (desc.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
-          entryApp->AddCircuit (desc.id, middleAddress, OR_CONN, clientAddress, OR_CONN);
-          clientApp->AddCircuit (desc.id, entryAddress, OR_CONN, ipHelper.NewAddress (), EDGE_CONN, desc.m_rng_request, desc.m_rng_think);
+          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
+          clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_rng_request, desc.m_rng_think);
         }
       else
         {
-          entryApp->AddCircuit (desc.id, middleAddress, OR_CONN, ipHelper.NewAddress (), EDGE_CONN, desc.m_rng_request, desc.m_rng_think);
+          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_rng_request, desc.m_rng_think);
         }
     }
 }
@@ -411,7 +411,7 @@ TorDumbbellHelper::GetProxyName (int id)
 void
 TorDumbbellHelper::PrintCircuits ()
 {
-  std::map<int,CircuitDescriptor>::iterator i;
+  map<int,CircuitDescriptor>::iterator i;
   for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
     {
       CircuitDescriptor e = i->second;

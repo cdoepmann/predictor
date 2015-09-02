@@ -32,28 +32,16 @@ UdpChannel::SetSocket (Ptr<Socket> socket)
   m_socket = socket;
 }
 
-bool
-UdpChannel::IsEdge ()
+uint8_t
+UdpChannel::GetType ()
 {
-  return m_conntype >= EDGE_CONN;
+  return m_conntype;
 }
 
 bool
-UdpChannel::IsOr ()
+UdpChannel::SpeaksCells ()
 {
-  return m_conntype == OR_CONN;
-}
-
-bool
-UdpChannel::IsServerEdge ()
-{
-  return m_conntype == SERVEREDGE;
-}
-
-bool
-UdpChannel::IsProxyEdge ()
-{
-  return m_conntype == PROXYEDGE;
+  return m_conntype == RELAYEDGE;
 }
 
 void
@@ -75,7 +63,7 @@ UdpChannel::SetTtlbCallback (void (*ttlb)(int, double, string), int id, string d
 void
 UdpChannel::RegisterCallbacks ()
 {
-  if (IsEdge ())
+  if (!SpeaksCells ())
     {
       Ptr<PseudoClientSocket> csock = m_socket->GetObject<PseudoClientSocket> ();
       if (csock)
@@ -158,54 +146,20 @@ TorBktapApp::GetTypeId (void)
 }
 
 void
-TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype)
+TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
+                         Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
 {
   TorBaseApp::AddCircuit (id, n_ip, n_conntype, p_ip, p_conntype);
-
+  
   // ensure unique circ_id
   NS_ASSERT (circuits[id] == 0);
 
   Ptr<BktapCircuit> circ = Create<BktapCircuit> (id);
 
-  if (p_conntype == EDGE_CONN)
-    {
-      p_conntype = PROXYEDGE;
-    }
-  circ->inbound = AddChannel (InetSocketAddress (p_ip,9001),p_conntype);
-  circ->inbound->circuits.push_back (circ);
-
-  if (n_conntype == EDGE_CONN)
-    {
-      n_conntype = SERVEREDGE;
-    }
-  circ->outbound = AddChannel (InetSocketAddress (n_ip,9001),n_conntype);
-  circ->outbound->circuits.push_back (circ);
-
-  circuits[id] = circ;
-}
-
-
-void
-TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
-                         Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
-{
-  TorBaseApp::AddCircuit (id, n_ip, n_conntype, p_ip, p_conntype);
-  NS_ASSERT (circuits[id] == 0);
-
-  Ptr<BktapCircuit> circ = Create<BktapCircuit> (id);
-
-  if (p_conntype == EDGE_CONN)
-    {
-      p_conntype = PROXYEDGE;
-    }
   circ->inbound = AddChannel (InetSocketAddress (p_ip,9001),p_conntype);
   circ->inbound->circuits.push_back (circ);
   circ->inbound->SetRandomVariableStreams (rng_request, rng_think);
 
-  if (n_conntype == EDGE_CONN)
-    {
-      n_conntype = SERVEREDGE;
-    }
   circ->outbound = AddChannel (InetSocketAddress (n_ip,9001),n_conntype);
   circ->outbound->circuits.push_back (circ);
 
@@ -251,7 +205,7 @@ TorBktapApp::StartApplication (void)
   Ipv4Mask ipmask = Ipv4Mask ("255.0.0.0");
 
   // iterate over all neighboring channels
-  std::map<Address,Ptr<UdpChannel> >::iterator it;
+  map<Address,Ptr<UdpChannel> >::iterator it;
   for ( it = channels.begin (); it != channels.end (); it++ )
     {
       Ptr<UdpChannel> ch = it->second;
@@ -259,17 +213,17 @@ TorBktapApp::StartApplication (void)
 
       ch->SetSocket (m_socket);
 
-      //TODO: works with PseudoSockets only
-      if (ch->IsEdge () && ipmask.IsMatch (InetSocketAddress::ConvertFrom (ch->m_remote).GetIpv4 (), Ipv4Address ("127.0.0.1")) )
+      // PseudoSockets only
+      if (ipmask.IsMatch (InetSocketAddress::ConvertFrom (ch->m_remote).GetIpv4 (), Ipv4Address ("127.0.0.1")) )
         {
-          if (ch->IsServerEdge ())
+          if (ch->GetType () == SERVEREDGE)
             {
               Ptr<Socket> socket = CreateObject<PseudoServerSocket> ();
               socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
               ch->SetSocket (socket);
             }
 
-          if (ch->IsProxyEdge ())
+          if (ch->GetType () == PROXYEDGE)
             {
               Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> ();
               socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
@@ -292,7 +246,7 @@ TorBktapApp::RefillReadCallback (int64_t prev_read_bucket)
 {
   if (prev_read_bucket <= 0 && m_readbucket.GetSize () > 0)
     {
-      std::map<Address,Ptr<UdpChannel> >::iterator it;
+      map<Address,Ptr<UdpChannel> >::iterator it;
       for ( it = channels.begin (); it != channels.end (); it++ )
         {
           Simulator::Schedule (Seconds (0), &TorBktapApp::ReadCallback, this, it->second->m_socket);
@@ -576,7 +530,7 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Ptr<Packet> cell;
 
-  if (ch->IsOr () && m_devQlimit <= m_devQ->GetNPackets ())
+  if (!ch->SpeaksCells () && m_devQlimit <= m_devQ->GetNPackets ())
     {
       return 0;
     }
@@ -600,12 +554,12 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
     {
       UdpCellHeader header;
       cell->PeekHeader (header);
-      if (ch->IsEdge ())
+      if (!ch->SpeaksCells ())
         {
           cell->RemoveHeader (header);
         }
 
-      if (circ->GetChannel (oppdir)->IsOr ())
+      if (circ->GetChannel (oppdir)->SpeaksCells ())
         {
           queue->virtRtt.SentSeq (header.seq);
           queue->actRtt.SentSeq (header.seq);
@@ -615,14 +569,14 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
       if (bytes_written > 0)
         {
 
-          if (ch->IsEdge ())
+          if (ch->SpeaksCells ())
             {
-              queue->DiscardUpTo (header.seq + 1);
-              ++queue->virtHeadSeq;
+              ScheduleRto (circ,direction);
             }
           else
             {
-              ScheduleRto (circ,direction);
+              queue->DiscardUpTo (header.seq + 1);
+              ++queue->virtHeadSeq;
             }
 
           if (queue->highestTxSeq == header.seq)
@@ -643,7 +597,7 @@ TorBktapApp::SendEmptyAck (Ptr<BktapCircuit> circ, CellDirection direction, uint
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
   NS_ASSERT (ch);
-  if (ch->IsOr ())
+  if (ch->SpeaksCells ())
     {
       Ptr<Packet> cell = Create<Packet> ();
       FdbkCellHeader header;
@@ -714,7 +668,7 @@ TorBktapApp::GetNextCircuit ()
 Ptr<UdpChannel>
 TorBktapApp::LookupChannel (Ptr<Socket> socket)
 {
-  std::map<Address,Ptr<UdpChannel> >::iterator it;
+  map<Address,Ptr<UdpChannel> >::iterator it;
   for ( it = channels.begin (); it != channels.end (); it++ )
     {
       NS_ASSERT (it->second);
@@ -843,7 +797,7 @@ TorBktapApp::DoDispose (void)
 {
   NS_LOG_FUNCTION (this);
 
-  std::map<uint16_t,Ptr<BktapCircuit> >::iterator i;
+  map<uint16_t,Ptr<BktapCircuit> >::iterator i;
   for (i = circuits.begin (); i != circuits.end (); ++i)
     {
       i->second->inbound = 0;

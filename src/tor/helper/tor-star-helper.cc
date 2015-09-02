@@ -173,7 +173,7 @@ TorStarHelper::BuildTopology ()
   //use the linux protocol stack for the spokes
   if (m_nscTcpCong.size () > 0)
     {
-      std::string nscStack = "liblinux2.6.26.so";
+      string nscStack = "liblinux2.6.26.so";
       m_stackHelper.SetTcp ("ns3::NscTcpL4Protocol","Library",StringValue (nscStack));
       if (m_nscTcpCong != "cubic")
         {
@@ -221,7 +221,7 @@ TorStarHelper::InstallCircuits ()
   BulkSendHelper serversHelper ("ns3::TcpSocketFactory", Address ());
   Ipv4AddressHelper ipHelper = Ipv4AddressHelper ("127.0.0.0", "255.0.0.0");
 
-  std::map<int,CircuitDescriptor>::iterator i;
+  map<int,CircuitDescriptor>::iterator i;
   for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
     {
       CircuitDescriptor e = i->second;
@@ -258,29 +258,29 @@ TorStarHelper::InstallCircuits ()
           serverAddress = ipHelper.NewAddress ();
         }
 
-      exitApp->AddCircuit (e.id, serverAddress, EDGE_CONN, middleAddress, OR_CONN);
-      middleApp->AddCircuit (e.id, exitAddress, OR_CONN, entryAddress, OR_CONN);
+      exitApp->AddCircuit (e.id, serverAddress, SERVEREDGE, middleAddress, RELAYEDGE);
+      middleApp->AddCircuit (e.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
-          entryApp->AddCircuit (e.id, middleAddress, OR_CONN, clientAddress, OR_CONN);
+          entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
           if (e.m_rng_request && e.m_rng_think)
             {
-              clientApp->AddCircuit (e.id, entryAddress, OR_CONN, ipHelper.NewAddress (), EDGE_CONN, e.m_rng_request, e.m_rng_think);
+              clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_rng_request, e.m_rng_think);
             }
           else
             {
-              clientApp->AddCircuit (e.id, entryAddress, OR_CONN, ipHelper.NewAddress (), EDGE_CONN);
+              clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE);
             }
         }
       else
         {
           if (e.m_rng_request && e.m_rng_think)
             {
-              entryApp->AddCircuit (e.id, middleAddress, OR_CONN, ipHelper.NewAddress (), EDGE_CONN, e.m_rng_request, e.m_rng_think);
+              entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_rng_request, e.m_rng_think);
             }
           else
             {
-              entryApp->AddCircuit (e.id, middleAddress, OR_CONN, ipHelper.NewAddress (), EDGE_CONN);
+              entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE);
             }
         }
     }
@@ -416,7 +416,7 @@ TorStarHelper::GetServerName (int id)
 void
 TorStarHelper::PrintCircuits ()
 {
-  std::map<int,CircuitDescriptor>::iterator i;
+  map<int,CircuitDescriptor>::iterator i;
   for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
     {
       CircuitDescriptor e = i->second;
