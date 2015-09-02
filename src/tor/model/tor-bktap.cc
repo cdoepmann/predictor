@@ -235,7 +235,7 @@ TorBktapApp::StartApplication (void)
               ch->SetSocket (socket);
               ch->RegisterCallbacks ();
               Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
-              Simulator::Schedule (Seconds (rng->GetValue (0.1,1.0)), &TorBktapApp::ReadCallback, this, socket);
+              socket->Start (Seconds (rng->GetValue (0.1,1.0)));
             }
         }
     }

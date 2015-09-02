@@ -8,6 +8,9 @@
 // TODO remove hard coded value
 #define PACKET_PAYLOAD_SIZE 498
 
+using namespace std;
+using namespace ns3;
+
 namespace ns3 {
 
 class RequestHeader : public Header
@@ -21,7 +24,7 @@ public:
 
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
-  virtual void Print (std::ostream &os) const;
+  virtual void Print (ostream &os) const;
   virtual uint32_t GetSerializedSize (void) const;
   virtual void Serialize (Buffer::Iterator start) const;
   virtual uint32_t Deserialize (Buffer::Iterator start);
@@ -116,9 +119,10 @@ public:
 
   void SetRequestStream (Ptr<RandomVariableStream>);
   void SetThinkStream (Ptr<RandomVariableStream>);
+  void Start (Time);
 
-  void SetTtfbCallback (void (*)(int, double, std::string), int, std::string);
-  void SetTtlbCallback (void (*)(int, double, std::string), int, std::string);
+  void SetTtfbCallback (void (*)(int, double, string), int, string);
+  void SetTtlbCallback (void (*)(int, double, string), int, string);
 
 private:
   void RequestPage ();
@@ -128,12 +132,12 @@ private:
   int m_leftToSend;
   Ptr<Packet> m_request;
   Time m_requestSent;
-  void (*ttfb_callback)(int, double, std::string);
-  void (*ttlb_callback)(int, double, std::string);
+  void (*ttfb_callback)(int, double, string);
+  void (*ttlb_callback)(int, double, string);
   int m_ttfb_id;
   int m_ttlb_id;
-  std::string m_ttfb_desc;
-  std::string m_ttlb_desc;
+  string m_ttfb_desc;
+  string m_ttlb_desc;
 
   Ptr<RandomVariableStream> m_thinkTimeStream;
   Ptr<RandomVariableStream> m_requestSizeStream;

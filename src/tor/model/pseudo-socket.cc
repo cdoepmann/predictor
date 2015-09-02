@@ -155,7 +155,7 @@ PseudoSinkSocket::PseudoSinkSocket ()
 uint32_t
 PseudoSinkSocket::GetTxAvailable (void) const
 {
-  return std::numeric_limits<uint32_t>::max ();
+  return numeric_limits<uint32_t>::max ();
 }
 
 int
@@ -189,7 +189,7 @@ PseudoBulkSocket::PseudoBulkSocket ()
 uint32_t
 PseudoBulkSocket::GetRxAvailable (void) const
 {
-  return std::numeric_limits<uint32_t>::max ();
+  return numeric_limits<uint32_t>::max ();
 }
 
 // What about PacketTags, i.e. SocketAddressTag?
@@ -264,7 +264,7 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
   //deal with fragmented requests
   if (p->GetSize () < PACKET_PAYLOAD_SIZE)
     {
-      // std::cout << "fragment" << std::endl;
+      // cout << "fragment" << endl;
       if (m_request)
         {
           uint8_t data[p->GetSize () + m_request->GetSize ()];
@@ -323,6 +323,8 @@ PseudoClientSocket::PseudoClientSocket ()
   ttfb_callback = 0;
   m_ttlb_id = 0;
   m_ttfb_id = 0;
+
+  Simulator::Schedule (Seconds (0.1), &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 
@@ -332,6 +334,7 @@ PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream,
   m_thinkTimeStream = thinkStream;
   m_leftToRead = 0;
   m_leftToSend = PACKET_PAYLOAD_SIZE;
+  Simulator::Schedule (Seconds (0.1), &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 void
@@ -352,6 +355,11 @@ PseudoClientSocket::SetThinkStream (Ptr<RandomVariableStream> thinkStream)
     }
 }
 
+void
+PseudoClientSocket::Start (Time startTime)
+{
+  Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
+}
 
 uint32_t
 PseudoClientSocket::GetRxAvailable () const
@@ -391,7 +399,7 @@ PseudoClientSocket::Recv (uint32_t maxSize, uint32_t flags)
       m_request->AddHeader (h);
     }
 
-  uint32_t size = std::min (maxSize,m_request->GetSize ());
+  uint32_t size = min (maxSize,m_request->GetSize ());
   Ptr<Packet> p = m_request->CreateFragment (0,size);
   m_request->RemoveAtStart (size);
   m_leftToSend -= size;
@@ -469,7 +477,7 @@ PseudoClientSocket::RoundUp (uint32_t num, uint32_t multiple)
 
 
 void
-PseudoClientSocket::SetTtfbCallback (void (*ttfb)(int, double, std::string), int id, std::string desc)
+PseudoClientSocket::SetTtfbCallback (void (*ttfb)(int, double, string), int id, string desc)
 {
   m_ttfb_id = id;
   m_ttfb_desc = desc;
@@ -477,7 +485,7 @@ PseudoClientSocket::SetTtfbCallback (void (*ttfb)(int, double, std::string), int
 }
 
 void
-PseudoClientSocket::SetTtlbCallback (void (*ttlb)(int, double, std::string), int id, std::string desc)
+PseudoClientSocket::SetTtlbCallback (void (*ttlb)(int, double, string), int id, string desc)
 {
   m_ttlb_id = id;
   m_ttlb_desc = desc;
@@ -508,7 +516,7 @@ uint32_t RequestHeader::GetSerializedSize (void) const
 {
   return 4;
 }
-void RequestHeader::Print (std::ostream &os) const   /*TODO*/
+void RequestHeader::Print (ostream &os) const   /*TODO*/
 {
 }
 void RequestHeader::SetRequestSize (uint32_t size)

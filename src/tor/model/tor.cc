@@ -181,7 +181,7 @@ TorApp::StartApplication (void)
               conn->SetSocket (socket);
               conn->RegisterCallbacks ();
               Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
-              conn->ScheduleRead (Seconds (rng->GetValue (0.1,1.0)));
+              socket->Start (Seconds (rng->GetValue (0.1,1.0)));
             }
         }
     }
