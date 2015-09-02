@@ -57,9 +57,9 @@ int main (int argc, char *argv[]) {
     m_bulkThink->SetAttribute("Constant", DoubleValue(0));
 
     /* state scenario/ add circuits inline */
-    ph.AddCircuit(1,"entry1","btlnk","exit1", m_bulkRequest, m_bulkThink);
-    ph.AddCircuit(2,"entry2","btlnk","exit1", m_bulkRequest, m_bulkThink);
-    ph.AddCircuit(3,"entry3","btlnk","exit2", m_bulkRequest, m_bulkThink);
+    ph.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.1)) );
+    ph.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.1)) );
+    ph.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.1)) );
 
     ph.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2MB/s")));
     ph.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2MB/s")));

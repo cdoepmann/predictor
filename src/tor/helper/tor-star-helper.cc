@@ -10,7 +10,6 @@ TorStarHelper::TorStarHelper ()
   m_nSpokes = 1;   // hack: spare one for concurrent traffic
   m_disableProxies = false;
   m_enablePcap = false;
-  m_enableBulkSockets = true;
   m_factory.SetTypeId ("ns3::TorApp");
 }
 
@@ -23,35 +22,12 @@ TorStarHelper::~TorStarHelper ()
 }
 
 void
-TorStarHelper::AddCircuit (int id, string entryName, string middleName, string exitName)
-{
-  NS_ASSERT (m_circuits.find (id) == m_circuits.end ());
-  CircuitDescriptor desc (id, GetProxyName (id), entryName, middleName, exitName, GetServerName (id));
-  m_circuits[id] = desc;
-  circuitIds.push_back (id);
-
-  if (!m_disableProxies)
-    {
-      AddRelay (GetProxyName (id));
-    }
-
-  AddRelay (entryName);
-  AddRelay (middleName);
-  AddRelay (exitName);
-
-  if (!m_enableBulkSockets)
-    {
-      AddServer (GetServerName (id));
-    }
-}
-
-void
 TorStarHelper::AddCircuit (int id, string entryName, string middleName, string exitName,
-                        Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
+                        Ptr<PseudoClientSocket> clientSocket)
 {
 
   NS_ASSERT (m_circuits.find (id) == m_circuits.end ());
-  CircuitDescriptor desc (id, GetProxyName (id), entryName, middleName, exitName, GetServerName (id), rng_request, rng_think);
+  CircuitDescriptor desc (id, GetProxyName (id), entryName, middleName, exitName, clientSocket);
   m_circuits[id] = desc;
   circuitIds.push_back (id);
 
@@ -63,13 +39,7 @@ TorStarHelper::AddCircuit (int id, string entryName, string middleName, string e
   AddRelay (entryName);
   AddRelay (middleName);
   AddRelay (exitName);
-
-  if (!m_enableBulkSockets)
-    {
-      AddServer (GetServerName (id));
-    }
 }
-
 
 void
 TorStarHelper::AddRelay (string name)
@@ -80,13 +50,6 @@ TorStarHelper::AddRelay (string name)
       m_relays[name] = desc;
       m_relayApps.Add (desc.tapp);
     }
-}
-
-void
-TorStarHelper::AddServer (string name)
-{
-  NS_ASSERT (m_server.find (name) == m_server.end ());
-  m_server[name] = m_nSpokes++;
 }
 
 void
@@ -122,12 +85,6 @@ TorStarHelper::EnablePcap (bool enablePcap)
 }
 
 void
-TorStarHelper::EnableBulkSockets (bool enableBulkSockets)
-{
-  m_enableBulkSockets = enableBulkSockets;
-}
-
-void
 TorStarHelper::SetTorAppType (string type)
 {
   m_factory.SetTypeId (type);
@@ -148,7 +105,6 @@ TorStarHelper::ParseFile (string filename)
 
   int id;
   string path[3], bw[3], dummy;
-  // while(f >> id >> dummy >> path[0] >> bw[0] >> path[1] >> bw[1] >> path[2] >> bw[2] >> dummy) {
   while (f >> id >> path[0] >> dummy >> bw[0] >> path[1] >> dummy >> bw[1] >> path[2] >> dummy >> bw[2])
     {
       AddCircuit (id, path[0], path[1], path[2]);
@@ -218,7 +174,6 @@ TorStarHelper::InstallCircuits ()
   Ptr<TorBaseApp> middleApp;
   Ptr<TorBaseApp> exitApp;
 
-  BulkSendHelper serversHelper ("ns3::TcpSocketFactory", Address ());
   Ipv4AddressHelper ipHelper = Ipv4AddressHelper ("127.0.0.0", "255.0.0.0");
 
   map<int,CircuitDescriptor>::iterator i;
@@ -243,47 +198,18 @@ TorStarHelper::InstallCircuits ()
       Ipv4Address entryAddress  = m_starHelper->GetSpokeIpv4Address (m_relays[e.entry ()].spokeId);
       Ipv4Address middleAddress = m_starHelper->GetSpokeIpv4Address (m_relays[e.middle ()].spokeId);
       Ipv4Address exitAddress   = m_starHelper->GetSpokeIpv4Address (m_relays[e.exit ()].spokeId);
-
-      Ipv4Address serverAddress;
-      if (!m_enableBulkSockets)
-        {
-          serverAddress = m_starHelper->GetSpokeIpv4Address (m_server[e.server ()]);
-          AddressValue remoteAddress (InetSocketAddress (exitAddress, 9001));
-          serversHelper.SetAttribute ("Remote", remoteAddress);
-          Ptr<Node> serverNode = m_starHelper->GetSpokeNode (m_server[e.server ()]);
-          m_serverApps.Add (serversHelper.Install (serverNode));
-        }
-      else
-        {
-          serverAddress = ipHelper.NewAddress ();
-        }
+      Ipv4Address serverAddress = ipHelper.NewAddress ();
 
       exitApp->AddCircuit (e.id, serverAddress, SERVEREDGE, middleAddress, RELAYEDGE);
       middleApp->AddCircuit (e.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
           entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
-          if (e.m_rng_request && e.m_rng_think)
-            {
-              Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (e.m_rng_request, e.m_rng_think);
-              clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
-            }
-          else
-            {
-              clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE);
-            }
+          clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_clientSocket);
         }
       else
         {
-          if (e.m_rng_request && e.m_rng_think)
-            {
-              Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (e.m_rng_request, e.m_rng_think);
-              entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
-            }
-          else
-            {
-              entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE);
-            }
+          entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_clientSocket);
         }
     }
 
@@ -316,13 +242,6 @@ TorStarHelper::GetTorAppsContainer ()
 {
   return m_relayApps;
 }
-
-ApplicationContainer
-TorStarHelper::GetServersContainer ()
-{
-  return m_serverApps;
-}
-
 
 Ptr<TorBaseApp>
 TorStarHelper::GetTorApp (string name)
@@ -405,16 +324,6 @@ TorStarHelper::GetProxyName (int id)
   return ss.str ();
 }
 
-
-string
-TorStarHelper::GetServerName (int id)
-{
-  stringstream ss;
-  ss << "server" << id;
-  return ss.str ();
-}
-
-
 void
 TorStarHelper::PrintCircuits ()
 {
@@ -430,10 +339,6 @@ TorStarHelper::PrintCircuits ()
       cout << "\t" << e.entry () << "[" << m_relays[e.entry ()].spokeId + 1 << "]";
       cout << "\t" << e.middle () << "[" << m_relays[e.middle ()].spokeId + 1 << "]";
       cout << "\t" << e.exit () << "[" << m_relays[e.exit ()].spokeId + 1 << "]";
-      if (!m_enableBulkSockets)
-        {
-          cout << "\t" << e.server () << "[" << m_server[e.server ()] + 1 << "]";
-        }
       cout << endl;
     }
 }

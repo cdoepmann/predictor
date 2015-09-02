@@ -109,8 +109,8 @@ private:
 class PseudoClientSocket : public PseudoSocket
 {
 public:
-  PseudoClientSocket ();
-  PseudoClientSocket (Ptr<RandomVariableStream> requestStream, Ptr<RandomVariableStream> thinkStream);
+  PseudoClientSocket (Time startTime=Seconds(0.1));
+  PseudoClientSocket (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>, Time startTime=Seconds(0.1));
 
   uint32_t GetTxAvailable () const;
   uint32_t GetRxAvailable () const;

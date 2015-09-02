@@ -304,7 +304,7 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
 
 
 
-PseudoClientSocket::PseudoClientSocket ()
+PseudoClientSocket::PseudoClientSocket (Time startTime)
 {
   //default: bulk sender
   Ptr<ConstantRandomVariable> rng_request = CreateObject<ConstantRandomVariable> ();
@@ -315,28 +315,27 @@ PseudoClientSocket::PseudoClientSocket ()
   rng_think->SetAttribute ("Constant", DoubleValue (0));
   m_thinkTimeStream = rng_think;
 
-  m_leftToRead = 0;
-  //TODO remove hard coded value
   m_leftToSend = PACKET_PAYLOAD_SIZE;
-
+  m_leftToRead = 0;
   ttlb_callback = 0;
   ttfb_callback = 0;
   m_ttlb_id = 0;
   m_ttfb_id = 0;
 
-  Simulator::Schedule (Seconds (0.1), &PseudoClientSocket::NotifyDataRecv, this);
+  Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 
-PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream, Ptr<RandomVariableStream> thinkStream)
+PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream, Ptr<RandomVariableStream> thinkStream, Time startTime)
 {
-  m_requestSizeStream = requestStream;
-  m_thinkTimeStream = thinkStream;
   m_leftToRead = 0;
-  m_leftToSend = PACKET_PAYLOAD_SIZE;
   ttlb_callback = 0;
   ttfb_callback = 0;
-  Simulator::Schedule (Seconds (0.1), &PseudoClientSocket::NotifyDataRecv, this);
+  m_requestSizeStream = requestStream;
+  m_thinkTimeStream = thinkStream;
+  m_leftToSend = PACKET_PAYLOAD_SIZE;
+
+  Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 void
