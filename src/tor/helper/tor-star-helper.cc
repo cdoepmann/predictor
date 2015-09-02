@@ -265,7 +265,8 @@ TorStarHelper::InstallCircuits ()
           entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
           if (e.m_rng_request && e.m_rng_think)
             {
-              clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_rng_request, e.m_rng_think);
+              Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (e.m_rng_request, e.m_rng_think);
+              clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
             }
           else
             {
@@ -276,7 +277,8 @@ TorStarHelper::InstallCircuits ()
         {
           if (e.m_rng_request && e.m_rng_think)
             {
-              entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_rng_request, e.m_rng_think);
+              Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (e.m_rng_request, e.m_rng_think);
+              entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
             }
           else
             {

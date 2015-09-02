@@ -14,22 +14,22 @@ NS_OBJECT_ENSURE_REGISTERED (TorBktapApp);
 UdpChannel::UdpChannel ()
 {
   NS_LOG_FUNCTION (this);
-  this->m_rng_request = 0;
-  this->m_rng_think = 0;
+  this->m_socket = 0;
 }
 
 UdpChannel::UdpChannel (Address remote, int conntype)
 {
   m_remote = remote;
   m_conntype = conntype;
-  this->m_rng_request = 0;
-  this->m_rng_think = 0;
+  m_ttfb_callback = 0;
+  m_ttlb_callback = 0;
+  this->m_socket = 0;
 }
 
 void
 UdpChannel::SetSocket (Ptr<Socket> socket)
 {
-  m_socket = socket;
+  this->m_socket = socket;
 }
 
 uint8_t
@@ -147,7 +147,7 @@ TorBktapApp::GetTypeId (void)
 
 void
 TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
-                         Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
+                         Ptr<PseudoClientSocket> clientSocket)
 {
   TorBaseApp::AddCircuit (id, n_ip, n_conntype, p_ip, p_conntype);
   
@@ -155,15 +155,15 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
   NS_ASSERT (circuits[id] == 0);
 
   Ptr<BktapCircuit> circ = Create<BktapCircuit> (id);
+  circuits[id] = circ;
 
   circ->inbound = AddChannel (InetSocketAddress (p_ip,9001),p_conntype);
   circ->inbound->circuits.push_back (circ);
-  circ->inbound->SetRandomVariableStreams (rng_request, rng_think);
+  circ->inbound->SetSocket (clientSocket);
 
   circ->outbound = AddChannel (InetSocketAddress (n_ip,9001),n_conntype);
   circ->outbound->circuits.push_back (circ);
 
-  circuits[id] = circ;
 }
 
 Ptr<UdpChannel>
@@ -211,7 +211,10 @@ TorBktapApp::StartApplication (void)
       Ptr<UdpChannel> ch = it->second;
       NS_ASSERT (ch);
 
-      ch->SetSocket (m_socket);
+      if (ch->SpeaksCells ())
+        {
+          ch->SetSocket (m_socket);
+        }
 
       // PseudoSockets only
       if (ipmask.IsMatch (InetSocketAddress::ConvertFrom (ch->m_remote).GetIpv4 (), Ipv4Address ("127.0.0.1")) )
@@ -225,17 +228,12 @@ TorBktapApp::StartApplication (void)
 
           if (ch->GetType () == PROXYEDGE)
             {
-              Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> ();
-              socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
-              if (ch->GetRequestStream () && ch->GetThinkStream ())
+              if (!ch->m_socket)
                 {
-                  socket->SetRequestStream (ch->GetRequestStream ());
-                  socket->SetThinkStream (ch->GetThinkStream ());
+                  ch->m_socket = CreateObject<PseudoClientSocket> ();
                 }
-              ch->SetSocket (socket);
+              ch->m_socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
               ch->RegisterCallbacks ();
-              Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
-              socket->Start (Seconds (rng->GetValue (0.1,1.0)));
             }
         }
     }
@@ -680,27 +678,6 @@ TorBktapApp::LookupChannel (Ptr<Socket> socket)
   return NULL;
 }
 
-
-
-
-void
-UdpChannel::SetRandomVariableStreams (Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
-{
-  m_rng_request = rng_request;
-  m_rng_think = rng_think;
-}
-
-Ptr<RandomVariableStream>
-UdpChannel::GetRequestStream ()
-{
-  return m_rng_request;
-}
-
-Ptr<RandomVariableStream>
-UdpChannel::GetThinkStream ()
-{
-  return m_rng_think;
-}
 
 
 

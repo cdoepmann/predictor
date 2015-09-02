@@ -2,7 +2,6 @@
 #define __TOR_BKTAP_H__
 
 #include "tor-base.h"
-#include "pseudo-socket.h"
 #include "cell-header.h"
 
 #include "ns3/point-to-point-net-device.h"
@@ -487,12 +486,6 @@ public:
   list<Ptr<BktapCircuit> > circuits;
   SimpleRttEstimator rttEstimator;
 
-  Ptr<RandomVariableStream> m_rng_request;
-  Ptr<RandomVariableStream> m_rng_think;
-  void SetRandomVariableStreams (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>);
-  Ptr<RandomVariableStream> GetRequestStream ();
-  Ptr<RandomVariableStream> GetThinkStream ();
-
   void SetTtfbCallback (void (*)(int, double, string), int, string = "");
   void SetTtlbCallback (void (*)(int, double, string), int, string = "");
   void RegisterCallbacks ();
@@ -566,11 +559,10 @@ public:
 
 
   Ptr<UdpChannel> AddChannel (Address, int);
-  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-                           Ptr<RandomVariableStream> rng_request=0,
-                           Ptr<RandomVariableStream> rng_think=0);
   Ptr<BktapCircuit> GetCircuit (uint32_t);
   Ptr<BktapCircuit> GetNextCircuit ();
+  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
+                           Ptr<PseudoClientSocket> clientSocket=0);
 
   Ptr<Socket> m_socket;
 

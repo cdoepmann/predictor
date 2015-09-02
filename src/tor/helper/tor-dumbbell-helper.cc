@@ -257,11 +257,13 @@ TorDumbbellHelper::InstallCircuits ()
       if (!m_disableProxies)
         {
           entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
-          clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_rng_request, desc.m_rng_think);
+          Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (desc.m_rng_request, desc.m_rng_think);
+          clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
         }
       else
         {
-          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_rng_request, desc.m_rng_think);
+          Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (desc.m_rng_request, desc.m_rng_think);
+          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
         }
     }
 }

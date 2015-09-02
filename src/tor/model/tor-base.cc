@@ -78,7 +78,7 @@ TorBaseApp::DoDispose (void)
 
 void
 TorBaseApp::AddCircuit (int circ_id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
-                        Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
+                        Ptr<PseudoClientSocket> clientSocket)
 {
   NS_LOG_FUNCTION (this);
 

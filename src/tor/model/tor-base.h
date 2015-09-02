@@ -5,6 +5,7 @@
 #include "ns3/internet-module.h"
 #include "ns3/data-rate.h"
 
+#include "pseudo-socket.h"
 #include "tokenbucket.h"
 
 #define RELAYEDGE 0 // aka speaks cells
@@ -38,7 +39,8 @@ public:
   virtual void StopApplication (void);
   virtual void DoDispose (void);
 
-  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int, Ptr<RandomVariableStream> rng_request=0, Ptr<RandomVariableStream> rng_think=0);
+  virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
+    Ptr<PseudoClientSocket> clientSocket=0);
 
   virtual void SetNodeName (std::string);
   virtual std::string GetNodeName (void);

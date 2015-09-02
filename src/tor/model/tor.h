@@ -3,7 +3,6 @@
 
 #include "tor-base.h"
 #include "cell-header.h"
-#include "pseudo-socket.h"
 
 namespace ns3 {
 
@@ -120,10 +119,6 @@ public:
   uint32_t GetOutbufSize ();
   uint32_t GetInbufSize ();
 
-  void SetRandomVariableStreams (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>);
-  Ptr<RandomVariableStream> GetRequestStream ();
-  Ptr<RandomVariableStream> GetThinkStream ();
-
   void SetTtfbCallback (void (*)(int, double, string), int, string = "");
   void SetTtlbCallback (void (*)(int, double, string), int, string = "");
   void RegisterCallbacks ();
@@ -144,9 +139,6 @@ private:
   EventId read_event;
   EventId write_event;
 
-  Ptr<RandomVariableStream> m_rng_request;
-  Ptr<RandomVariableStream> m_rng_think;
-
   void (*m_ttfb_callback)(int, double, string);
   void (*m_ttlb_callback)(int, double, string);
   int m_ttfb_id;
@@ -166,8 +158,7 @@ public:
   TorApp ();
   virtual ~TorApp ();
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-                           Ptr<RandomVariableStream> rng_request=0,
-                           Ptr<RandomVariableStream> rng_think=0);
+                           Ptr<PseudoClientSocket> clientSocket=0);
 
   virtual void StartApplication (void);
   virtual void StopApplication (void);

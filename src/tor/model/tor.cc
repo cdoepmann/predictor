@@ -50,7 +50,7 @@ TorApp::DoDispose (void)
 
 void
 TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, int p_conntype,
-                    Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
+                    Ptr<PseudoClientSocket> clientSocket)
 {
   TorBaseApp::AddCircuit (id, n_ip, n_conntype, p_ip, p_conntype);
 
@@ -60,7 +60,7 @@ TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, 
   // allocate and init new circuit
   Ptr<Connection> p_conn = AddConnection (p_ip, p_conntype);
   Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
-  p_conn->SetRandomVariableStreams (rng_request, rng_think);
+  p_conn->SetSocket (clientSocket);
 
   Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn);
 
@@ -169,19 +169,17 @@ TorApp::StartApplication (void)
 
           if (conn->GetType () == PROXYEDGE)
             {
-              Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> ();
-              if (conn->GetRequestStream () && conn->GetThinkStream ())
+              Ptr<Socket> socket = conn->GetSocket ();
+              if (!socket)
                 {
-                  socket->SetRequestStream (conn->GetRequestStream ());
-                  socket->SetThinkStream (conn->GetThinkStream ());
+                  socket = CreateObject<PseudoClientSocket> ();
                 }
+
               socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
               // socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
               conn->RegisterCallbacks ();
-              Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
-              socket->Start (Seconds (rng->GetValue (0.1,1.0)));
             }
         }
     }
@@ -959,8 +957,6 @@ Connection::Connection (TorApp* torapp, Ipv4Address ip, int conntype)
 
   m_socket = 0;
   m_conntype = conntype;
-  m_rng_request = 0;
-  m_rng_think = 0;
   m_ttfb_id = -1;
   m_ttlb_id = -1;
   m_ttfb_callback = 0;
@@ -1154,25 +1150,6 @@ uint32_t
 Connection::GetInbufSize ()
 {
   return inbuf.size;
-}
-
-void
-Connection::SetRandomVariableStreams (Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think)
-{
-  m_rng_request = rng_request;
-  m_rng_think = rng_think;
-}
-
-Ptr<RandomVariableStream>
-Connection::GetRequestStream ()
-{
-  return m_rng_request;
-}
-
-Ptr<RandomVariableStream>
-Connection::GetThinkStream ()
-{
-  return m_rng_think;
 }
 
 void

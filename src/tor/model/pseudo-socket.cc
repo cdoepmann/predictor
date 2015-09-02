@@ -334,6 +334,8 @@ PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream,
   m_thinkTimeStream = thinkStream;
   m_leftToRead = 0;
   m_leftToSend = PACKET_PAYLOAD_SIZE;
+  ttlb_callback = 0;
+  ttfb_callback = 0;
   Simulator::Schedule (Seconds (0.1), &PseudoClientSocket::NotifyDataRecv, this);
 }
 
