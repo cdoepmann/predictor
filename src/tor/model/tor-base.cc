@@ -99,4 +99,95 @@ TorBaseApp::GetNodeName (void)
   return m_name;
 }
 
+
+
+
+
+BaseCircuit::BaseCircuit ()
+{
+  NS_LOG_FUNCTION (this);
+}
+
+BaseCircuit::BaseCircuit (uint16_t id)
+{
+  NS_LOG_FUNCTION (this);
+  m_id = id;
+  ResetStats ();
+}
+
+BaseCircuit::~BaseCircuit ()
+{
+  NS_LOG_FUNCTION (this);
+}
+
+uint16_t
+BaseCircuit::GetId ()
+{
+  return m_id;
+}
+
+CellDirection
+BaseCircuit::GetOppositeDirection (CellDirection direction)
+{
+  if (direction == OUTBOUND)
+    {
+      return INBOUND;
+    }
+  else
+    {
+      return OUTBOUND;
+    }
+}
+
+uint32_t
+BaseCircuit::GetBytesRead (CellDirection direction)
+{
+  if (direction == OUTBOUND)
+    {
+      return stats_n_bytes_read;
+    }
+  else
+    {
+      return stats_p_bytes_read;
+    }
+}
+
+uint32_t
+BaseCircuit::GetBytesWritten (CellDirection direction)
+{
+  if (direction == OUTBOUND)
+    {
+      return stats_n_bytes_written;
+    }
+  else
+    {
+      return stats_p_bytes_written;
+    }
+}
+
+void
+BaseCircuit::ResetStats ()
+{
+  stats_p_bytes_read = 0;
+  stats_n_bytes_read = 0;
+  stats_p_bytes_written = 0;
+  stats_n_bytes_written = 0;
+}
+
+void
+BaseCircuit::IncrementStats (CellDirection direction, uint32_t read, uint32_t write)
+{
+  if (direction == OUTBOUND)
+    {
+      stats_n_bytes_read += read;
+      stats_n_bytes_written += write;
+    }
+  else
+    {
+      stats_p_bytes_read += read;
+      stats_p_bytes_written += write;
+    }
+}
+
+
 } //namespace ns3

@@ -42,7 +42,7 @@ UdpChannel::SpeaksCells ()
   return m_conntype == RELAYEDGE;
 }
 
-BktapCircuit::BktapCircuit (uint32_t id) : BaseCircuit (id)
+BktapCircuit::BktapCircuit (uint16_t id) : BaseCircuit (id)
 {
   inboundQueue = Create<SeqQueue> ();
   outboundQueue = Create<SeqQueue> ();
@@ -120,6 +120,7 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
 
   Ptr<BktapCircuit> circ = Create<BktapCircuit> (id);
   circuits[id] = circ;
+  baseCircuits[id] = circ;
 
   circ->inbound = AddChannel (InetSocketAddress (p_ip,9001),p_conntype);
   circ->inbound->circuits.push_back (circ);
@@ -610,7 +611,7 @@ TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection direction)
 }
 
 Ptr<BktapCircuit>
-TorBktapApp::GetCircuit (uint32_t id)
+TorBktapApp::GetCircuit (uint16_t id)
 {
   return circuits[id];
 }
@@ -646,91 +647,7 @@ TorBktapApp::LookupChannel (Ptr<Socket> socket)
 
 
 
-BaseCircuit::BaseCircuit ()
-{
-  NS_LOG_FUNCTION (this);
-}
 
-BaseCircuit::BaseCircuit (uint32_t id)
-{
-  NS_LOG_FUNCTION (this);
-  m_id = id;
-  ResetStats ();
-}
-
-BaseCircuit::~BaseCircuit ()
-{
-  NS_LOG_FUNCTION (this);
-}
-
-uint32_t
-BaseCircuit::GetId ()
-{
-  return m_id;
-}
-
-CellDirection
-BaseCircuit::GetOppositeDirection (CellDirection direction)
-{
-  if (direction == OUTBOUND)
-    {
-      return INBOUND;
-    }
-  else
-    {
-      return OUTBOUND;
-    }
-}
-
-uint32_t
-BaseCircuit::GetBytesRead (CellDirection direction)
-{
-  if (direction == OUTBOUND)
-    {
-      return stats_n_bytes_read;
-    }
-  else
-    {
-      return stats_p_bytes_read;
-    }
-}
-
-uint32_t
-BaseCircuit::GetBytesWritten (CellDirection direction)
-{
-  if (direction == OUTBOUND)
-    {
-      return stats_n_bytes_written;
-    }
-  else
-    {
-      return stats_p_bytes_written;
-    }
-}
-
-void
-BaseCircuit::ResetStats ()
-{
-  stats_p_bytes_read = 0;
-  stats_n_bytes_read = 0;
-  stats_p_bytes_written = 0;
-  stats_n_bytes_written = 0;
-}
-
-void
-BaseCircuit::IncrementStats (CellDirection direction, uint32_t read, uint32_t write)
-{
-  if (direction == OUTBOUND)
-    {
-      stats_n_bytes_read += read;
-      stats_n_bytes_written += write;
-    }
-  else
-    {
-      stats_p_bytes_read += read;
-      stats_p_bytes_written += write;
-    }
-}
 
 void
 TorBktapApp::DoDispose (void)
@@ -747,6 +664,7 @@ TorBktapApp::DoDispose (void)
 
     }
   circuits.clear ();
+  baseCircuits.clear ();
   channels.clear ();
   Application::DoDispose ();
 }

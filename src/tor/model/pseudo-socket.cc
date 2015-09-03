@@ -317,10 +317,10 @@ PseudoClientSocket::PseudoClientSocket (Time startTime)
 
   m_leftToSend = PACKET_PAYLOAD_SIZE;
   m_leftToRead = 0;
-  ttlb_callback = 0;
-  ttfb_callback = 0;
-  m_ttlb_id = 0;
-  m_ttfb_id = 0;
+  ttlbCallback = 0;
+  ttfbCallback = 0;
+  m_ttlbId = 0;
+  m_ttfbId = 0;
 
   m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
 }
@@ -329,8 +329,8 @@ PseudoClientSocket::PseudoClientSocket (Time startTime)
 PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream, Ptr<RandomVariableStream> thinkStream, Time startTime)
 {
   m_leftToRead = 0;
-  ttlb_callback = 0;
-  ttfb_callback = 0;
+  ttlbCallback = 0;
+  ttfbCallback = 0;
   m_requestSizeStream = requestStream;
   m_thinkTimeStream = thinkStream;
   m_leftToSend = PACKET_PAYLOAD_SIZE;
@@ -427,9 +427,9 @@ PseudoClientSocket::Send (Ptr<Packet> p, uint32_t flags)
   if (m_leftToRead == m_requestSize)
     {
       Time ttfb = Time (Simulator::Now () - m_requestSent);
-      if (ttfb_callback)
+      if (ttfbCallback)
         {
-          ttfb_callback (m_ttfb_id, ttfb.GetSeconds (), m_ttlb_desc);
+          ttfbCallback (m_ttfbId, ttfb.GetSeconds (), m_ttfbDesc);
         }
     }
 
@@ -440,9 +440,9 @@ PseudoClientSocket::Send (Ptr<Packet> p, uint32_t flags)
     {
       m_leftToRead = 0;
       Time ttlb = Time (Simulator::Now () - m_requestSent);
-      if (ttlb_callback)
+      if (ttlbCallback)
         {
-          ttlb_callback (m_ttlb_id, ttlb.GetSeconds (), m_ttlb_desc);
+          ttlbCallback (m_ttlbId, ttlb.GetSeconds (), m_ttlbDesc);
         }
       Simulator::Schedule (Seconds (m_thinkTimeStream->GetValue ()), &PseudoClientSocket::RequestPage, this);
     }
@@ -481,17 +481,17 @@ PseudoClientSocket::RoundUp (uint32_t num, uint32_t multiple)
 void
 PseudoClientSocket::SetTtfbCallback (void (*ttfb)(int, double, string), int id, string desc)
 {
-  m_ttfb_id = id;
-  m_ttfb_desc = desc;
-  ttfb_callback = ttfb;
+  m_ttfbId = id;
+  m_ttfbDesc = desc;
+  ttfbCallback = ttfb;
 }
 
 void
 PseudoClientSocket::SetTtlbCallback (void (*ttlb)(int, double, string), int id, string desc)
 {
-  m_ttlb_id = id;
-  m_ttlb_desc = desc;
-  ttlb_callback = ttlb;
+  m_ttlbId = id;
+  m_ttlbDesc = desc;
+  ttlbCallback = ttlb;
 }
 
 

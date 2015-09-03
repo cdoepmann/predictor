@@ -8,7 +8,7 @@ TorStarHelper::TorStarHelper ()
   m_startTimeStream = 0;
   m_starHelper = 0;
   m_nSpokes = 0;
-  m_nSpokes = 1;   // hack: spare one for concurrent traffic
+  m_nSpokes = 1;   // hack: spare one for concurrent traffic simulation
   m_disableProxies = false;
   m_enablePcap = false;
   m_factory.SetTypeId ("ns3::TorApp");

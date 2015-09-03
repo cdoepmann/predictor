@@ -43,6 +43,7 @@ TorApp::DoDispose (void)
       i->second->DoDispose ();
     }
   circuits.clear ();
+  baseCircuits.clear ();
   connections.clear ();
   Application::DoDispose ();
 }
@@ -70,6 +71,7 @@ TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, 
 
   // add to the global list of circuits
   circuits[id] = circ;
+  baseCircuits[id] = circ;
 }
 
 Ptr<Connection>
@@ -213,7 +215,7 @@ TorApp::StopApplication (void)
 }
 
 Ptr<Circuit>
-TorApp::GetCircuit (uint32_t circid)
+TorApp::GetCircuit (uint16_t circid)
 {
   return circuits[circid];
 }
@@ -299,7 +301,7 @@ TorApp::PackageRelayCell (Ptr<Connection> conn, Ptr<Packet> cell)
 }
 
 void
-TorApp::PackageRelayCellImpl (int circ_id, Ptr<Packet> cell)
+TorApp::PackageRelayCellImpl (uint16_t circ_id, Ptr<Packet> cell)
 {
   NS_ASSERT (cell);
   CellHeader h;
@@ -511,20 +513,13 @@ TorApp::RoundRobin (int base, int64_t global_bucket)
 
 
 
-Circuit::Circuit (uint32_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_conn)
+Circuit::Circuit (uint16_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_conn) : BaseCircuit (circ_id)
 {
-  this->circ_id = circ_id;
-
   this->p_cellQ = new queue<Ptr<Packet> >;
   this->n_cellQ = new queue<Ptr<Packet> >;
 
   this->deliver_window = CIRCWINDOW_START;
   this->package_window = CIRCWINDOW_START;
-
-  this->stats_p_bytes_read = 0;
-  this->stats_p_bytes_written = 0;
-  this->stats_n_bytes_read = 0;
-  this->stats_n_bytes_written = 0;
 
   this->p_conn = p_conn;
   this->n_conn = n_conn;
@@ -582,7 +577,7 @@ Circuit::PopCell (CellDirection direction)
     {
       if (!IsSendme (cell))
         {
-          IncStatsBytes (direction, 0, CELL_PAYLOAD_SIZE);
+          IncrementStats (direction, 0, CELL_PAYLOAD_SIZE);
         }
 
       /* handle sending sendme cells here (instead of in PushCell) because
@@ -595,9 +590,9 @@ Circuit::PopCell (CellDirection direction)
           if (deliver_window <= CIRCWINDOW_START - CIRCWINDOW_INCREMENT)
             {
               IncDeliverWindow ();
-              NS_LOG_LOGIC ("[Circuit " << circ_id << "] Send SENDME cell ");
+              NS_LOG_LOGIC ("[Circuit " << GetId () << "] Send SENDME cell ");
               Ptr<Packet> sendme_cell = CreateSendme ();
-              GetQueue (GetOppositeDirection (direction))->push (sendme_cell);
+              GetQueue (BaseCircuit::GetOppositeDirection (direction))->push (sendme_cell);
               GetOppositeConnection (direction)->ScheduleWrite ();
             }
         }
@@ -633,7 +628,7 @@ Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
             {
               // update package window
               IncPackageWindow ();
-              NS_LOG_LOGIC ("[Circuit " << circ_id << "] Received SENDME cell. Package window now " << package_window);
+              NS_LOG_LOGIC ("[Circuit " << GetId () << "] Received SENDME cell. Package window now " << package_window);
               if (conn->IsBlocked ())
                 {
                   conn->SetBlocked (false);
@@ -648,19 +643,13 @@ Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
           cell->RemoveHeader (h);
         }
 
-      IncStatsBytes (direction, CELL_PAYLOAD_SIZE, 0);
+      IncrementStats (direction, CELL_PAYLOAD_SIZE, 0);
       GetQueue (direction)->push (cell);
     }
 }
 
 
 
-
-uint32_t
-Circuit::GetId ()
-{
-  return circ_id;
-}
 
 
 Ptr<Connection>
@@ -733,20 +722,6 @@ Circuit::GetOppositeDirection (Ptr<Connection> conn)
       return OUTBOUND;
     }
 }
-
-CellDirection
-Circuit::GetOppositeDirection (CellDirection direction)
-{
-  if (direction == OUTBOUND)
-    {
-      return INBOUND;
-    }
-  else
-    {
-      return OUTBOUND;
-    }
-}
-
 
 Ptr<Circuit>
 Circuit::GetNextCirc (Ptr<Connection> conn)
@@ -833,57 +808,6 @@ Circuit::GetQueueSize (CellDirection direction)
   else
     {
       return this->p_cellQ->size ();
-    }
-}
-
-
-uint32_t
-Circuit::GetStatsBytesRead (CellDirection direction)
-{
-  if (direction == OUTBOUND)
-    {
-      return stats_n_bytes_read;
-    }
-  else
-    {
-      return stats_p_bytes_read;
-    }
-}
-
-uint32_t
-Circuit::GetStatsBytesWritten (CellDirection direction)
-{
-  if (direction == OUTBOUND)
-    {
-      return stats_n_bytes_written;
-    }
-  else
-    {
-      return stats_p_bytes_written;
-    }
-}
-
-void
-Circuit::ResetStatsBytes ()
-{
-  stats_p_bytes_read = 0;
-  stats_n_bytes_read = 0;
-  stats_p_bytes_written = 0;
-  stats_n_bytes_written = 0;
-}
-
-void
-Circuit::IncStatsBytes (CellDirection direction, uint32_t read, uint32_t write)
-{
-  if (direction == OUTBOUND)
-    {
-      stats_n_bytes_read += read;
-      stats_n_bytes_written += write;
-    }
-  else
-    {
-      stats_p_bytes_read += read;
-      stats_p_bytes_written += write;
     }
 }
 

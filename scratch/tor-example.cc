@@ -7,8 +7,7 @@ using namespace ns3;
 using namespace std;
 NS_LOG_COMPONENT_DEFINE ("TorExample");
 
-void StatsCallbackBktap(TorStarHelper*, Time);
-void StatsCallbackVanilla(TorStarHelper*, Time);
+void StatsCallback(TorStarHelper*, Time);
 
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
@@ -82,11 +81,7 @@ int main (int argc, char *argv[]) {
     relays.Stop (simTime);
     Simulator::Stop (simTime);
 
-    if (vanilla) {
-        Simulator::Schedule(Seconds(0), &StatsCallbackVanilla, &ph, simTime);
-    } else {
-        Simulator::Schedule(Seconds(0), &StatsCallbackBktap, &ph, simTime);
-    }
+    Simulator::Schedule(Seconds(0), &StatsCallback, &ph, simTime);
 
     NS_LOG_INFO("start simulation");
     Simulator::Run ();
@@ -97,16 +92,15 @@ int main (int argc, char *argv[]) {
     return 0;
 }
 
-
 /* example of (cumulative) i/o stats */
-void StatsCallbackBktap(TorStarHelper* ph, Time simTime) {
+void StatsCallback(TorStarHelper* ph, Time simTime) {
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
     for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
-      Ptr<TorBktapApp> proxyApp = ph->GetProxyApp(*id)->GetObject<TorBktapApp> ();
-      Ptr<TorBktapApp> exitApp = ph->GetExitApp(*id)->GetObject<TorBktapApp> ();
-      Ptr<BktapCircuit> proxyCirc = proxyApp->circuits[*id];
-      Ptr<BktapCircuit> exitCirc = exitApp->circuits[*id];
+      Ptr<TorBaseApp> proxyApp = ph->GetProxyApp(*id);
+      Ptr<TorBaseApp> exitApp = ph->GetExitApp(*id);
+      Ptr<BaseCircuit> proxyCirc = proxyApp->baseCircuits[*id];
+      Ptr<BaseCircuit> exitCirc = exitApp->baseCircuits[*id];
       cout << exitCirc->GetBytesRead(INBOUND) << " " << proxyCirc->GetBytesWritten(INBOUND) << " ";
       // cout << proxyCirc->GetBytesRead(OUTBOUND) << " " << exitCirc->GetBytesWritten(OUTBOUND) << " ";
       // proxyCirc->ResetStats(); exitCirc->ResetStats();
@@ -115,26 +109,5 @@ void StatsCallbackBktap(TorStarHelper* ph, Time simTime) {
 
     Time resolution = MilliSeconds(10);
     if (Simulator::Now()+resolution < simTime)
-        Simulator::Schedule(resolution, &StatsCallbackBktap, ph, simTime);
-}
-
-
-/* example of (cumulative) i/o stats */
-void StatsCallbackVanilla(TorStarHelper* ph, Time simTime) {
-    cout << Simulator::Now().GetSeconds() << " ";
-    vector<int>::iterator id;
-    for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
-      Ptr<TorApp> proxyApp = ph->GetProxyApp(*id)->GetObject<TorApp> ();
-      Ptr<TorApp> exitApp = ph->GetExitApp(*id)->GetObject<TorApp> ();
-      Ptr<Circuit> proxyCirc = proxyApp->circuits[*id];
-      Ptr<Circuit> exitCirc = exitApp->circuits[*id];
-      cout << exitCirc->GetStatsBytesRead(INBOUND) << " " << proxyCirc->GetStatsBytesWritten(INBOUND) << " ";
-      // cout << proxyCirc->GetStatsBytesRead(OUTBOUND) << " " << exitCirc->GetStatsBytesWritten(OUTBOUND) << " ";
-      // proxyCirc->ResetStatsBytes(); exitCirc->ResetStatsBytes();
-    }
-    cout << endl;
-
-    Time resolution = MilliSeconds(10);
-    if (Simulator::Now()+resolution < simTime)
-        Simulator::Schedule(resolution, &StatsCallbackVanilla, ph, simTime);
+        Simulator::Schedule(resolution, &StatsCallback, ph, simTime);
 }

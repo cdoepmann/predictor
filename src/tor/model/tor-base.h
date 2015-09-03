@@ -19,6 +19,8 @@ using namespace ns3;
 
 namespace ns3 {
 
+class BaseCircuit;
+
 /** Used to indicate which way a cell is going on a circuit.
   * Inbound = cell is moving torwards the client
   * Outbound = cell is moving away from the client */
@@ -54,6 +56,32 @@ public:
   Time m_refilltime;
   TokenBucket m_writebucket;
   TokenBucket m_readbucket;
+  map<uint16_t,Ptr<BaseCircuit> > baseCircuits;
+
+};
+
+class BaseCircuit : public SimpleRefCount<BaseCircuit>
+{
+public:
+  BaseCircuit ();
+  BaseCircuit (uint16_t);
+  virtual ~BaseCircuit ();
+
+  uint16_t GetId ();
+  CellDirection GetOppositeDirection (CellDirection direction);
+
+  uint32_t GetBytesRead (CellDirection);
+  uint32_t GetBytesWritten (CellDirection);
+  void IncrementStats (CellDirection,uint32_t,uint32_t);
+  void ResetStats ();
+
+protected:
+  uint16_t m_id;
+
+  uint32_t stats_p_bytes_read;
+  uint32_t stats_p_bytes_written;
+  uint32_t stats_n_bytes_read;
+  uint32_t stats_n_bytes_written;
 };
 
 

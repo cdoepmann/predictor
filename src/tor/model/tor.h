@@ -25,10 +25,10 @@ class Connection;
 class TorApp;
 
 
-class Circuit : public SimpleRefCount<Circuit>
+class Circuit : public BaseCircuit
 {
 public:
-  Circuit (uint32_t, Ptr<Connection>, Ptr<Connection>);
+  Circuit (uint16_t, Ptr<Connection>, Ptr<Connection>);
   ~Circuit ();
   void DoDispose ();
 
@@ -43,16 +43,9 @@ public:
   Ptr<Connection> GetOppositeConnection (Ptr<Connection>);
   CellDirection GetDirection (Ptr<Connection>);
   CellDirection GetOppositeDirection (Ptr<Connection>);
-  CellDirection GetOppositeDirection (CellDirection);
 
   Ptr<Circuit> GetNextCirc (Ptr<Connection>);
   void SetNextCirc (Ptr<Connection>, Ptr<Circuit>);
-
-  uint32_t GetId ();
-  uint32_t GetStatsBytesRead (CellDirection);
-  uint32_t GetStatsBytesWritten (CellDirection);
-  void IncStatsBytes (CellDirection,uint32_t,uint32_t);
-  void ResetStatsBytes ();
 
   uint32_t GetPackageWindow ();
   void IncPackageWindow ();
@@ -63,8 +56,6 @@ private:
   Ptr<Packet> PopQueue (queue<Ptr<Packet> >*);
   bool IsSendme (Ptr<Packet>);
   Ptr<Packet> CreateSendme ();
-
-  int circ_id;
 
   queue<Ptr<Packet> > *p_cellQ;
   queue<Ptr<Packet> > *n_cellQ;
@@ -85,12 +76,6 @@ private:
    * circuit-level sendme cells to indicate that we're willing to accept
    * more. */
   int deliver_window;
-
-  uint32_t stats_p_bytes_read;
-  uint32_t stats_p_bytes_written;
-
-  uint32_t stats_n_bytes_read;
-  uint32_t stats_n_bytes_written;
 
 };
 
@@ -153,7 +138,7 @@ public:
   virtual void StartApplication (void);
   virtual void StopApplication (void);
 
-  Ptr<Circuit> GetCircuit (uint32_t circid);
+  Ptr<Circuit> GetCircuit (uint16_t);
 
   virtual Ptr<Connection> AddConnection (Ipv4Address, int);
   void AddActiveCircuit (Ptr<Connection>, Ptr<Circuit>);
@@ -164,7 +149,7 @@ public:
   virtual void ConnReadCallback (Ptr<Socket>);
   virtual void ConnWriteCallback (Ptr<Socket>, uint32_t);
   void PackageRelayCell (Ptr<Connection> conn, Ptr<Packet> data);
-  void PackageRelayCellImpl (int, Ptr<Packet>);
+  void PackageRelayCellImpl (uint16_t, Ptr<Packet>);
   void ReceiveRelayCell (Ptr<Connection> conn, Ptr<Packet> cell);
   void AppendCellToCircuitQueue (Ptr<Circuit> circ, Ptr<Packet> cell, CellDirection direction);
   Ptr<Circuit> LookupCircuitFromCell (Ptr<Packet>);

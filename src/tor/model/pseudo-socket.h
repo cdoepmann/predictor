@@ -132,12 +132,12 @@ private:
   int m_leftToSend;
   Ptr<Packet> m_request;
   Time m_requestSent;
-  void (*ttfb_callback)(int, double, string);
-  void (*ttlb_callback)(int, double, string);
-  int m_ttfb_id;
-  int m_ttlb_id;
-  string m_ttfb_desc;
-  string m_ttlb_desc;
+  void (*ttfbCallback)(int, double, string);
+  void (*ttlbCallback)(int, double, string);
+  int m_ttfbId;
+  int m_ttlbId;
+  string m_ttfbDesc;
+  string m_ttlbDesc;
   EventId m_startEvent;
 
   Ptr<RandomVariableStream> m_thinkTimeStream;

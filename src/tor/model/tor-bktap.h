@@ -490,35 +490,13 @@ public:
 
 
 
-class BaseCircuit : public SimpleRefCount<BaseCircuit>
-{
-public:
-  BaseCircuit ();
-  BaseCircuit (uint32_t);
-  virtual ~BaseCircuit ();
 
-  uint32_t GetId ();
-  CellDirection GetOppositeDirection (CellDirection direction);
-
-  uint32_t GetBytesRead (CellDirection);
-  uint32_t GetBytesWritten (CellDirection);
-  void IncrementStats (CellDirection,uint32_t,uint32_t);
-  void ResetStats ();
-
-private:
-  uint32_t m_id;
-
-  uint32_t stats_p_bytes_read;
-  uint32_t stats_p_bytes_written;
-  uint32_t stats_n_bytes_read;
-  uint32_t stats_n_bytes_written;
-};
 
 
 class BktapCircuit : public BaseCircuit
 {
 public:
-  BktapCircuit (uint32_t);
+  BktapCircuit (uint16_t);
   // ~BktapCircuit();
 
   Ptr<UdpChannel> inbound;
@@ -549,7 +527,7 @@ public:
 
 
   Ptr<UdpChannel> AddChannel (Address, int);
-  Ptr<BktapCircuit> GetCircuit (uint32_t);
+  Ptr<BktapCircuit> GetCircuit (uint16_t);
   Ptr<BktapCircuit> GetNextCircuit ();
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
                            Ptr<PseudoClientSocket> clientSocket=0);
