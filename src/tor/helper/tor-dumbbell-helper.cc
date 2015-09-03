@@ -28,6 +28,9 @@ TorDumbbellHelper::TorDumbbellHelper ()
   m_clientThink->SetAttribute ("Max", DoubleValue (20.0));
 
   m_rng = CreateObject<UniformRandomVariable> ();
+  m_startTimeStream = CreateObject<UniformRandomVariable> ();
+  m_startTimeStream->SetAttribute ("Min", DoubleValue (0.01));
+  m_startTimeStream->SetAttribute ("Max", DoubleValue (1.0));
 
   m_factory.SetTypeId ("ns3::TorApp");
 }
@@ -47,11 +50,13 @@ TorDumbbellHelper::AddCircuit (int id, string entryName, string middleName, stri
   CircuitDescriptor desc;
   if (typehint == "bulk")
     {
-      desc = CircuitDescriptor (id, GetProxyName (id), entryName, middleName, exitName, m_bulkRequest, m_bulkThink, typehint);
+      desc = CircuitDescriptor (id, GetProxyName (id), entryName, middleName, exitName, typehint,
+              CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTimeStream->GetValue ())) );
     }
   else if (typehint == "web")
     {
-      desc = CircuitDescriptor (id, GetProxyName (id), entryName, middleName, exitName, m_clientRequest, m_clientThink, typehint);
+      desc = CircuitDescriptor (id, GetProxyName (id), entryName, middleName, exitName, typehint,
+              CreateObject<PseudoClientSocket> (m_clientRequest, m_clientThink, Seconds(m_startTimeStream->GetValue ())) );
     }
   m_circuits[id] = desc;
   circuitIds.push_back (id);
@@ -107,6 +112,12 @@ void
 TorDumbbellHelper::SetTorAppType (string type)
 {
   m_factory.SetTypeId (type);
+}
+
+void
+TorDumbbellHelper::SetStartTimeStream (Ptr<RandomVariableStream> startTimeStream)
+{
+  m_startTimeStream = startTimeStream;
 }
 
 void
@@ -256,14 +267,11 @@ TorDumbbellHelper::InstallCircuits ()
       middleApp->AddCircuit (desc.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
-          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
-          Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (desc.m_rng_request, desc.m_rng_think);
-          clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
+          clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_clientSocket);
         }
       else
         {
-          Ptr<PseudoClientSocket> socket = CreateObject<PseudoClientSocket> (desc.m_rng_request, desc.m_rng_think);
-          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, socket);
+          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_clientSocket);
         }
     }
 }

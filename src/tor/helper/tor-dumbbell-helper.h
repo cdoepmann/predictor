@@ -23,6 +23,7 @@ public:
   void EnableNscStack (bool,string = "cubic");
   void SetTorAppType (string);
   void ParseFile (string,uint32_t = 0,double = 0.05);
+  void SetStartTimeStream (Ptr<RandomVariableStream>);
 
   void BuildTopology ();
   void PrintCircuits ();
@@ -48,53 +49,34 @@ private:
   class CircuitDescriptor
   {
 public:
-    CircuitDescriptor ()
-    {
-    }
-    CircuitDescriptor (int id, string _proxy, string _entry, string _middle, string _exit,
-                       Ptr<RandomVariableStream> rng_request, Ptr<RandomVariableStream> rng_think, string typehint)
+    CircuitDescriptor () {}
+    CircuitDescriptor (int id, string _proxy, string _entry, string _middle, string _exit, string typehint,
+                       Ptr<PseudoClientSocket> clientSocket)
     {
       this->id = id;
       this->path[0] = _proxy;
       this->path[1] = _entry;
       this->path[2] = _middle;
       this->path[3] = _exit;
-      this->m_rng_request = rng_request;
-      this->m_rng_think = rng_think;
+      this->m_clientSocket = clientSocket;
       this->m_typehint = typehint;
     }
 
-    string proxy ()
-    {
-      return path[0];
-    }
-    string entry ()
-    {
-      return path[1];
-    }
-    string middle ()
-    {
-      return path[2];
-    }
-    string exit ()
-    {
-      return path[3];
-    }
-
+    string proxy () { return path[0]; }
+    string entry () { return path[1]; }
+    string middle () { return path[2]; }
+    string exit () { return path[3]; }
 
     int id;
     string path[5];
-    Ptr<RandomVariableStream> m_rng_request;
-    Ptr<RandomVariableStream> m_rng_think;
+    Ptr<PseudoClientSocket> m_clientSocket;
     string m_typehint;
   };
 
   class RelayDescriptor
   {
 public:
-    RelayDescriptor ()
-    {
-    }
+    RelayDescriptor () {}
     RelayDescriptor (string name, string continent, int spokeId, Ptr<TorBaseApp> app)
     {
       this->spokeId = spokeId;
@@ -137,6 +119,7 @@ public:
   Ptr<ConstantRandomVariable> m_bulkThink;
   Ptr<ConstantRandomVariable> m_clientRequest;
   Ptr<UniformRandomVariable> m_clientThink;
+  Ptr<RandomVariableStream> m_startTimeStream;
 
   PointToPointDumbbellHelper *m_dumbbellHelper;
 

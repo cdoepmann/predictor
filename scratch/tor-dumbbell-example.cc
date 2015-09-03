@@ -49,6 +49,12 @@ int main (int argc, char *argv[]) {
 
     ph.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
     ph.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
+
+    Ptr<UniformRandomVariable> m_startTime = CreateObject<UniformRandomVariable> ();
+    m_startTime->SetAttribute ("Min", DoubleValue (0.1));
+    m_startTime->SetAttribute ("Max", DoubleValue (30.0));
+    ph.SetStartTimeStream (m_startTime);
+
     ph.ParseFile ("circuits.dat",10); // parse scenario from file
     // ph.PrintCircuits();
     ph.BuildTopology(); // finally build topology, setup relays and seed circuits
