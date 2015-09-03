@@ -119,9 +119,6 @@ public:
   uint32_t GetOutbufSize ();
   uint32_t GetInbufSize ();
 
-  void SetTtfbCallback (void (*)(int, double, string), int, string = "");
-  void SetTtlbCallback (void (*)(int, double, string), int, string = "");
-  void RegisterCallbacks ();
 private:
   TorApp* torapp;
   Ipv4Address remote;
@@ -138,13 +135,6 @@ private:
 
   EventId read_event;
   EventId write_event;
-
-  void (*m_ttfb_callback)(int, double, string);
-  void (*m_ttlb_callback)(int, double, string);
-  int m_ttfb_id;
-  int m_ttlb_id;
-  string m_ttfb_desc;
-  string m_ttlb_desc;
 };
 
 

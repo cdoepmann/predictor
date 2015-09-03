@@ -179,7 +179,6 @@ TorApp::StartApplication (void)
               // socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
-              conn->RegisterCallbacks ();
             }
         }
     }
@@ -957,10 +956,6 @@ Connection::Connection (TorApp* torapp, Ipv4Address ip, int conntype)
 
   m_socket = 0;
   m_conntype = conntype;
-  m_ttfb_id = -1;
-  m_ttlb_id = -1;
-  m_ttfb_callback = 0;
-  m_ttlb_callback = 0;
 }
 
 
@@ -1151,39 +1146,5 @@ Connection::GetInbufSize ()
 {
   return inbuf.size;
 }
-
-void
-Connection::SetTtfbCallback (void (*ttfb)(int, double, string), int id, string desc)
-{
-  m_ttfb_id = id;
-  m_ttfb_desc = desc;
-  m_ttfb_callback = ttfb;
-}
-
-void
-Connection::SetTtlbCallback (void (*ttlb)(int, double, string), int id, string desc)
-{
-  m_ttlb_id = id;
-  m_ttlb_desc = desc;
-  m_ttlb_callback = ttlb;
-}
-
-void
-Connection::RegisterCallbacks ()
-{
-  if (!SpeaksCells ())
-    {
-      Ptr<PseudoClientSocket> csock = GetSocket ()->GetObject<PseudoClientSocket> ();
-      if (csock)
-        {
-          if (m_ttfb_callback)
-            {
-              csock->SetTtfbCallback (m_ttfb_callback, m_ttfb_id, m_ttfb_desc);
-              csock->SetTtlbCallback (m_ttlb_callback, m_ttlb_id, m_ttlb_desc);
-            }
-        }
-    }
-}
-
 
 } //namespace ns3

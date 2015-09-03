@@ -127,6 +127,31 @@ TorDumbbellHelper::DisableProxies (bool disableProxies)
 }
 
 void
+TorDumbbellHelper::RegisterTtfbCallback (void (*ttfb)(int, double, string))
+{
+  NS_ASSERT (m_circuits.size () > 1 );
+  map<int,CircuitDescriptor>::iterator i;
+  for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
+    {
+      CircuitDescriptor desc = i->second;
+      desc.m_clientSocket->SetTtfbCallback (ttfb, desc.id, desc.m_typehint);
+    }
+}
+
+void
+TorDumbbellHelper::RegisterTtlbCallback (void (*ttlb)(int, double, string))
+{
+  NS_ASSERT (m_circuits.size () > 0);
+  map<int,CircuitDescriptor>::iterator i;
+  for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
+    {
+      CircuitDescriptor desc = i->second;
+      desc.m_clientSocket->SetTtlbCallback (ttlb, desc.id, desc.m_typehint);
+    }
+}
+
+
+void
 TorDumbbellHelper::ParseFile (string filename, uint32_t m, double bulkFraction)
 {
   ifstream f (filename.c_str ());

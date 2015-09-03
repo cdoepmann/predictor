@@ -485,16 +485,6 @@ public:
   uint8_t m_conntype;
   list<Ptr<BktapCircuit> > circuits;
   SimpleRttEstimator rttEstimator;
-
-  void SetTtfbCallback (void (*)(int, double, string), int, string = "");
-  void SetTtlbCallback (void (*)(int, double, string), int, string = "");
-  void RegisterCallbacks ();
-  void (*m_ttfb_callback)(int, double, string);
-  void (*m_ttlb_callback)(int, double, string);
-  int m_ttfb_id;
-  int m_ttlb_id;
-  string m_ttfb_desc;
-  string m_ttlb_desc;
 };
 
 

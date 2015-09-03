@@ -9,8 +9,6 @@ NS_LOG_COMPONENT_DEFINE ("TorExample");
 
 void StatsCallbackBktap(TorDumbbellHelper*, Time);
 void StatsCallbackVanilla(TorDumbbellHelper*, Time);
-void RegisterCallbacksVanilla(TorDumbbellHelper*);
-void RegisterCallbacksBktap(TorDumbbellHelper*);
 void TtfbCallback(int, double, std::string);
 void TtlbCallback(int, double, std::string);
 
@@ -59,6 +57,9 @@ int main (int argc, char *argv[]) {
     // ph.PrintCircuits();
     ph.BuildTopology(); // finally build topology, setup relays and seed circuits
 
+    ph.RegisterTtfbCallback (TtfbCallback);
+    ph.RegisterTtlbCallback (TtlbCallback);
+
     ApplicationContainer relays = ph.GetTorAppsContainer();
 
     relays.Start (Seconds (0.0));
@@ -67,10 +68,8 @@ int main (int argc, char *argv[]) {
 
     if (vanilla){
         Simulator::Schedule(Seconds(0), &StatsCallbackVanilla, &ph, simTime);
-        RegisterCallbacksVanilla(&ph);
     } else {
         Simulator::Schedule(Seconds(0), &StatsCallbackBktap, &ph, simTime);
-        RegisterCallbacksBktap(&ph);
     }
 
     NS_LOG_INFO("start simulation");
@@ -124,35 +123,6 @@ void StatsCallbackVanilla(TorDumbbellHelper* ph, Time simTime) {
     resolution = Seconds(1);
     if (Simulator::Now()+resolution < simTime)
         Simulator::Schedule(resolution, &StatsCallbackVanilla, ph, simTime);
-}
-
-
-void RegisterCallbacksVanilla (TorDumbbellHelper* ph){
-    Ptr<TorApp> tapp;
-    Ptr<Circuit> circ;
-    Ptr<Connection> conn;
-    vector<int>::iterator id;
-    for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
-        tapp = ph->GetProxyApp(*id)->GetObject<TorApp>();
-        circ = tapp->circuits[*id];
-        conn = circ->GetConnection(INBOUND);
-        conn->SetTtfbCallback(TtfbCallback, *id);
-        conn->SetTtlbCallback(TtlbCallback, *id);
-    }
-}
-
-void RegisterCallbacksBktap (TorDumbbellHelper* ph){
-    Ptr<TorBktapApp> tapp;
-    Ptr<BktapCircuit> circ;
-    Ptr<UdpChannel> ch;
-    vector<int>::iterator id;
-    for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
-        tapp = ph->GetProxyApp(*id)->GetObject<TorBktapApp>();
-        circ = tapp->circuits[*id];
-        ch = circ->inbound;
-        ch->SetTtfbCallback(TtfbCallback, *id);
-        ch->SetTtlbCallback(TtlbCallback, *id);
-    }
 }
 
 void TtfbCallback(int id, double time, std::string desc) {

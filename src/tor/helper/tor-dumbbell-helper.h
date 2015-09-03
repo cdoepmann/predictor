@@ -24,6 +24,8 @@ public:
   void SetTorAppType (string);
   void ParseFile (string,uint32_t = 0,double = 0.05);
   void SetStartTimeStream (Ptr<RandomVariableStream>);
+  void RegisterTtfbCallback (void (*)(int, double, string));
+  void RegisterTtlbCallback (void (*)(int, double, string));
 
   void BuildTopology ();
   void PrintCircuits ();
