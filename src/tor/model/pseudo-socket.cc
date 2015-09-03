@@ -322,7 +322,7 @@ PseudoClientSocket::PseudoClientSocket (Time startTime)
   m_ttlb_id = 0;
   m_ttfb_id = 0;
 
-  Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
+  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 
@@ -335,7 +335,7 @@ PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream,
   m_thinkTimeStream = thinkStream;
   m_leftToSend = PACKET_PAYLOAD_SIZE;
 
-  Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
+  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 void
@@ -359,7 +359,8 @@ PseudoClientSocket::SetThinkStream (Ptr<RandomVariableStream> thinkStream)
 void
 PseudoClientSocket::Start (Time startTime)
 {
-  Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
+  m_startEvent.Cancel ();
+  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
 }
 
 uint32_t

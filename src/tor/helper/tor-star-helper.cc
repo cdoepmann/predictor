@@ -5,6 +5,7 @@ TorStarHelper::TorStarHelper ()
   m_p2pHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pHelper.SetChannelAttribute ("Delay", StringValue ("20ms"));
 
+  m_startTimeStream = 0;
   m_starHelper = 0;
   m_nSpokes = 0;
   m_nSpokes = 1;   // hack: spare one for concurrent traffic
@@ -27,6 +28,16 @@ TorStarHelper::AddCircuit (int id, string entryName, string middleName, string e
 {
 
   NS_ASSERT (m_circuits.find (id) == m_circuits.end ());
+
+  if (!clientSocket)
+    {
+      clientSocket = CreateObject<PseudoClientSocket> ();
+      if (m_startTimeStream)
+        {
+          clientSocket->Start (Seconds (m_startTimeStream->GetValue ()));
+        }
+    }
+
   CircuitDescriptor desc (id, GetProxyName (id), entryName, middleName, exitName, clientSocket);
   m_circuits[id] = desc;
   circuitIds.push_back (id);
@@ -63,6 +74,12 @@ void
 TorStarHelper::SetRtt (Time rtt)
 {
   m_p2pHelper.SetChannelAttribute ("Delay", TimeValue (rtt / 4.0));
+}
+
+void
+TorStarHelper::SetStartTimeStream (Ptr<RandomVariableStream> startTimeStream)
+{
+  m_startTimeStream = startTimeStream;
 }
 
 void

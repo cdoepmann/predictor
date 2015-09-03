@@ -22,6 +22,7 @@ public:
     void ParseFile(string);
     void AddCircuit(int, string, string, string, Ptr<PseudoClientSocket> clientSocket=0);
     void SetRelayAttribute(string, string, const AttributeValue &value);
+    void SetStartTimeStream (Ptr<RandomVariableStream>);
     void SetRtt(Time);
     void DisableProxies(bool);
     void EnablePcap(bool);
@@ -104,11 +105,10 @@ private:
     bool m_disableProxies;
     bool m_enablePcap;
     std::string m_nscTcpCong;
-
     std::string m_torAppType;
+    Ptr<RandomVariableStream> m_startTimeStream;
 
     ApplicationContainer m_relayApps;
-
     InternetStackHelper m_stackHelper;
     Ipv4AddressHelper m_addressHelper;
     PointToPointHelper m_p2pHelper;

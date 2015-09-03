@@ -56,10 +56,15 @@ int main (int argc, char *argv[]) {
     Ptr<ConstantRandomVariable> m_bulkThink = CreateObject<ConstantRandomVariable>();
     m_bulkThink->SetAttribute("Constant", DoubleValue(0));
 
+    Ptr<UniformRandomVariable> m_startTime = CreateObject<UniformRandomVariable> ();
+    m_startTime->SetAttribute ("Min", DoubleValue (0.1));
+    m_startTime->SetAttribute ("Max", DoubleValue (1.0));
+    // ph.SetStartTimeStream (m_startTime); // default start time when no PseudoClientSocket specified
+
     /* state scenario/ add circuits inline */
-    ph.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.1)) );
-    ph.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.1)) );
-    ph.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.1)) );
+    ph.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    ph.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    ph.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
 
     ph.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2MB/s")));
     ph.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2MB/s")));

@@ -109,7 +109,7 @@ private:
 class PseudoClientSocket : public PseudoSocket
 {
 public:
-  PseudoClientSocket (Time startTime=Seconds(0.1));
+  PseudoClientSocket (Time startTime=Seconds(0.01));
   PseudoClientSocket (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>, Time startTime=Seconds(0.1));
 
   uint32_t GetTxAvailable () const;
@@ -138,6 +138,7 @@ private:
   int m_ttlb_id;
   string m_ttfb_desc;
   string m_ttlb_desc;
+  EventId m_startEvent;
 
   Ptr<RandomVariableStream> m_thinkTimeStream;
   Ptr<RandomVariableStream> m_requestSizeStream;
