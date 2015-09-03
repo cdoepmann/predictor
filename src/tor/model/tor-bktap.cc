@@ -492,7 +492,7 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Ptr<Packet> cell;
 
-  if (!ch->SpeaksCells () && m_devQlimit <= m_devQ->GetNPackets ())
+  if (ch->SpeaksCells () && m_devQlimit <= m_devQ->GetNPackets ())
     {
       return 0;
     }
