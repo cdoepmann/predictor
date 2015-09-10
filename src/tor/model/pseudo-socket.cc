@@ -208,6 +208,10 @@ PseudoServerSocket::PseudoServerSocket ()
   m_leftToSend = 0;
   m_leftToRead = PACKET_PAYLOAD_SIZE;
   m_request = 0;
+
+  m_rng = CreateObject<ExponentialRandomVariable> ();
+  m_rng->SetAttribute ("Mean", DoubleValue (20));
+  m_rng->SetAttribute ("Bound", DoubleValue (200));
 }
 
 uint32_t
@@ -290,7 +294,7 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
       RequestHeader h;
       m_request->PeekHeader (h);
       m_leftToSend = h.GetRequestSize ();
-      Simulator::ScheduleNow (&PseudoServerSocket::NotifyDataRecv, this);
+      Simulator::Schedule (MilliSeconds(m_rng->GetInteger ()), &PseudoServerSocket::NotifyDataRecv, this);
     }
   else
     {

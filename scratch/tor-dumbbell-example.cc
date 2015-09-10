@@ -97,9 +97,9 @@ void StatsCallback(TorDumbbellHelper* ph, Time simTime) {
 }
 
 void TtfbCallback(int id, double time, std::string desc) {
-    cout << Simulator::Now().GetSeconds() << " ttfb from id " << id << ": " << time << endl;
+    cout << Simulator::Now().GetSeconds() << " " << desc << " ttfb from id " << id << ": " << time << endl;
 }
 
 void TtlbCallback(int id, double time, std::string desc) {
-    cout << Simulator::Now().GetSeconds() << " ttlb from id " << id << ": " << time << endl;
+    cout << Simulator::Now().GetSeconds() << " " << desc << " ttlb from id " << id << ": " << time << endl;
 }

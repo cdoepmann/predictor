@@ -2,13 +2,42 @@
 
 TorDumbbellHelper::TorDumbbellHelper ()
 {
+  // Based on the iPlane data set: latencies 2015-08-04
+  //RTT between ["NA", "NA"] (min/Q1/Median/Q3/max in ms) 11 29 45.0 73 148
+  Ptr<EmpiricalRandomVariable> owd = CreateObject<EmpiricalRandomVariable> ();
+  owd->CDF ( 11/2.0,0.00);
+  owd->CDF ( 29/2.0,0.25);
+  owd->CDF ( 45/2.0,0.50);
+  owd->CDF ( 73/2.0,0.75);
+  owd->CDF (148/2.0,1.00);
+  uint32_t leftDelay = owd->GetInteger ();
+
+  // RTT between ["EU", "EU"] (min/Q1/Median/Q3/max in ms) 14 27 37.0 48 65
+  owd = CreateObject<EmpiricalRandomVariable> ();
+  owd->CDF ( 14/2.0,0.00);
+  owd->CDF ( 27/2.0,0.25);
+  owd->CDF ( 37/2.0,0.50);
+  owd->CDF ( 48/2.0,0.75);
+  owd->CDF ( 65/2.0,1.00);
+  uint32_t rightDelay = owd->GetInteger ();
+
+  // RTT between ["EU", "NA"] (min/Q1/Median/Q3/max in ms) 78 117 132.0 161 252
+  owd = CreateObject<EmpiricalRandomVariable> ();
+  owd->CDF ( 78/2.0,0.00);
+  owd->CDF (117/2.0,0.25);
+  owd->CDF (132/2.0,0.50);
+  owd->CDF (161/2.0,0.75);
+  owd->CDF (252/2.0,1.00);
+  uint32_t routerDelay = owd->GetInteger ();
+  routerDelay = max (routerDelay-(rightDelay+leftDelay), (uint32_t) 1);
+
+  m_p2pLeftHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(leftDelay)));
+  m_p2pRightHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(rightDelay)));
+  m_p2pRouterHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(routerDelay)));
+
   m_p2pLeftHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pRightHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pRouterHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
-
-  m_p2pLeftHelper.SetChannelAttribute ("Delay", StringValue ("22ms"));
-  m_p2pRightHelper.SetChannelAttribute ("Delay", StringValue ("21ms"));
-  m_p2pRouterHelper.SetChannelAttribute ("Delay", StringValue ("50ms"));
 
   m_dumbbellHelper = 0;
   m_nLeftLeaf = 0;
@@ -292,6 +321,7 @@ TorDumbbellHelper::InstallCircuits ()
       middleApp->AddCircuit (desc.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
+          entryApp->AddCircuit(desc.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
           clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_clientSocket);
         }
       else

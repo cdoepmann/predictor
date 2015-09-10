@@ -103,6 +103,7 @@ private:
   uint32_t m_leftToSend;
   uint32_t m_leftToRead;
   Ptr<Packet> m_request;
+  Ptr<ExponentialRandomVariable> m_rng;
 };
 
 
