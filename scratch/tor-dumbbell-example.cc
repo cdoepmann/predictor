@@ -52,7 +52,7 @@ int main (int argc, char *argv[]) {
     m_startTime->SetAttribute ("Max", DoubleValue (30.0));
     ph.SetStartTimeStream (m_startTime);
 
-    ph.ParseFile ("circuits.dat",10); // parse scenario from file
+    ph.ParseFile ("circuits-5000c50r-20150804.dat",10); // parse scenario from file
     // ph.PrintCircuits();
     ph.BuildTopology(); // finally build topology, setup relays and seed circuits
 
