@@ -47,6 +47,7 @@ TorDumbbellHelper::TorDumbbellHelper ()
 
   m_bulkRequest = CreateObject<ConstantRandomVariable> ();
   m_bulkRequest->SetAttribute ("Constant", DoubleValue (5 * 1024 * 1024));
+  // m_bulkRequest->SetAttribute("Constant", DoubleValue(pow(2,30)));
   m_bulkThink = CreateObject<ConstantRandomVariable> ();
   m_bulkThink->SetAttribute ("Constant", DoubleValue (0));
 

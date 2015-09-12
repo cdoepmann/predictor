@@ -14,12 +14,12 @@ void TtlbCallback(int, double, std::string);
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
     Time simTime = Time("120s");
-    bool vanilla = true;
+    string transport = "vanilla";
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
     cmd.AddValue("time", "simulation time", simTime);
-    cmd.AddValue("vanilla", "use vanilla tor", vanilla);
+    cmd.AddValue("transport", "transport protocol", transport);
     cmd.Parse(argc, argv);
 
     SeedManager::SetSeed (42);
@@ -36,38 +36,39 @@ int main (int argc, char *argv[]) {
     /* TorApp defaults. Note, this also affects onion proxies. */
     // Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("100Mbps")));
     // Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("100Mbps")));
-    // Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
-    // Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
+    Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
+    Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
     
     NS_LOG_INFO("setup topology");
 
-    TorDumbbellHelper ph;
-    if (!vanilla){
-        ph.SetTorAppType("ns3::TorBktapApp");
-    }
+    TorDumbbellHelper th;
+    if (transport == "pctcp")
+        th.SetTorAppType("ns3::TorPctcpApp");
+    else if (transport == "bktap")
+        th.SetTorAppType("ns3::TorBktapApp");
 
-    ph.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
-    ph.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
+    th.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
+    th.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
 
     Ptr<UniformRandomVariable> m_startTime = CreateObject<UniformRandomVariable> ();
     m_startTime->SetAttribute ("Min", DoubleValue (0.1));
     m_startTime->SetAttribute ("Max", DoubleValue (30.0));
-    ph.SetStartTimeStream (m_startTime);
+    th.SetStartTimeStream (m_startTime);
 
-    ph.ParseFile ("circuits-5000c50r-20150804.dat",10,0.05); // parse scenario from file
-    // ph.PrintCircuits();
-    ph.BuildTopology(); // finally build topology, setup relays and seed circuits
+    th.ParseFile ("circuits-5000c50r-20150804.dat",10,0.05); // parse scenario from file
+    // th.PrintCircuits();
+    th.BuildTopology(); // finally build topology, setup relays and seed circuits
 
-    ph.RegisterTtfbCallback (TtfbCallback);
-    ph.RegisterTtlbCallback (TtlbCallback);
+    th.RegisterTtfbCallback (TtfbCallback);
+    th.RegisterTtlbCallback (TtlbCallback);
 
-    ApplicationContainer relays = ph.GetTorAppsContainer();
+    ApplicationContainer relays = th.GetTorAppsContainer();
 
     relays.Start (Seconds (0.0));
     relays.Stop (simTime);
     Simulator::Stop (simTime);
 
-    Simulator::Schedule(Seconds(0), &StatsCallback, &ph, simTime);
+    Simulator::Schedule(Seconds(0), &StatsCallback, &th, simTime);
 
     NS_LOG_INFO("start simulation");
     Simulator::Run ();
@@ -79,12 +80,12 @@ int main (int argc, char *argv[]) {
 }
 
 /* example of (cumulative) i/o stats */
-void StatsCallback(TorDumbbellHelper* ph, Time simTime) {
+void StatsCallback(TorDumbbellHelper* th, Time simTime) {
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
-    for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
-      Ptr<TorBaseApp> proxyApp = ph->GetProxyApp(*id);
-      Ptr<TorBaseApp> exitApp = ph->GetExitApp(*id);
+    for (id = th->circuitIds.begin(); id != th->circuitIds.end(); ++id) {
+      Ptr<TorBaseApp> proxyApp = th->GetProxyApp(*id);
+      Ptr<TorBaseApp> exitApp = th->GetExitApp(*id);
       Ptr<BaseCircuit> proxyCirc = proxyApp->baseCircuits[*id];
       Ptr<BaseCircuit> exitCirc = exitApp->baseCircuits[*id];
       cout << exitCirc->GetBytesRead(INBOUND) << " " << proxyCirc->GetBytesWritten(INBOUND) << " ";
@@ -95,7 +96,7 @@ void StatsCallback(TorDumbbellHelper* ph, Time simTime) {
 
     Time resolution = MilliSeconds(10);
     if (Simulator::Now()+resolution < simTime)
-        Simulator::Schedule(resolution, &StatsCallback, ph, simTime);
+        Simulator::Schedule(resolution, &StatsCallback, th, simTime);
 }
 
 void TtfbCallback(int id, double time, std::string desc) {

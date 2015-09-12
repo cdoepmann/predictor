@@ -13,13 +13,13 @@ int main (int argc, char *argv[]) {
     uint32_t run = 1;
     Time simTime = Time("60s");
     uint32_t rtt = 40;
-    bool vanilla = true;
+    string transport = "vanilla";
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
     cmd.AddValue("rtt", "hop-by-hop rtt in msec", rtt);
     cmd.AddValue("time", "simulation time", simTime);
-    cmd.AddValue("vanilla", "use vanilla tor", vanilla);
+    cmd.AddValue("transport", "transport protocol", transport);
     cmd.Parse(argc, argv);
 
     SeedManager::SetSeed (42);
@@ -36,21 +36,22 @@ int main (int argc, char *argv[]) {
     /* TorApp defaults. Note, this also affects onion proxies. */
     // Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("100Mbps")));
     // Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("100Mbps")));
-    // Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
-    // Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
+    Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
+    Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
 
     NS_LOG_INFO("setup topology");
 
-    TorStarHelper ph;
-    if (!vanilla) {
-        ph.SetTorAppType("ns3::TorBktapApp");
-    }
+    TorStarHelper th;
+    if (transport == "pctcp")
+        th.SetTorAppType("ns3::TorPctcpApp");
+    else if (transport == "bktap")
+        th.SetTorAppType("ns3::TorBktapApp");
 
-    ph.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
-    ph.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
-    ph.SetRtt(MilliSeconds(rtt)); // set rtt
-    // ph.EnablePcap(true); // enable pcap logging
-    // ph.ParseFile ("circuits.dat"); // parse scenario from file
+    th.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
+    th.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
+    th.SetRtt(MilliSeconds(rtt)); // set rtt
+    // th.EnablePcap(true); // enable pcap logging
+    // th.ParseFile ("circuits.dat"); // parse scenario from file
 
     Ptr<ConstantRandomVariable> m_bulkRequest = CreateObject<ConstantRandomVariable>();
     m_bulkRequest->SetAttribute("Constant", DoubleValue(pow(2,30)));
@@ -60,30 +61,30 @@ int main (int argc, char *argv[]) {
     Ptr<UniformRandomVariable> m_startTime = CreateObject<UniformRandomVariable> ();
     m_startTime->SetAttribute ("Min", DoubleValue (0.1));
     m_startTime->SetAttribute ("Max", DoubleValue (1.0));
-    // ph.SetStartTimeStream (m_startTime); // default start time when no PseudoClientSocket specified
+    // th.SetStartTimeStream (m_startTime); // default start time when no PseudoClientSocket specified
 
     /* state scenario/ add circuits inline */
-    ph.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
-    ph.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
-    ph.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
 
-    ph.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2MB/s")));
-    ph.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2MB/s")));
+    th.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2Mb/s")));
+    th.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2Mb/s")));
 
-    // ph.PrintCircuits();
-    ph.BuildTopology(); // finally build topology, setup relays and seed circuits
+    // th.PrintCircuits();
+    th.BuildTopology(); // finally build topology, setup relays and seed circuits
 
     /* limit the access link */
-    // Ptr<Node> client = ph.GetTorNode("btlnk");
+    // Ptr<Node> client = th.GetTorNode("btlnk");
     // client->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("1MB/s"));
     // client->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("1MB/s"));
 
-    ApplicationContainer relays = ph.GetTorAppsContainer();
+    ApplicationContainer relays = th.GetTorAppsContainer();
     relays.Start (Seconds (0.0));
     relays.Stop (simTime);
     Simulator::Stop (simTime);
 
-    Simulator::Schedule(Seconds(0), &StatsCallback, &ph, simTime);
+    Simulator::Schedule(Seconds(0), &StatsCallback, &th, simTime);
 
     NS_LOG_INFO("start simulation");
     Simulator::Run ();
@@ -95,12 +96,14 @@ int main (int argc, char *argv[]) {
 }
 
 /* example of (cumulative) i/o stats */
-void StatsCallback(TorStarHelper* ph, Time simTime) {
+void
+StatsCallback(TorStarHelper* th, Time simTime)
+{
     cout << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
-    for (id = ph->circuitIds.begin(); id != ph->circuitIds.end(); ++id) {
-      Ptr<TorBaseApp> proxyApp = ph->GetProxyApp(*id);
-      Ptr<TorBaseApp> exitApp = ph->GetExitApp(*id);
+    for (id = th->circuitIds.begin(); id != th->circuitIds.end(); ++id) {
+      Ptr<TorBaseApp> proxyApp = th->GetProxyApp(*id);
+      Ptr<TorBaseApp> exitApp = th->GetExitApp(*id);
       Ptr<BaseCircuit> proxyCirc = proxyApp->baseCircuits[*id];
       Ptr<BaseCircuit> exitCirc = exitApp->baseCircuits[*id];
       cout << exitCirc->GetBytesRead(INBOUND) << " " << proxyCirc->GetBytesWritten(INBOUND) << " ";
@@ -111,5 +114,5 @@ void StatsCallback(TorStarHelper* ph, Time simTime) {
 
     Time resolution = MilliSeconds(10);
     if (Simulator::Now()+resolution < simTime)
-        Simulator::Schedule(resolution, &StatsCallback, ph, simTime);
+        Simulator::Schedule(resolution, &StatsCallback, th, simTime);
 }

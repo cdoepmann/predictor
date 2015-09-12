@@ -11,6 +11,7 @@ def build(bld):
     module.source = [
         'model/tor-base.cc',
         'model/tor.cc',
+        'model/tor-pctcp.cc',
         'model/tor-bktap.cc',
         'model/cell-header.cc',
         'model/pseudo-socket.cc',
@@ -29,6 +30,7 @@ def build(bld):
     headers.source = [
         'model/tor-base.h',
         'model/tor.h',
+        'model/tor-pctcp.h',
         'model/tor-bktap.h',
         'model/cell-header.h',
         'model/pseudo-socket.h',
