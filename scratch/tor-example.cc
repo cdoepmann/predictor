@@ -36,6 +36,8 @@ int main (int argc, char *argv[]) {
     /* TorApp defaults. Note, this also affects onion proxies. */
     // Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("100Mbps")));
     // Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("100Mbps")));
+    // Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
+    // Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
 
     NS_LOG_INFO("setup topology");
 

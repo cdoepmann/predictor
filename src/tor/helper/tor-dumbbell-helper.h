@@ -136,6 +136,10 @@ public:
   PointToPointHelper m_p2pRightHelper;
   PointToPointHelper m_p2pRouterHelper;
 
+  Ptr<EmpiricalRandomVariable> m_owdLeft;
+  Ptr<EmpiricalRandomVariable> m_owdRight;
+  Ptr<EmpiricalRandomVariable> m_owdRouter;
+
 };
 
 

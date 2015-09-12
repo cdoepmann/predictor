@@ -17,7 +17,15 @@ TorApp::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::TorApp")
     .SetParent<TorBaseApp> ()
-    .AddConstructor<TorApp> ();
+    .AddConstructor<TorApp> ()
+    .AddAttribute ("WindowStart", "End-to-end sliding window size (in cells).",
+                   IntegerValue (1000),
+                   MakeIntegerAccessor (&TorApp::m_windowStart),
+                   MakeIntegerChecker<int> ())
+    .AddAttribute ("WindowIncrement", "End-to-end sliding window increment (in cells).",
+                   IntegerValue (100),
+                   MakeIntegerAccessor (&TorApp::m_windowIncrement),
+                   MakeIntegerChecker<int> ());
   return tid;
 }
 
@@ -63,7 +71,7 @@ TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, 
   Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
   p_conn->SetSocket (clientSocket);
 
-  Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn);
+  Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
 
   // add to circuit list maintained by every connection
   AddActiveCircuit (p_conn, circ);
@@ -513,13 +521,16 @@ TorApp::RoundRobin (int base, int64_t global_bucket)
 
 
 
-Circuit::Circuit (uint16_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_conn) : BaseCircuit (circ_id)
+Circuit::Circuit (uint16_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_conn,
+  int windowStart, int windowIncrement) : BaseCircuit (circ_id)
 {
   this->p_cellQ = new queue<Ptr<Packet> >;
   this->n_cellQ = new queue<Ptr<Packet> >;
 
-  this->deliver_window = CIRCWINDOW_START;
-  this->package_window = CIRCWINDOW_START;
+  m_windowStart = windowStart;
+  m_windowIncrement = windowIncrement;
+  this->deliver_window = m_windowStart;
+  this->package_window = m_windowStart;
 
   this->p_conn = p_conn;
   this->n_conn = n_conn;
@@ -587,7 +598,7 @@ Circuit::PopCell (CellDirection direction)
       if (!conn->SpeaksCells ())
         {
           deliver_window--;
-          if (deliver_window <= CIRCWINDOW_START - CIRCWINDOW_INCREMENT)
+          if (deliver_window <= m_windowStart - m_windowIncrement)
             {
               IncDeliverWindow ();
               NS_LOG_LOGIC ("[Circuit " << GetId () << "] Send SENDME cell ");
@@ -820,10 +831,10 @@ Circuit::GetPackageWindow ()
 void
 Circuit::IncPackageWindow ()
 {
-  package_window += CIRCWINDOW_INCREMENT;
-  if (package_window > CIRCWINDOW_START)
+  package_window += m_windowIncrement;
+  if (package_window > m_windowStart)
     {
-      package_window = CIRCWINDOW_START;
+      package_window = m_windowStart;
     }
 }
 
@@ -836,10 +847,10 @@ Circuit::GetDeliverWindow ()
 void
 Circuit::IncDeliverWindow ()
 {
-  deliver_window += CIRCWINDOW_INCREMENT;
-  if (deliver_window > CIRCWINDOW_START)
+  deliver_window += m_windowIncrement;
+  if (deliver_window > m_windowStart)
     {
-      deliver_window = CIRCWINDOW_START;
+      deliver_window = m_windowStart;
     }
 }
 

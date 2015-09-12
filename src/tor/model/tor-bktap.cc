@@ -642,13 +642,6 @@ TorBktapApp::LookupChannel (Ptr<Socket> socket)
   return NULL;
 }
 
-
-
-
-
-
-
-
 void
 TorBktapApp::DoDispose (void)
 {

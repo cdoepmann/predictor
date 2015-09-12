@@ -28,7 +28,7 @@ class TorApp;
 class Circuit : public BaseCircuit
 {
 public:
-  Circuit (uint16_t, Ptr<Connection>, Ptr<Connection>);
+  Circuit (uint16_t, Ptr<Connection>, Ptr<Connection>, int, int);
   ~Circuit ();
   void DoDispose ();
 
@@ -77,6 +77,8 @@ private:
    * more. */
   int deliver_window;
 
+  int m_windowStart;
+  int m_windowIncrement;
 };
 
 
@@ -162,6 +164,8 @@ public:
   Ptr<Socket> listen_socket;
   vector<Ptr<Connection> > connections;
   map<uint16_t,Ptr<Circuit> > circuits;
+  int m_windowStart;
+  int m_windowIncrement;
 
 protected:
   virtual void DoDispose (void);
