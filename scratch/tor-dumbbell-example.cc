@@ -46,6 +46,8 @@ int main (int argc, char *argv[]) {
         th.SetTorAppType("ns3::TorPctcpApp");
     else if (transport == "bktap")
         th.SetTorAppType("ns3::TorBktapApp");
+    else if (transport == "n23")
+        th.SetTorAppType("ns3::TorN23App");
 
     th.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
     th.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor

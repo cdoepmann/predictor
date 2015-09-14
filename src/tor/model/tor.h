@@ -32,8 +32,8 @@ public:
   ~Circuit ();
   void DoDispose ();
 
-  Ptr<Packet> PopCell (CellDirection);
-  void PushCell (Ptr<Packet>, CellDirection);
+  virtual Ptr<Packet> PopCell (CellDirection);
+  virtual void PushCell (Ptr<Packet>, CellDirection);
   queue<Ptr<Packet> >* GetQueue (CellDirection);
   uint32_t GetQueueSize (CellDirection);
   uint32_t SendCell (CellDirection);
@@ -52,7 +52,7 @@ public:
   uint32_t GetDeliverWindow ();
   void IncDeliverWindow ();
 
-private:
+protected:
   Ptr<Packet> PopQueue (queue<Ptr<Packet> >*);
   bool IsSendme (Ptr<Packet>);
   Ptr<Packet> CreateSendme ();
