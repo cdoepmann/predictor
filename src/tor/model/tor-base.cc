@@ -20,10 +20,10 @@ TorBaseApp::GetTypeId (void)
                    AddressValue (InetSocketAddress (Ipv4Address::GetAny (), 9001)),
                    MakeAddressAccessor (&TorBaseApp::m_local), MakeAddressChecker ())
     .AddAttribute ("BandwidthRate", "The data rate in on state.",
-                   DataRateValue (DataRate ("5Mbps")),
+                   DataRateValue (DataRate ("1GB/s")),
                    MakeDataRateAccessor (&TorBaseApp::m_rate), MakeDataRateChecker ())
     .AddAttribute ("BandwidthBurst", "The data burst in on state.",
-                   DataRateValue (DataRate ("10Mbps")),
+                   DataRateValue (DataRate ("1GB/s")),
                    MakeDataRateAccessor (&TorBaseApp::m_burst), MakeDataRateChecker ())
     .AddAttribute ("Refilltime", "Refill interval of the token bucket.",
                    TimeValue (Time ("100ms")),

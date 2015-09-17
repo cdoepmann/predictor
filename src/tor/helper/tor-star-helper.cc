@@ -4,7 +4,7 @@ TorStarHelper::TorStarHelper ()
 {
   m_p2pHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pHelper.SetChannelAttribute ("Delay", StringValue ("20ms"));
-
+  m_rng = CreateObject<UniformRandomVariable> ();
   m_startTimeStream = 0;
   m_starHelper = 0;
   m_nSpokes = 0;
@@ -114,16 +114,38 @@ TorStarHelper::DisableProxies (bool disableProxies)
 }
 
 void
-TorStarHelper::ParseFile (string filename)
+TorStarHelper::ParseFile (string filename, uint32_t m)
 {
   ifstream f;
   f.open (filename.c_str ());
   NS_ASSERT (f.is_open ());
 
+  set<uint32_t> chosenCircuits;
+  if (m > 0)
+    {
+      string line;
+      uint32_t n;
+      for (n = 0; getline (f, line); ++n){}
+      NS_ASSERT (m <= n);
+      while (chosenCircuits.size () < m)
+        {
+          chosenCircuits.insert (m_rng->GetInteger (1,n));
+        }
+      f.close ();
+      f.open (filename.c_str ());
+    }
+
   int id;
   string path[3], bw[3], dummy;
+  uint32_t lineno = 0;
   while (f >> id >> path[0] >> dummy >> bw[0] >> path[1] >> dummy >> bw[1] >> path[2] >> dummy >> bw[2])
     {
+      ++lineno;
+      if (m > 0 && chosenCircuits.find (lineno) == chosenCircuits.end ())
+        {
+          continue;
+        }
+      
       AddCircuit (id, path[0], path[1], path[2]);
       for (int i = 0; i < 3; ++i)
         {

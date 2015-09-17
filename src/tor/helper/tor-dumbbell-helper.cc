@@ -159,7 +159,7 @@ TorDumbbellHelper::DisableProxies (bool disableProxies)
 void
 TorDumbbellHelper::RegisterTtfbCallback (void (*ttfb)(int, double, string))
 {
-  NS_ASSERT (m_circuits.size () > 1 );
+  NS_ASSERT (m_circuits.size () > 0 );
   map<int,CircuitDescriptor>::iterator i;
   for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
     {
@@ -192,9 +192,7 @@ TorDumbbellHelper::ParseFile (string filename, uint32_t m, double bulkFraction)
     {
       string line;
       uint32_t n;
-      for (n = 0; getline (f, line); ++n)
-        {
-        }
+      for (n = 0; getline (f, line); ++n){}
       NS_ASSERT (m <= n);
       while (chosenCircuits.size () < m)
         {
@@ -269,14 +267,14 @@ TorDumbbellHelper::BuildTopology ()
 
   for (int i = 0; i < m_nLeftLeaf; ++i)
     {
-      Ptr<PointToPointChannel> ch = m_dumbbellHelper->GetLeft(i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()-> GetObject<PointToPointChannel> ();
+      Ptr<PointToPointChannel> ch = GetNode("NA",i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()-> GetObject<PointToPointChannel> ();
       ch->SetAttribute ("Delay", TimeValue (MilliSeconds(m_owdLeft->GetInteger ())));
       m_stackHelper.Install (m_dumbbellHelper->GetLeft (i));
     }
 
   for (int i = 0; i < m_nRightLeaf; ++i)
     {
-      Ptr<PointToPointChannel> ch = m_dumbbellHelper->GetRight(i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()-> GetObject<PointToPointChannel> ();
+      Ptr<PointToPointChannel> ch = GetNode("EU",i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()-> GetObject<PointToPointChannel> ();
       ch->SetAttribute ("Delay", TimeValue (MilliSeconds(m_owdRight->GetInteger ())));
       m_stackHelper.Install (m_dumbbellHelper->GetRight (i));
     }
@@ -310,6 +308,8 @@ TorDumbbellHelper::InstallCircuits ()
       if (!m_disableProxies)
         {
           clientApp = InstallTorApp (desc.proxy ());
+          GetNode(desc.proxy ())->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("10Mb/s"));
+          GetNode(desc.proxy ())->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("10Mb/s"));
         }
       entryApp = InstallTorApp (desc.entry ());
       middleApp = InstallTorApp (desc.middle ());
