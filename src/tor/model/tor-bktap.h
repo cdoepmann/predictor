@@ -521,10 +521,10 @@ public:
   ~TorBktapApp ();
 
   virtual void StartApplication (void);
-  // virtual void StopApplication (void);
+  virtual void StopApplication (void);
   virtual void DoDispose (void);
   void RefillReadCallback (int64_t);
-
+  void RefillWriteCallback (int64_t);
 
   Ptr<UdpChannel> AddChannel (Address, int);
   Ptr<BktapCircuit> GetCircuit (uint16_t);
@@ -548,6 +548,7 @@ public:
   void CongestionAvoidance (Ptr<SeqQueue>, Time);
   Ptr<UdpChannel> LookupChannel (Ptr<Socket>);
 
+  void SocketWriteCallback (Ptr<Socket>, uint32_t);
   void WriteCallback ();
   uint32_t FlushPendingCell (Ptr<BktapCircuit>, CellDirection,bool = false);
   void SendEmptyAck (Ptr<BktapCircuit>, CellDirection, uint8_t, uint32_t);

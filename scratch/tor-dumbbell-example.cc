@@ -34,8 +34,8 @@ int main (int argc, char *argv[]) {
     // Config::SetDefault ("ns3::DropTailQueue::MaxPackets", UintegerValue (100));
 
     /* TorApp defaults. Note, this also affects onion proxies. */
-    Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("12Mbps")));
-    Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("12Mbps")));
+    // Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("12Mbps")));
+    // Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("12Mbps")));
     Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
     Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
     
@@ -57,7 +57,7 @@ int main (int argc, char *argv[]) {
     m_startTime->SetAttribute ("Max", DoubleValue (30.0));
     th.SetStartTimeStream (m_startTime);
 
-    th.ParseFile ("circuits-5000c50r-20150804.dat",10,0.05); // parse scenario from file
+    th.ParseFile ("circuits-5000c50r-20150804.dat",10,0.1); // parse scenario from file
     // th.PrintCircuits();
     th.BuildTopology(); // finally build topology, setup relays and seed circuits
 

@@ -151,6 +151,7 @@ TorBktapApp::StartApplication (void)
   m_refilltime = MilliSeconds (10);
   TorBaseApp::StartApplication ();
   m_readbucket.SetRefilledCallback (MakeCallback (&TorBktapApp::RefillReadCallback, this));
+  m_writebucket.SetRefilledCallback (MakeCallback (&TorBktapApp::RefillWriteCallback, this));
 
   circit = circuits.begin ();
 
@@ -166,6 +167,7 @@ TorBktapApp::StartApplication (void)
     }
 
   m_socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
+  m_socket->SetDataSentCallback (MakeCallback (&TorBktapApp::SocketWriteCallback, this));
 
   Ipv4Mask ipmask = Ipv4Mask ("255.0.0.0");
 
@@ -204,15 +206,35 @@ TorBktapApp::StartApplication (void)
 }
 
 void
+TorBktapApp::StopApplication (void)
+{
+  m_socket->Close ();
+  m_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+  m_socket->SetDataSentCallback (MakeNullCallback<void, Ptr<Socket>, uint32_t > ());
+}
+
+void
 TorBktapApp::RefillReadCallback (int64_t prev_read_bucket)
 {
-  if (prev_read_bucket <= 0 && m_readbucket.GetSize () > 0)
+  vector<Ptr<Socket> > v;
+  map<Address,Ptr<UdpChannel> >::iterator it;
+  for ( it = channels.begin (); it != channels.end (); it++ )
     {
-      map<Address,Ptr<UdpChannel> >::iterator it;
-      for ( it = channels.begin (); it != channels.end (); it++ )
+      Ptr<Socket> socket = it->second->m_socket;
+      if (std::find(v.begin(), v.end(),socket)==v.end())
         {
           Simulator::Schedule (Seconds (0), &TorBktapApp::ReadCallback, this, it->second->m_socket);
+          v.push_back (socket);
         }
+    }
+}
+
+void
+TorBktapApp::RefillWriteCallback (int64_t prev_read_bucket)
+{
+  if (prev_read_bucket <= 0 && writeevent.IsExpired ())
+    {
+      writeevent = Simulator::ScheduleNow (&TorBktapApp::WriteCallback, this);
     }
 }
 
@@ -227,13 +249,6 @@ TorBktapApp::ReadCallback (Ptr<Socket> socket)
   else
     {
       read_bytes = ReadFromRelay (socket);
-    }
-
-  //TODO: eliminate busy-reading for better run-time performance
-  Time t = Time (Seconds (CELL_PAYLOAD_SIZE * 8 / static_cast<double> (m_burst.GetBitRate ())));
-  if (readevent.IsExpired ())
-    {
-      readevent = Simulator::Schedule (t, &TorBktapApp::ReadCallback, this, socket);
     }
 
   if (writeevent.IsExpired ())
@@ -401,13 +416,12 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, Ptr<P
 
   CellDirection oppdir = circ->GetOppositeDirection (direction);
   ch = circ->GetChannel (oppdir);
+  Simulator::Schedule (Seconds (0), &TorBktapApp::ReadCallback, this, ch->m_socket);
 
   if (writeevent.IsExpired ())
     {
       writeevent = Simulator::Schedule (Seconds (0), &TorBktapApp::WriteCallback, this);
     }
-
-  Simulator::Schedule (Seconds (0), &TorBktapApp::ReadCallback, this, ch->m_socket);
 }
 
 uint32_t
@@ -454,6 +468,15 @@ TorBktapApp::PackageRelayCell (Ptr<BktapCircuit> circ, CellDirection direction, 
 }
 
 void
+TorBktapApp::SocketWriteCallback (Ptr<Socket> s, uint32_t i)
+{
+  if (writeevent.IsExpired ())
+    {
+      writeevent = Simulator::Schedule (Seconds(0), &TorBktapApp::WriteCallback, this);
+    }
+}
+
+void
 TorBktapApp::WriteCallback ()
 {
   uint32_t bytes_written = 0;
@@ -471,18 +494,18 @@ TorBktapApp::WriteCallback ()
         }
     }
 
-  Time t = Time (Seconds (CELL_PAYLOAD_SIZE * 8 / static_cast<double> (m_burst.GetBitRate ())));
   if (bytes_written > 0)
     {
       m_writebucket.Decrement (bytes_written);
-      t = Seconds (0);
-    }
-
-  if (writeevent.IsExpired ())
-    {
-      writeevent = Simulator::Schedule (t, &TorBktapApp::WriteCallback, this);
+      // try flushing more ...
+      if (writeevent.IsExpired ())
+        {
+          writeevent = Simulator::ScheduleNow (&TorBktapApp::WriteCallback, this);
+        }
     }
 }
+
+
 
 uint32_t
 TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, bool retx)

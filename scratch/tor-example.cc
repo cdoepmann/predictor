@@ -49,7 +49,7 @@ int main (int argc, char *argv[]) {
     else if (transport == "n23")
         th.SetTorAppType("ns3::TorN23App");
 
-    th.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
+    // th.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
     th.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
     th.SetRtt(MilliSeconds(rtt)); // set rtt
     // th.EnablePcap(true); // enable pcap logging
