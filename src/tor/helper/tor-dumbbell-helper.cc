@@ -35,6 +35,22 @@ TorDumbbellHelper::TorDumbbellHelper ()
   m_p2pRightHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(rightDelay)));
   m_p2pRouterHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(routerDelay)));
 
+  //Q1 2015 State of the Internet Report, Germany
+  m_clientBwRight = CreateObject<EmpiricalRandomVariable> ();
+  m_clientBwRight->CDF ( 1,0.00);
+  m_clientBwRight->CDF ( 4,0.14);
+  m_clientBwRight->CDF (10,0.69);
+  m_clientBwRight->CDF (15,0.86);
+  m_clientBwRight->CDF (47,1.00);
+
+  //Q1 2015 State of the Internet Report, US
+  m_clientBwLeft = CreateObject<EmpiricalRandomVariable> ();
+  m_clientBwLeft->CDF ( 1,0.00);
+  m_clientBwLeft->CDF ( 4,0.24);
+  m_clientBwLeft->CDF (10,0.56);
+  m_clientBwLeft->CDF (15,0.78);
+  m_clientBwLeft->CDF (54,1.00);
+
   m_p2pLeftHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pRightHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
   m_p2pRouterHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
@@ -308,8 +324,7 @@ TorDumbbellHelper::InstallCircuits ()
       if (!m_disableProxies)
         {
           clientApp = InstallTorApp (desc.proxy ());
-          GetNode(desc.proxy ())->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("10Mb/s"));
-          GetNode(desc.proxy ())->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("10Mb/s"));
+          SetProxyAccessRate (desc.proxy ());
         }
       entryApp = InstallTorApp (desc.entry ());
       middleApp = InstallTorApp (desc.middle ());
@@ -351,6 +366,29 @@ TorDumbbellHelper::InstallTorApp (string name)
       GetNode (name)->AddApplication (desc.tapp);
     }
   return desc.tapp;
+}
+
+void
+TorDumbbellHelper::SetProxyAccessRate (string name)
+{
+  uint64_t bw;
+  if (GetContinent(name) == "EU")
+    {
+      bw = m_clientBwRight->GetValue () * 1000000;
+    }
+  else
+    {
+      bw = m_clientBwLeft->GetValue () * 1000000;
+    }
+    GetNode(name)->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate(bw));
+    GetNode(name)->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate(bw));
+}
+
+
+string
+TorDumbbellHelper::GetContinent (string name)
+{
+  return m_relays[name].continent;
 }
 
 

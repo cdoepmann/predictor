@@ -101,6 +101,8 @@ public:
 
   void InstallCircuits ();
   Ptr<TorBaseApp> InstallTorApp (string);
+  void SetProxyAccessRate (string);
+  string GetContinent (string);
 
   map<int,CircuitDescriptor> m_circuits;
   map<string, RelayDescriptor> m_relays;
@@ -140,6 +142,8 @@ public:
   Ptr<EmpiricalRandomVariable> m_owdRight;
   Ptr<EmpiricalRandomVariable> m_owdRouter;
 
+  Ptr<EmpiricalRandomVariable> m_clientBwLeft;
+  Ptr<EmpiricalRandomVariable> m_clientBwRight;
 };
 
 
