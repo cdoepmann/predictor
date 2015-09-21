@@ -120,8 +120,7 @@ N23Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
 
       if (IsCredit (cell))
         {
-          IncrementCredit (direction);
-          if (conn->IsBlocked ())
+          if (IncrementCredit (direction) && conn->IsBlocked ())
             {
               conn->SetBlocked (false);
               conn->ScheduleRead();
@@ -152,21 +151,27 @@ N23Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
     }
 }
 
-void
+bool
 N23Circuit::IncrementCredit (CellDirection direction)
 {
+  bool positive = false;
   if (BaseCircuit::GetOppositeDirection (direction) == OUTBOUND)
     {
       n_creditBalance += N2;
       if (n_creditBalance > N2+N3)
         n_creditBalance = N2+N3;
+      if (n_creditBalance > 0)
+        positive = true;
     }
   else
     {
       p_creditBalance += N2;
       if (p_creditBalance > N2+N3)
         p_creditBalance = N2+N3;
+      if (p_creditBalance > 0)
+        positive = true;
     }
+  return positive;
 }
 
 

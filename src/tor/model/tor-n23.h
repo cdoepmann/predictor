@@ -19,7 +19,7 @@ public:
   virtual void PushCell (Ptr<Packet>, CellDirection);
   Ptr<Packet> CreateCredit ();
   bool IsCredit (Ptr<Packet>);
-  void IncrementCredit (CellDirection);
+  bool IncrementCredit (CellDirection);
 
   int p_creditBalance;
   int n_creditBalance;
