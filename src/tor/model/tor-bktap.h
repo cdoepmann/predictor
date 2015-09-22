@@ -351,7 +351,9 @@ public:
   uint32_t dupackcnt;
   map< uint32_t, Ptr<Packet> > cellMap;
 
-  queue<Ptr<Packet> > ackq;
+  queue<uint32_t> ackq;
+  queue<uint32_t> fwdq;
+  EventId flushFeedbackEvent;
 
   SimpleRttEstimator virtRtt;
   SimpleRttEstimator actRtt;
@@ -552,6 +554,7 @@ public:
   void WriteCallback ();
   uint32_t FlushPendingCell (Ptr<BktapCircuit>, CellDirection,bool = false);
   void SendEmptyAck (Ptr<BktapCircuit>, CellDirection, uint8_t, uint32_t);
+  void FlushFeedbackQ (Ptr<BktapCircuit>, CellDirection);
   void ScheduleRto (Ptr<BktapCircuit>, CellDirection, bool = false);
   void Rto (Ptr<BktapCircuit>, CellDirection);
 

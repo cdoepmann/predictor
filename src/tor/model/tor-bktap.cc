@@ -288,7 +288,7 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
                 {
                   ReceivedAck (circ,direction,cell);
                 }
-              else if (h.flags & FWD)
+              if (h.flags & FWD)
                 {
                   ReceivedFwd (circ,direction,cell);
                 }
@@ -584,25 +584,55 @@ TorBktapApp::SendEmptyAck (Ptr<BktapCircuit> circ, CellDirection direction, uint
   NS_ASSERT (ch);
   if (ch->SpeaksCells ())
     {
-      Ptr<Packet> cell = Create<Packet> ();
-      FdbkCellHeader header;
-      header.circId = circ->GetId ();
-      header.flags = flag;
       if (flag & ACK)
         {
-          header.ack = ack;
+          queue->ackq.push (ack);
         }
       if (flag & FWD)
         {
-          header.fwd = ack;
+          queue->fwdq.push (ack);
+        }
+      if (queue->ackq.size () > 1 && queue->fwdq.size () > 0)
+        {
+          queue->flushFeedbackEvent.Cancel ();
+          FlushFeedbackQ (circ, direction);
+        }
+      else
+        {
+          queue->flushFeedbackEvent = Simulator::Schedule(MilliSeconds(1), &TorBktapApp::FlushFeedbackQ, this, circ, direction);
+        }
+    }
+}
+
+void
+TorBktapApp::FlushFeedbackQ (Ptr<BktapCircuit> circ, CellDirection direction)
+{
+  Ptr<UdpChannel> ch = circ->GetChannel (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  NS_ASSERT (ch);
+
+  while (m_devQ->GetNPackets () < m_devQlimit && (queue->ackq.size () > 0 || queue->fwdq.size () > 0))
+    {
+      Ptr<Packet> cell = Create<Packet> ();
+      FdbkCellHeader header;
+      header.circId = circ->GetId ();
+      if (queue->ackq.size () > 0)
+        {
+          header.flags |= ACK;
+          while (queue->ackq.size () > 0 && header.ack < queue->ackq.front ())
+            {
+              header.ack = queue->ackq.front ();
+              queue->ackq.pop ();
+            }
+        }
+      if (queue->fwdq.size () > 0)
+        {
+          header.flags |= FWD;
+          header.fwd = queue->fwdq.front ();
+          queue->fwdq.pop ();
         }
       cell->AddHeader (header);
-      queue->ackq.push (cell);
-      while (m_devQ->GetNPackets () < m_devQlimit && queue->ackq.size () > 0)
-        {
-          ch->m_socket->SendTo (queue->ackq.front (), 0, ch->m_remote);
-          queue->ackq.pop ();
-        }
+      ch->m_socket->SendTo (cell, 0, ch->m_remote);
     }
 }
 
