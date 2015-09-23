@@ -12,6 +12,8 @@
 #define NS3_SOCK_STREAM 0
 #define VEGASALPHA 3
 #define VEGASBETA 6
+#define UDP_CELL_HEADER_SIZE (4 + 4 + 2 + 6 + 2 + 1)
+
 
 namespace ns3 {
 
@@ -353,7 +355,7 @@ public:
 
   queue<uint32_t> ackq;
   queue<uint32_t> fwdq;
-  EventId flushFeedbackEvent;
+  EventId delFeedbackEvent;
 
   SimpleRttEstimator virtRtt;
   SimpleRttEstimator actRtt;
@@ -482,6 +484,13 @@ public:
   uint8_t GetType ();
   bool SpeaksCells ();
 
+  void ScheduleFlush ();
+  void Flush ();
+  EventId m_flushEvent;
+  queue<Ptr<Packet> > m_flushQueue;
+  Ptr<Queue> m_devQ;
+  uint32_t m_devQlimit;
+
   Ptr<Socket> m_socket;
   Address m_remote;
   uint8_t m_conntype;
@@ -545,16 +554,16 @@ public:
   uint32_t ReadFromRelay (Ptr<Socket>);
   void PackageRelayCell (Ptr<BktapCircuit>, CellDirection, Ptr<Packet>);
   void ReceivedRelayCell (Ptr<BktapCircuit>, CellDirection, Ptr<Packet>);
-  void ReceivedAck (Ptr<BktapCircuit>, CellDirection, Ptr<Packet>);
-  void ReceivedFwd (Ptr<BktapCircuit>, CellDirection, Ptr<Packet>);
+  void ReceivedAck (Ptr<BktapCircuit>, CellDirection, FdbkCellHeader);
+  void ReceivedFwd (Ptr<BktapCircuit>, CellDirection, FdbkCellHeader);
   void CongestionAvoidance (Ptr<SeqQueue>, Time);
   Ptr<UdpChannel> LookupChannel (Ptr<Socket>);
 
   void SocketWriteCallback (Ptr<Socket>, uint32_t);
   void WriteCallback ();
   uint32_t FlushPendingCell (Ptr<BktapCircuit>, CellDirection,bool = false);
-  void SendEmptyAck (Ptr<BktapCircuit>, CellDirection, uint8_t, uint32_t);
-  void FlushFeedbackQ (Ptr<BktapCircuit>, CellDirection);
+  void SendFeedbackCell (Ptr<BktapCircuit>, CellDirection, uint8_t, uint32_t);
+  void PushFeedbackCell (Ptr<BktapCircuit>, CellDirection);
   void ScheduleRto (Ptr<BktapCircuit>, CellDirection, bool = false);
   void Rto (Ptr<BktapCircuit>, CellDirection);
 

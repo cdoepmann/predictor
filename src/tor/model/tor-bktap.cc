@@ -42,6 +42,40 @@ UdpChannel::SpeaksCells ()
   return m_conntype == RELAYEDGE;
 }
 
+void
+UdpChannel::Flush ()
+{
+  while (m_flushQueue.size () > 0)
+    {
+      if (SpeaksCells () && m_devQlimit <= m_devQ->GetNPackets ())
+        {
+          return;
+        }
+      Ptr<Packet> data = Create<Packet> ();
+      while (m_flushQueue.size () > 0 && data->GetSize()+m_flushQueue.front ()->GetSize () <= 1400)
+        {
+          data->AddAtEnd(m_flushQueue.front ());
+          m_flushQueue.pop ();
+        }
+      m_socket->SendTo (data,0,m_remote);
+    }
+}
+
+
+void
+UdpChannel::ScheduleFlush ()
+{
+  if (m_flushQueue.size () > 1)
+    {
+      m_flushEvent.Cancel ();
+      Flush();
+    }
+  else
+    {
+      m_flushEvent = Simulator::Schedule(MilliSeconds(1), &UdpChannel::Flush, this);
+    }
+}
+
 BktapCircuit::BktapCircuit (uint16_t id) : BaseCircuit (id)
 {
   inboundQueue = Create<SeqQueue> ();
@@ -86,8 +120,6 @@ BktapCircuit::GetQueue (CellDirection direction)
       return this->inboundQueue;
     }
 }
-
-
 
 
 TorBktapApp::TorBktapApp ()
@@ -181,6 +213,8 @@ TorBktapApp::StartApplication (void)
       if (ch->SpeaksCells ())
         {
           ch->SetSocket (m_socket);
+          ch->m_devQ = m_devQ;
+          ch->m_devQlimit = m_devQlimit;
         }
 
       // PseudoSockets only
@@ -263,39 +297,44 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
   uint32_t read_bytes = 0;
   while (socket->GetRxAvailable () > 0)
     {
-      Ptr<Packet> cell;
+      Ptr<Packet> data;
       Address from;
-      if (cell = socket->RecvFrom (from))
+      if (data = socket->RecvFrom (from))
         {
-          cell->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
-          m_readbucket.Decrement (cell->GetSize ());
-          BaseCellHeader header;
-          cell->PeekHeader (header);
-          Ptr<BktapCircuit> circ = circuits[header.circId];
-          NS_ASSERT (circ);
+          data->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
+          m_readbucket.Decrement (data->GetSize ());
+          read_bytes += data->GetSize ();
           Ptr<UdpChannel> ch = channels[from];
           NS_ASSERT (ch);
-          CellDirection direction = circ->GetDirection (ch);
-          CellDirection oppdir = circ->GetOppositeDirection (direction);
-          circ->IncrementStats (oppdir,cell->GetSize (),0);
-          read_bytes += cell->GetSize ();
-
-          if (header.cellType == FDBK)
+          while (data->GetSize() > 0)
             {
-              FdbkCellHeader h;
-              cell->PeekHeader (h);
-              if (h.flags & ACK)
+              BaseCellHeader header;
+              data->PeekHeader (header);
+              Ptr<BktapCircuit> circ = circuits[header.circId];
+              NS_ASSERT (circ);
+              CellDirection direction = circ->GetDirection (ch);
+              CellDirection oppdir = circ->GetOppositeDirection (direction);
+              if (header.cellType == FDBK)
                 {
-                  ReceivedAck (circ,direction,cell);
+                  FdbkCellHeader h;
+                  data->RemoveHeader (h);
+                  circ->IncrementStats (oppdir,h.GetSerializedSize (),0);
+                  if (h.flags & ACK)
+                    {
+                      ReceivedAck (circ,direction,h);
+                    }
+                  if (h.flags & FWD)
+                    {
+                      ReceivedFwd (circ,direction,h);
+                    }
                 }
-              if (h.flags & FWD)
+              else
                 {
-                  ReceivedFwd (circ,direction,cell);
+                  Ptr<Packet> cell = data->CreateFragment (0,CELL_PAYLOAD_SIZE+UDP_CELL_HEADER_SIZE);
+                  data->RemoveAtStart (CELL_PAYLOAD_SIZE+UDP_CELL_HEADER_SIZE);
+                  circ->IncrementStats (oppdir,cell->GetSize (),0);
+                  ReceivedRelayCell (circ,oppdir,cell);
                 }
-            }
-          else
-            {
-              ReceivedRelayCell (circ,oppdir,cell);
             }
         }
     }
@@ -310,17 +349,14 @@ TorBktapApp::ReceivedRelayCell (Ptr<BktapCircuit> circ, CellDirection direction,
   cell->PeekHeader (header);
   queue->Add (cell, header.seq);
   CellDirection oppdir = circ->GetOppositeDirection (direction);
-  SendEmptyAck (circ, oppdir, ACK, queue->tailSeq + 1);
+  SendFeedbackCell (circ, oppdir, ACK, queue->tailSeq + 1);
 }
 
 
 void
-TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, Ptr<Packet> cell)
+TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkCellHeader header)
 {
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
-  FdbkCellHeader header;
-  cell->PeekHeader (header);
-
   if (header.ack == queue->headSeq)
     {
       // DupACK. Do fast retransmit.
@@ -386,14 +422,11 @@ TorBktapApp::CongestionAvoidance (Ptr<SeqQueue> queue, Time baseRtt)
 }
 
 void
-TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, Ptr<Packet> cell)
+TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkCellHeader header)
 {
   //Received flow control feeback (FWD)
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
-  FdbkCellHeader header;
-  cell->PeekHeader (header);
-
   Time rtt = queue->virtRtt.EstimateRtt (header.fwd);
   ch->rttEstimator.AddSample (rtt);
 
@@ -515,11 +548,6 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Ptr<Packet> cell;
 
-  if (ch->SpeaksCells () && m_devQlimit <= m_devQ->GetNPackets ())
-    {
-      return 0;
-    }
-
   if (queue->Window () <= 0 && !retx)
     {
       return 0;
@@ -550,34 +578,33 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
           queue->actRtt.SentSeq (header.seq);
         }
 
-      int bytes_written = ch->m_socket->SendTo (cell,0,ch->m_remote);
-      if (bytes_written > 0)
+      ch->m_flushQueue.push (cell);
+      int bytes_written = cell->GetSize ();
+      ch->ScheduleFlush ();
+
+      if (ch->SpeaksCells ())
         {
-
-          if (ch->SpeaksCells ())
-            {
-              ScheduleRto (circ,direction);
-            }
-          else
-            {
-              queue->DiscardUpTo (header.seq + 1);
-              ++queue->virtHeadSeq;
-            }
-
-          if (queue->highestTxSeq == header.seq)
-            {
-              circ->IncrementStats (direction,0,bytes_written);
-              SendEmptyAck (circ, oppdir, FWD, queue->highestTxSeq + 1);
-            }
-
-          return bytes_written;
+          ScheduleRto (circ,direction);
         }
+      else
+        {
+          queue->DiscardUpTo (header.seq + 1);
+          ++queue->virtHeadSeq;
+        }
+
+      if (queue->highestTxSeq == header.seq)
+        {
+          circ->IncrementStats (direction,0,bytes_written);
+          SendFeedbackCell (circ, oppdir, FWD, queue->highestTxSeq + 1);
+        }
+
+      return bytes_written;
     }
   return 0;
 }
 
 void
-TorBktapApp::SendEmptyAck (Ptr<BktapCircuit> circ, CellDirection direction, uint8_t flag, uint32_t ack)
+TorBktapApp::SendFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction, uint8_t flag, uint32_t ack)
 {
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
@@ -592,26 +619,26 @@ TorBktapApp::SendEmptyAck (Ptr<BktapCircuit> circ, CellDirection direction, uint
         {
           queue->fwdq.push (ack);
         }
-      if (queue->ackq.size () > 1 && queue->fwdq.size () > 0)
+      if (queue->ackq.size () > 0 && queue->fwdq.size () > 0)
         {
-          queue->flushFeedbackEvent.Cancel ();
-          FlushFeedbackQ (circ, direction);
+          queue->delFeedbackEvent.Cancel ();
+          PushFeedbackCell (circ, direction);
         }
       else
         {
-          queue->flushFeedbackEvent = Simulator::Schedule(MilliSeconds(1), &TorBktapApp::FlushFeedbackQ, this, circ, direction);
+          queue->delFeedbackEvent = Simulator::Schedule(MilliSeconds(1), &TorBktapApp::PushFeedbackCell, this, circ, direction);
         }
     }
 }
 
 void
-TorBktapApp::FlushFeedbackQ (Ptr<BktapCircuit> circ, CellDirection direction)
+TorBktapApp::PushFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction)
 {
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
   NS_ASSERT (ch);
 
-  while (m_devQ->GetNPackets () < m_devQlimit && (queue->ackq.size () > 0 || queue->fwdq.size () > 0))
+  while (queue->ackq.size () > 0 || queue->fwdq.size () > 0)
     {
       Ptr<Packet> cell = Create<Packet> ();
       FdbkCellHeader header;
@@ -632,7 +659,8 @@ TorBktapApp::FlushFeedbackQ (Ptr<BktapCircuit> circ, CellDirection direction)
           queue->fwdq.pop ();
         }
       cell->AddHeader (header);
-      ch->m_socket->SendTo (cell, 0, ch->m_remote);
+      ch->m_flushQueue.push (cell);
+      ch->ScheduleFlush ();
     }
 }
 
