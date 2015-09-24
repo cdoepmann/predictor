@@ -5,35 +5,35 @@ TorDumbbellHelper::TorDumbbellHelper ()
   // Based on the iPlane data set: latencies 2015-08-04
   //RTT between ["NA", "NA"] (min/Q1/Median/Q3/max in ms) 11 29 45.0 73 148
   m_owdLeft = CreateObject<EmpiricalRandomVariable> ();
-  m_owdLeft->CDF ( 11/2.0,0.00);
-  m_owdLeft->CDF ( 29/2.0,0.25);
-  m_owdLeft->CDF ( 45/2.0,0.50);
-  m_owdLeft->CDF ( 73/2.0,0.75);
-  m_owdLeft->CDF (148/2.0,1.00);
+  m_owdLeft->CDF ( 11 / 2.0,0.00);
+  m_owdLeft->CDF ( 29 / 2.0,0.25);
+  m_owdLeft->CDF ( 45 / 2.0,0.50);
+  m_owdLeft->CDF ( 73 / 2.0,0.75);
+  m_owdLeft->CDF (148 / 2.0,1.00);
   uint32_t leftDelay = m_owdLeft->GetInteger ();
 
   // RTT between ["EU", "EU"] (min/Q1/Median/Q3/max in ms) 14 27 37.0 48 65
   m_owdRight = CreateObject<EmpiricalRandomVariable> ();
-  m_owdRight->CDF ( 14/2.0,0.00);
-  m_owdRight->CDF ( 27/2.0,0.25);
-  m_owdRight->CDF ( 37/2.0,0.50);
-  m_owdRight->CDF ( 48/2.0,0.75);
-  m_owdRight->CDF ( 65/2.0,1.00);
+  m_owdRight->CDF ( 14 / 2.0,0.00);
+  m_owdRight->CDF ( 27 / 2.0,0.25);
+  m_owdRight->CDF ( 37 / 2.0,0.50);
+  m_owdRight->CDF ( 48 / 2.0,0.75);
+  m_owdRight->CDF ( 65 / 2.0,1.00);
   uint32_t rightDelay = m_owdRight->GetInteger ();
 
   // RTT between ["EU", "NA"] (min/Q1/Median/Q3/max in ms) 78 117 132.0 161 252
   m_owdRouter = CreateObject<EmpiricalRandomVariable> ();
-  m_owdRouter->CDF ( 78/2.0,0.00);
-  m_owdRouter->CDF (117/2.0,0.25);
-  m_owdRouter->CDF (132/2.0,0.50);
-  m_owdRouter->CDF (161/2.0,0.75);
-  m_owdRouter->CDF (252/2.0,1.00);
+  m_owdRouter->CDF ( 78 / 2.0,0.00);
+  m_owdRouter->CDF (117 / 2.0,0.25);
+  m_owdRouter->CDF (132 / 2.0,0.50);
+  m_owdRouter->CDF (161 / 2.0,0.75);
+  m_owdRouter->CDF (252 / 2.0,1.00);
   uint32_t routerDelay = m_owdRouter->GetInteger ();
-  routerDelay = max (routerDelay-(rightDelay+leftDelay), (uint32_t) 1);
+  routerDelay = max (routerDelay - (rightDelay + leftDelay), (uint32_t) 1);
 
-  m_p2pLeftHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(leftDelay)));
-  m_p2pRightHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(rightDelay)));
-  m_p2pRouterHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds(routerDelay)));
+  m_p2pLeftHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (leftDelay)));
+  m_p2pRightHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (rightDelay)));
+  m_p2pRouterHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (routerDelay)));
 
   //Q1 2015 State of the Internet Report, Germany
   m_clientBwRight = CreateObject<EmpiricalRandomVariable> ();
@@ -97,12 +97,14 @@ TorDumbbellHelper::AddCircuit (int id, string entryName, string middleName, stri
   if (typehint == "bulk")
     {
       desc = CircuitDescriptor (id, GetProxyName (id), entryName, middleName, exitName, typehint,
-              CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTimeStream->GetValue ())) );
+                                CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink,
+                                Seconds (m_startTimeStream->GetValue ())) );
     }
   else if (typehint == "web")
     {
       desc = CircuitDescriptor (id, GetProxyName (id), entryName, middleName, exitName, typehint,
-              CreateObject<PseudoClientSocket> (m_clientRequest, m_clientThink, Seconds(m_startTimeStream->GetValue ())) );
+                                CreateObject<PseudoClientSocket> (m_clientRequest, m_clientThink,
+                                Seconds (m_startTimeStream->GetValue ())) );
     }
   m_circuits[id] = desc;
   circuitIds.push_back (id);
@@ -208,7 +210,9 @@ TorDumbbellHelper::ParseFile (string filename, uint32_t m, double bulkFraction)
     {
       string line;
       uint32_t n;
-      for (n = 0; getline (f, line); ++n){}
+      for (n = 0; getline (f, line); ++n)
+        {
+        }
       NS_ASSERT (m <= n);
       while (chosenCircuits.size () < m)
         {
@@ -249,9 +253,9 @@ TorDumbbellHelper::ParseFile (string filename, uint32_t m, double bulkFraction)
       for (int i = 0; i < 3; ++i)
         {
           if (continent[i] != "EU" || continent[i] != "NA")
-          {
-            continent[i] = m_rng->GetValue () <= 0.68 ? "EU" : "NA";
-          }
+            {
+              continent[i] = m_rng->GetValue () <= 0.68 ? "EU" : "NA";
+            }
           AddRelay (path[i],continent[i]);
           SetRelayAttribute (path[i], "BandwidthRate", DataRateValue (DataRate (bw[i] + "B/s")));
           SetRelayAttribute (path[i], "BandwidthBurst", DataRateValue (DataRate (bw[i] + "B/s")));
@@ -283,15 +287,15 @@ TorDumbbellHelper::BuildTopology ()
 
   for (int i = 0; i < m_nLeftLeaf; ++i)
     {
-      Ptr<PointToPointChannel> ch = GetNode("NA",i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()-> GetObject<PointToPointChannel> ();
-      ch->SetAttribute ("Delay", TimeValue (MilliSeconds(m_owdLeft->GetInteger ())));
+      Ptr<PointToPointChannel> ch = GetNode ("NA",i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()->GetObject<PointToPointChannel> ();
+      ch->SetAttribute ("Delay", TimeValue (MilliSeconds (m_owdLeft->GetInteger ())));
       m_stackHelper.Install (m_dumbbellHelper->GetLeft (i));
     }
 
   for (int i = 0; i < m_nRightLeaf; ++i)
     {
-      Ptr<PointToPointChannel> ch = GetNode("EU",i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()-> GetObject<PointToPointChannel> ();
-      ch->SetAttribute ("Delay", TimeValue (MilliSeconds(m_owdRight->GetInteger ())));
+      Ptr<PointToPointChannel> ch = GetNode ("EU",i)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()->GetObject<PointToPointChannel> ();
+      ch->SetAttribute ("Delay", TimeValue (MilliSeconds (m_owdRight->GetInteger ())));
       m_stackHelper.Install (m_dumbbellHelper->GetRight (i));
     }
 
@@ -345,7 +349,7 @@ TorDumbbellHelper::InstallCircuits ()
       middleApp->AddCircuit (desc.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
-          entryApp->AddCircuit(desc.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
+          entryApp->AddCircuit (desc.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
           clientApp->AddCircuit (desc.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, desc.m_clientSocket);
         }
       else
@@ -372,7 +376,7 @@ void
 TorDumbbellHelper::SetProxyAccessRate (string name)
 {
   uint64_t bw;
-  if (GetContinent(name) == "EU")
+  if (GetContinent (name) == "EU")
     {
       bw = m_clientBwRight->GetValue () * 1000000;
     }
@@ -380,8 +384,8 @@ TorDumbbellHelper::SetProxyAccessRate (string name)
     {
       bw = m_clientBwLeft->GetValue () * 1000000;
     }
-    GetNode(name)->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate(bw));
-    GetNode(name)->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate(bw));
+  GetNode (name)->GetDevice (0)->GetObject<PointToPointNetDevice> ()->SetDataRate (DataRate (bw));
+  GetNode (name)->GetDevice (0)->GetChannel ()->GetDevice (0)->GetObject<PointToPointNetDevice> ()->SetDataRate (DataRate (bw));
 }
 
 

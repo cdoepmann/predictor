@@ -52,9 +52,9 @@ UdpChannel::Flush ()
           return;
         }
       Ptr<Packet> data = Create<Packet> ();
-      while (m_flushQueue.size () > 0 && data->GetSize()+m_flushQueue.front ()->GetSize () <= 1400)
+      while (m_flushQueue.size () > 0 && data->GetSize () + m_flushQueue.front ()->GetSize () <= 1400)
         {
-          data->AddAtEnd(m_flushQueue.front ());
+          data->AddAtEnd (m_flushQueue.front ());
           m_flushQueue.pop ();
         }
       m_socket->SendTo (data,0,m_remote);
@@ -68,11 +68,11 @@ UdpChannel::ScheduleFlush ()
   if (m_flushQueue.size () > 1)
     {
       m_flushEvent.Cancel ();
-      Flush();
+      Flush ();
     }
   else
     {
-      m_flushEvent = Simulator::Schedule(MilliSeconds(1), &UdpChannel::Flush, this);
+      m_flushEvent = Simulator::Schedule (MilliSeconds (1), &UdpChannel::Flush, this);
     }
 }
 
@@ -146,7 +146,7 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
                          Ptr<PseudoClientSocket> clientSocket)
 {
   TorBaseApp::AddCircuit (id, n_ip, n_conntype, p_ip, p_conntype);
-  
+
   // ensure unique circ_id
   NS_ASSERT (circuits[id] == 0);
 
@@ -255,7 +255,7 @@ TorBktapApp::RefillReadCallback (int64_t prev_read_bucket)
   for ( it = channels.begin (); it != channels.end (); it++ )
     {
       Ptr<Socket> socket = it->second->m_socket;
-      if (std::find(v.begin(), v.end(),socket)==v.end())
+      if (std::find (v.begin (), v.end (),socket) == v.end ())
         {
           Simulator::Schedule (Seconds (0), &TorBktapApp::ReadCallback, this, it->second->m_socket);
           v.push_back (socket);
@@ -306,7 +306,7 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
           read_bytes += data->GetSize ();
           Ptr<UdpChannel> ch = channels[from];
           NS_ASSERT (ch);
-          while (data->GetSize() > 0)
+          while (data->GetSize () > 0)
             {
               BaseCellHeader header;
               data->PeekHeader (header);
@@ -330,8 +330,8 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
                 }
               else
                 {
-                  Ptr<Packet> cell = data->CreateFragment (0,CELL_PAYLOAD_SIZE+UDP_CELL_HEADER_SIZE);
-                  data->RemoveAtStart (CELL_PAYLOAD_SIZE+UDP_CELL_HEADER_SIZE);
+                  Ptr<Packet> cell = data->CreateFragment (0,CELL_PAYLOAD_SIZE + UDP_CELL_HEADER_SIZE);
+                  data->RemoveAtStart (CELL_PAYLOAD_SIZE + UDP_CELL_HEADER_SIZE);
                   circ->IncrementStats (oppdir,cell->GetSize (),0);
                   ReceivedRelayCell (circ,oppdir,cell);
                 }
@@ -505,7 +505,7 @@ TorBktapApp::SocketWriteCallback (Ptr<Socket> s, uint32_t i)
 {
   if (writeevent.IsExpired ())
     {
-      writeevent = Simulator::Schedule (Seconds(0), &TorBktapApp::WriteCallback, this);
+      writeevent = Simulator::Schedule (Seconds (0), &TorBktapApp::WriteCallback, this);
     }
 }
 
@@ -626,7 +626,7 @@ TorBktapApp::SendFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction, 
         }
       else
         {
-          queue->delFeedbackEvent = Simulator::Schedule(MilliSeconds(1), &TorBktapApp::PushFeedbackCell, this, circ, direction);
+          queue->delFeedbackEvent = Simulator::Schedule (MilliSeconds (1), &TorBktapApp::PushFeedbackCell, this, circ, direction);
         }
     }
 }

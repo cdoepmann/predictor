@@ -42,7 +42,7 @@ public:
   virtual void DoDispose (void);
 
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-    Ptr<PseudoClientSocket> clientSocket=0);
+                           Ptr<PseudoClientSocket> clientSocket = 0);
 
   virtual void SetNodeName (std::string);
   virtual std::string GetNodeName (void);

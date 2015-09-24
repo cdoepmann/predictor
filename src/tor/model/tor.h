@@ -135,7 +135,7 @@ public:
   TorApp ();
   virtual ~TorApp ();
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-                           Ptr<PseudoClientSocket> clientSocket=0);
+                           Ptr<PseudoClientSocket> clientSocket = 0);
 
   virtual void StartApplication (void);
   virtual void StopApplication (void);

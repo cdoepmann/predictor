@@ -110,8 +110,8 @@ private:
 class PseudoClientSocket : public PseudoSocket
 {
 public:
-  PseudoClientSocket (Time startTime=Seconds(0.01));
-  PseudoClientSocket (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>, Time startTime=Seconds(0.1));
+  PseudoClientSocket (Time startTime = Seconds (0.01));
+  PseudoClientSocket (Ptr<RandomVariableStream>, Ptr<RandomVariableStream>, Time startTime = Seconds (0.1));
 
   uint32_t GetTxAvailable () const;
   uint32_t GetRxAvailable () const;

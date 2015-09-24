@@ -51,7 +51,9 @@ private:
   class CircuitDescriptor
   {
 public:
-    CircuitDescriptor () {}
+    CircuitDescriptor ()
+    {
+    }
     CircuitDescriptor (int id, string _proxy, string _entry, string _middle, string _exit, string typehint,
                        Ptr<PseudoClientSocket> clientSocket)
     {
@@ -64,10 +66,22 @@ public:
       this->m_typehint = typehint;
     }
 
-    string proxy () { return path[0]; }
-    string entry () { return path[1]; }
-    string middle () { return path[2]; }
-    string exit () { return path[3]; }
+    string proxy ()
+    {
+      return path[0];
+    }
+    string entry ()
+    {
+      return path[1];
+    }
+    string middle ()
+    {
+      return path[2];
+    }
+    string exit ()
+    {
+      return path[3];
+    }
 
     int id;
     string path[5];
@@ -78,7 +92,9 @@ public:
   class RelayDescriptor
   {
 public:
-    RelayDescriptor () {}
+    RelayDescriptor ()
+    {
+    }
     RelayDescriptor (string name, string continent, int spokeId, Ptr<TorBaseApp> app)
     {
       this->spokeId = spokeId;

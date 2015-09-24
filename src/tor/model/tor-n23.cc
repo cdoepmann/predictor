@@ -7,12 +7,14 @@ NS_LOG_COMPONENT_DEFINE ("TorN23App");
 NS_OBJECT_ENSURE_REGISTERED (TorN23App);
 
 
-TorN23App::TorN23App() {
-
+TorN23App::TorN23App ()
+{
+  //
 }
 
-TorN23App::~TorN23App() {
-
+TorN23App::~TorN23App ()
+{
+  //
 }
 
 TypeId
@@ -52,12 +54,12 @@ TorN23App::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_i
 
 
 N23Circuit::N23Circuit (uint16_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_conn,
-  int windowStart, int windowIncrement) : Circuit (circ_id, n_conn, p_conn, windowStart, windowIncrement)
+                        int windowStart, int windowIncrement) : Circuit (circ_id, n_conn, p_conn, windowStart, windowIncrement)
 {
-    p_creditBalance = N2 + N3;
-    n_creditBalance = N2 + N3;
-    p_cellsforwarded = 0;
-    n_cellsforwarded = 0;
+  p_creditBalance = N2 + N3;
+  n_creditBalance = N2 + N3;
+  p_cellsforwarded = 0;
+  n_cellsforwarded = 0;
 }
 
 Ptr<Packet>
@@ -67,7 +69,7 @@ N23Circuit::PopCell (CellDirection direction)
   Ptr<Connection> conn = GetConnection (direction);
   Ptr<Connection> opp_conn = GetOppositeConnection (direction);
   bool sendCredit = false;
- 
+
   if (direction == OUTBOUND)
     {
       cell = this->PopQueue (this->n_cellQ);
@@ -88,7 +90,7 @@ N23Circuit::PopCell (CellDirection direction)
               sendCredit = true;
             }
         }
-      else 
+      else
         {
           if (N2 <= ++p_cellsforwarded)
             {
@@ -123,22 +125,26 @@ N23Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
           if (IncrementCredit (direction) && conn->IsBlocked ())
             {
               conn->SetBlocked (false);
-              conn->ScheduleRead();
+              conn->ScheduleRead ();
             }
-          opp_conn->ScheduleWrite ();  
+          opp_conn->ScheduleWrite ();
           return;
         }
-      
-        if (direction == OUTBOUND)
-          {
-            if (--n_creditBalance <= 0 && !opp_conn->SpeaksCells ())
+
+      if (direction == OUTBOUND)
+        {
+          if (--n_creditBalance <= 0 && !opp_conn->SpeaksCells ())
+            {
               opp_conn->SetBlocked (true);
-          }
-        else
-          {
-            if (--p_creditBalance <= 0 && !opp_conn->SpeaksCells ())
+            }
+        }
+      else
+        {
+          if (--p_creditBalance <= 0 && !opp_conn->SpeaksCells ())
+            {
               opp_conn->SetBlocked (true);
-          }
+            }
+        }
 
       if (!conn->SpeaksCells ())
         {
@@ -158,18 +164,26 @@ N23Circuit::IncrementCredit (CellDirection direction)
   if (BaseCircuit::GetOppositeDirection (direction) == OUTBOUND)
     {
       n_creditBalance += N2;
-      if (n_creditBalance > N2+N3)
-        n_creditBalance = N2+N3;
+      if (n_creditBalance > N2 + N3)
+        {
+          n_creditBalance = N2 + N3;
+        }
       if (n_creditBalance > 0)
-        positive = true;
+        {
+          positive = true;
+        }
     }
   else
     {
       p_creditBalance += N2;
-      if (p_creditBalance > N2+N3)
-        p_creditBalance = N2+N3;
+      if (p_creditBalance > N2 + N3)
+        {
+          p_creditBalance = N2 + N3;
+        }
       if (p_creditBalance > 0)
-        positive = true;
+        {
+          positive = true;
+        }
     }
   return positive;
 }

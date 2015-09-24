@@ -32,11 +32,11 @@ class TorN23App : public TorApp
 {
 public:
   static TypeId GetTypeId (void);
-  TorN23App();
-  ~TorN23App();
+  TorN23App ();
+  ~TorN23App ();
 
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-                           Ptr<PseudoClientSocket> clientSocket=0);
+                           Ptr<PseudoClientSocket> clientSocket = 0);
 };
 
 

@@ -24,7 +24,7 @@ TorStarHelper::~TorStarHelper ()
 
 void
 TorStarHelper::AddCircuit (int id, string entryName, string middleName, string exitName,
-                        Ptr<PseudoClientSocket> clientSocket)
+                           Ptr<PseudoClientSocket> clientSocket)
 {
 
   NS_ASSERT (m_circuits.find (id) == m_circuits.end ());
@@ -125,7 +125,9 @@ TorStarHelper::ParseFile (string filename, uint32_t m)
     {
       string line;
       uint32_t n;
-      for (n = 0; getline (f, line); ++n){}
+      for (n = 0; getline (f, line); ++n)
+        {
+        }
       NS_ASSERT (m <= n);
       while (chosenCircuits.size () < m)
         {
@@ -145,7 +147,7 @@ TorStarHelper::ParseFile (string filename, uint32_t m)
         {
           continue;
         }
-      
+
       AddCircuit (id, path[0], path[1], path[2]);
       for (int i = 0; i < 3; ++i)
         {

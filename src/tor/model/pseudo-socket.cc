@@ -294,7 +294,7 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
       RequestHeader h;
       m_request->PeekHeader (h);
       m_leftToSend = h.GetRequestSize ();
-      Simulator::Schedule (MilliSeconds(m_rng->GetInteger ()), &PseudoServerSocket::NotifyDataRecv, this);
+      Simulator::Schedule (MilliSeconds (m_rng->GetInteger ()), &PseudoServerSocket::NotifyDataRecv, this);
     }
   else
     {

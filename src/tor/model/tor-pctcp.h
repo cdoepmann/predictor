@@ -10,8 +10,8 @@ class TorPctcpApp : public TorApp
 {
 public:
   static TypeId GetTypeId (void);
-  TorPctcpApp();
-  ~TorPctcpApp();
+  TorPctcpApp ();
+  ~TorPctcpApp ();
 
   virtual Ptr<Connection> AddConnection (Ipv4Address, int);
 

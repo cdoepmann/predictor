@@ -522,7 +522,7 @@ TorApp::RoundRobin (int base, int64_t global_bucket)
 
 
 Circuit::Circuit (uint16_t circ_id, Ptr<Connection> n_conn, Ptr<Connection> p_conn,
-  int windowStart, int windowIncrement) : BaseCircuit (circ_id)
+                  int windowStart, int windowIncrement) : BaseCircuit (circ_id)
 {
   this->p_cellQ = new queue<Ptr<Packet> >;
   this->n_cellQ = new queue<Ptr<Packet> >;

@@ -541,7 +541,7 @@ public:
   Ptr<BktapCircuit> GetCircuit (uint16_t);
   Ptr<BktapCircuit> GetNextCircuit ();
   virtual void AddCircuit (int, Ipv4Address, int, Ipv4Address, int,
-                           Ptr<PseudoClientSocket> clientSocket=0);
+                           Ptr<PseudoClientSocket> clientSocket = 0);
 
   Ptr<Socket> m_socket;
 
