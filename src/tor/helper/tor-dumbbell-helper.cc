@@ -28,12 +28,12 @@ TorDumbbellHelper::TorDumbbellHelper ()
   m_owdRouter->CDF (132 / 2.0,0.50);
   m_owdRouter->CDF (161 / 2.0,0.75);
   m_owdRouter->CDF (252 / 2.0,1.00);
-  uint32_t routerDelay = m_owdRouter->GetInteger ();
-  routerDelay = max (routerDelay - (rightDelay + leftDelay), (uint32_t) 1);
+  m_routerDelay = m_owdRouter->GetInteger ();
+  m_routerDelay = max ((int)m_routerDelay - (int)(rightDelay + leftDelay), 1);
 
   m_p2pLeftHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (leftDelay)));
   m_p2pRightHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (rightDelay)));
-  m_p2pRouterHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (routerDelay)));
+  m_p2pRouterHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (m_routerDelay)));
 
   //Q1 2015 State of the Internet Report, Germany
   m_clientBwRight = CreateObject<EmpiricalRandomVariable> ();
@@ -359,6 +359,59 @@ TorDumbbellHelper::InstallCircuits ()
     }
 }
 
+Ptr<PointToPointChannel>
+TorDumbbellHelper::GetP2pChannel(RelayDescriptor desc)
+{
+  Ptr<Node> node = GetNode (desc.continent,desc.spokeId);
+  return node->GetDevice (0)->GetObject<PointToPointNetDevice> ()->GetChannel ()->GetObject<PointToPointChannel> ();
+}
+
+int64_t
+TorDumbbellHelper::GetOwd(CircuitDescriptor desc)
+{
+  int64_t owd = 0;
+  TimeValue t;
+  Ptr<PointToPointChannel> ch;
+  RelayDescriptor dEntry = m_relays[desc.entry ()];
+  RelayDescriptor dMiddle = m_relays[desc.middle ()];
+  RelayDescriptor dExit = m_relays[desc.exit ()];
+
+  if (!m_disableProxies)
+    {
+      // Proxy --- Entry
+      RelayDescriptor dProxy = m_relays[desc.proxy ()];
+      GetP2pChannel(dProxy)->GetAttribute ("Delay", t);
+      owd += t.Get ().GetMilliSeconds ();
+      GetP2pChannel(dEntry)->GetAttribute ("Delay", t);
+      owd += t.Get ().GetMilliSeconds ();
+      if (dProxy.continent != dEntry.continent)
+        {
+          owd += m_routerDelay;
+        }
+    }
+
+    //Entry --- Middle
+    GetP2pChannel(dEntry)->GetAttribute ("Delay", t);
+    owd += t.Get ().GetMilliSeconds ();
+    GetP2pChannel(dMiddle)->GetAttribute ("Delay", t);
+    owd += t.Get ().GetMilliSeconds ();
+    if (dEntry.continent != dMiddle.continent)
+      {
+        owd += m_routerDelay;
+      }
+
+    //Middle --- Exit
+    GetP2pChannel(dMiddle)->GetAttribute ("Delay", t);
+    owd += t.Get ().GetMilliSeconds ();
+    GetP2pChannel(dExit)->GetAttribute ("Delay", t);
+    owd += t.Get ().GetMilliSeconds ();
+    if (dMiddle.continent != dExit.continent)
+      {
+        owd += m_routerDelay;
+      }
+
+  return owd;
+}
 
 Ptr<TorBaseApp>
 TorDumbbellHelper::InstallTorApp (string name)
@@ -540,5 +593,17 @@ TorDumbbellHelper::PrintCircuits ()
       cout << "\t" << e.middle () << "[" << m_relays[e.middle ()].continent << "]";
       cout << "\t" << e.exit () << "[" << m_relays[e.exit ()].continent << "]";
       cout << endl;
+    }
+}
+
+void
+TorDumbbellHelper::PrintBaseRtt ()
+{
+  map<int,CircuitDescriptor>::iterator i;
+  for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
+    {
+      CircuitDescriptor desc = i->second;
+      cout << desc.id << " (" << desc.m_typehint << "): ";
+      cout << 2*GetOwd (desc) << endl;
     }
 }

@@ -29,6 +29,7 @@ public:
 
   void BuildTopology ();
   void PrintCircuits ();
+  void PrintBaseRtt ();
 
   ApplicationContainer GetTorAppsContainer ();
 
@@ -115,6 +116,8 @@ public:
 
   void AddRelay (string,string = "");
 
+  int64_t GetOwd (CircuitDescriptor);
+  Ptr<PointToPointChannel> GetP2pChannel (RelayDescriptor);
   void InstallCircuits ();
   Ptr<TorBaseApp> InstallTorApp (string);
   void SetProxyAccessRate (string);
@@ -134,7 +137,6 @@ public:
   ObjectFactory m_factory;
 
   Ptr<UniformRandomVariable> m_rng;
-
   Ptr<ConstantRandomVariable> m_bulkRequest;
   Ptr<ConstantRandomVariable> m_bulkThink;
   Ptr<ConstantRandomVariable> m_clientRequest;
@@ -157,6 +159,7 @@ public:
   Ptr<EmpiricalRandomVariable> m_owdLeft;
   Ptr<EmpiricalRandomVariable> m_owdRight;
   Ptr<EmpiricalRandomVariable> m_owdRouter;
+  uint32_t m_routerDelay;
 
   Ptr<EmpiricalRandomVariable> m_clientBwLeft;
   Ptr<EmpiricalRandomVariable> m_clientBwRight;
