@@ -13,13 +13,13 @@ int main (int argc, char *argv[]) {
     uint32_t run = 1;
     Time simTime = Time("60s");
     uint32_t rtt = 40;
-    string transport = "vanilla";
+    string flavor = "vanilla";
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
     cmd.AddValue("rtt", "hop-by-hop rtt in msec", rtt);
     cmd.AddValue("time", "simulation time", simTime);
-    cmd.AddValue("transport", "transport protocol", transport);
+    cmd.AddValue("flavor", "Tor flavor", flavor);
     cmd.Parse(argc, argv);
 
     SeedManager::SetSeed (12);
@@ -42,12 +42,14 @@ int main (int argc, char *argv[]) {
     NS_LOG_INFO("setup topology");
 
     TorStarHelper th;
-    if (transport == "pctcp")
+    if (flavor == "pctcp")
         th.SetTorAppType("ns3::TorPctcpApp");
-    else if (transport == "bktap")
+    else if (flavor == "bktap")
         th.SetTorAppType("ns3::TorBktapApp");
-    else if (transport == "n23")
+    else if (flavor == "n23")
         th.SetTorAppType("ns3::TorN23App");
+    else if (flavor == "fair")
+        th.SetTorAppType("ns3::TorFairApp");
 
     // th.DisableProxies(true); // make circuits shorter (entry = proxy), thus the simulation faster
     th.EnableNscStack(true,"cubic"); // enable linux protocol stack and set tcp flavor
