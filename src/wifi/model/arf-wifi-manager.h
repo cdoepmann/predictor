@@ -17,6 +17,7 @@
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
+
 #ifndef ARF_WIFI_MANAGER_H
 #define ARF_WIFI_MANAGER_H
 
@@ -46,8 +47,9 @@ public:
   ArfWifiManager ();
   virtual ~ArfWifiManager ();
 
+
 private:
-  // overriden from base class
+  //overriden from base class
   virtual WifiRemoteStation * DoCreateStation (void) const;
   virtual void DoReportRxOk (WifiRemoteStation *station,
                              double rxSnr, WifiMode txMode);
@@ -59,7 +61,7 @@ private:
                                double ackSnr, WifiMode ackMode, double dataSnr);
   virtual void DoReportFinalRtsFailed (WifiRemoteStation *station);
   virtual void DoReportFinalDataFailed (WifiRemoteStation *station);
-  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station, uint32_t size);
+  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station);
   virtual WifiTxVector DoGetRtsTxVector (WifiRemoteStation *station);
   virtual bool IsLowLatency (void) const;
 
@@ -67,6 +69,6 @@ private:
   uint32_t m_successThreshold;
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* ARF_WIFI_MANAGER_H */

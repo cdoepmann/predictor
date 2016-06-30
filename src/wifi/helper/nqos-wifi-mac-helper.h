@@ -17,10 +17,15 @@
  *
  * Author: Mirko Banchi <mk.banchi@gmail.com>
  */
+
 #ifndef NQOS_WIFI_MAC_HELPER_H
 #define NQOS_WIFI_MAC_HELPER_H
 
 #include "wifi-helper.h"
+
+/**
+ * (Deprecated) ns3::NonQosWifiMacHelper declaration.
+ */
 
 namespace ns3 {
 
@@ -67,19 +72,28 @@ public:
    * \param v6 the value of the attribute to set
    * \param n7 the name of the attribute to set
    * \param v7 the value of the attribute to set
+   * \param n8 the name of the attribute to set
+   * \param v8 the value of the attribute to set
+   * \param n9 the name of the attribute to set
+   * \param v9 the value of the attribute to set
+   * \param n10 the name of the attribute to set
+   * \param v10 the value of the attribute to set
    *
    * All the attributes specified in this method should exist
    * in the requested mac.
    */
   virtual void SetType (std::string type,
-                std::string n0 = "", const AttributeValue &v0 = EmptyAttributeValue (),
-                std::string n1 = "", const AttributeValue &v1 = EmptyAttributeValue (),
-                std::string n2 = "", const AttributeValue &v2 = EmptyAttributeValue (),
-                std::string n3 = "", const AttributeValue &v3 = EmptyAttributeValue (),
-                std::string n4 = "", const AttributeValue &v4 = EmptyAttributeValue (),
-                std::string n5 = "", const AttributeValue &v5 = EmptyAttributeValue (),
-                std::string n6 = "", const AttributeValue &v6 = EmptyAttributeValue (),
-                std::string n7 = "", const AttributeValue &v7 = EmptyAttributeValue ());
+                        std::string n0 = "", const AttributeValue &v0 = EmptyAttributeValue (),
+                        std::string n1 = "", const AttributeValue &v1 = EmptyAttributeValue (),
+                        std::string n2 = "", const AttributeValue &v2 = EmptyAttributeValue (),
+                        std::string n3 = "", const AttributeValue &v3 = EmptyAttributeValue (),
+                        std::string n4 = "", const AttributeValue &v4 = EmptyAttributeValue (),
+                        std::string n5 = "", const AttributeValue &v5 = EmptyAttributeValue (),
+                        std::string n6 = "", const AttributeValue &v6 = EmptyAttributeValue (),
+                        std::string n7 = "", const AttributeValue &v7 = EmptyAttributeValue (),
+                        std::string n8 = "", const AttributeValue &v8 = EmptyAttributeValue (),
+                        std::string n9 = "", const AttributeValue &v9 = EmptyAttributeValue (),
+                        std::string n10 = "", const AttributeValue &v10 = EmptyAttributeValue ());
 protected:
   ObjectFactory m_mac;
 private:

@@ -44,6 +44,7 @@ CsmaNetDevice::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::CsmaNetDevice")
     .SetParent<NetDevice> ()
+    .SetGroupName ("Csma")
     .AddConstructor<CsmaNetDevice> ()
     .AddAttribute ("Address", 
                    "The MAC address of this device.",
@@ -520,7 +521,7 @@ CsmaNetDevice::TransmitStart (void)
           m_txMachineState = BUSY;
           m_phyTxBeginTrace (m_currentPkt);
 
-          Time tEvent = Seconds (m_bps.CalculateTxTime (m_currentPkt->GetSize ()));
+          Time tEvent = m_bps.CalculateBytesTxTime (m_currentPkt->GetSize ());
           NS_LOG_LOGIC ("Schedule TransmitCompleteEvent in " << tEvent.GetSeconds () << "sec");
           Simulator::Schedule (tEvent, &CsmaNetDevice::TransmitCompleteEvent, this);
         }
@@ -563,8 +564,9 @@ CsmaNetDevice::TransmitAbort (void)
     }
   else
     {
-      m_currentPkt = m_queue->Dequeue ();
-      NS_ASSERT_MSG (m_currentPkt != 0, "CsmaNetDevice::TransmitAbort(): IsEmpty false but no Packet on queue?");
+      Ptr<QueueItem> item = m_queue->Dequeue ();
+      NS_ASSERT_MSG (item != 0, "CsmaNetDevice::TransmitAbort(): IsEmpty false but no Packet on queue?");
+      m_currentPkt = item->GetPacket ();
       m_snifferTrace (m_currentPkt);
       m_promiscSnifferTrace (m_currentPkt);
       TransmitStart ();
@@ -631,8 +633,9 @@ CsmaNetDevice::TransmitReadyEvent (void)
     }
   else
     {
-      m_currentPkt = m_queue->Dequeue ();
-      NS_ASSERT_MSG (m_currentPkt != 0, "CsmaNetDevice::TransmitReadyEvent(): IsEmpty false but no Packet on queue?");
+      Ptr<QueueItem> item = m_queue->Dequeue ();
+      NS_ASSERT_MSG (item != 0, "CsmaNetDevice::TransmitReadyEvent(): IsEmpty false but no Packet on queue?");
+      m_currentPkt = item->GetPacket ();
       m_snifferTrace (m_currentPkt);
       m_promiscSnifferTrace (m_currentPkt);
       TransmitStart ();
@@ -656,7 +659,7 @@ CsmaNetDevice::Attach (Ptr<CsmaChannel> ch)
   //
   // We use the Ethernet interframe gap of 96 bit times.
   //
-  m_tInterframeGap = Seconds (m_bps.CalculateTxTime (96/8));
+  m_tInterframeGap = m_bps.CalculateBytesTxTime (96/8);
 
   //
   // This device is up whenever a channel is attached to it.
@@ -967,7 +970,7 @@ CsmaNetDevice::SendFrom (Ptr<Packet> packet, const Address& src, const Address& 
   // Place the packet to be sent on the send queue.  Note that the 
   // queue may fire a drop trace, but we will too.
   //
-  if (m_queue->Enqueue (packet) == false)
+  if (m_queue->Enqueue (Create<QueueItem> (packet)) == false)
     {
       m_macTxDropTrace (packet);
       return false;
@@ -982,8 +985,9 @@ CsmaNetDevice::SendFrom (Ptr<Packet> packet, const Address& src, const Address& 
     {
       if (m_queue->IsEmpty () == false)
         {
-          m_currentPkt = m_queue->Dequeue ();
-          NS_ASSERT_MSG (m_currentPkt != 0, "CsmaNetDevice::SendFrom(): IsEmpty false but no Packet on queue?");
+          Ptr<QueueItem> item = m_queue->Dequeue ();
+          NS_ASSERT_MSG (item != 0, "CsmaNetDevice::SendFrom(): IsEmpty false but no Packet on queue?");
+          m_currentPkt = item->GetPacket ();
           m_promiscSnifferTrace (m_currentPkt);
           m_snifferTrace (m_currentPkt);
           TransmitStart ();

@@ -17,6 +17,7 @@
  *
  * Author: Mirko Banchi <mk.banchi@gmail.com>
  */
+
 #include "ns3/test.h"
 #include "ns3/log.h"
 #include "ns3/qos-utils.h"
@@ -96,29 +97,36 @@ PacketBufferingCaseA::DoRun (void)
 
   uint16_t receivedSeq = 4001 * 16;
   uint32_t mappedSeq = QosUtilsMapSeqControlToUniqueInteger (receivedSeq, endSeq);
-  for (i = m_buffer.begin (); i != m_buffer.end () && QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) < mappedSeq; i++)
+  /* cycle to right position for this packet */
+  for (i = m_buffer.begin (); i != m_buffer.end (); i++)
     {
-      ;
+      if (QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) >= mappedSeq)
+        {
+          //position found
+          break;
+        }
     }
-  {
-    m_buffer.insert (i, receivedSeq);
-  }
+  m_buffer.insert (i, receivedSeq);
 
   receivedSeq = 3999 * 16;
   mappedSeq = QosUtilsMapSeqControlToUniqueInteger (receivedSeq, endSeq);
-  for (i = m_buffer.begin (); i != m_buffer.end () && QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) < mappedSeq; i++)
+  /* cycle to right position for this packet */
+  for (i = m_buffer.begin (); i != m_buffer.end (); i++)
     {
-      ;
+      if (QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) >= mappedSeq)
+        {
+          //position found
+          break;
+        }
     }
-  {
-    m_buffer.insert (i, receivedSeq);
-  }
+  m_buffer.insert (i, receivedSeq);
 
   for (i = m_buffer.begin (), j = m_expectedBuffer.begin (); i != m_buffer.end (); i++, j++)
     {
       NS_TEST_EXPECT_MSG_EQ (*i, *j, "error in buffer order");
     }
 }
+
 
 /* ----- = old packets
  * +++++ = new packets
@@ -181,39 +189,49 @@ PacketBufferingCaseB::DoRun (void)
 
   uint16_t receivedSeq = 15 * 16;
   uint32_t mappedSeq = QosUtilsMapSeqControlToUniqueInteger (receivedSeq, endSeq);
-  for (i = m_buffer.begin (); i != m_buffer.end () && QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) < mappedSeq; i++)
+  /* cycle to right position for this packet */
+  for (i = m_buffer.begin (); i != m_buffer.end (); i++)
     {
-      ;
+      if (QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) >= mappedSeq)
+        {
+          //position found
+          break;
+        }
     }
-  {
-    m_buffer.insert (i, receivedSeq);
-  }
+  m_buffer.insert (i, receivedSeq);
 
   receivedSeq = 15 * 16 + 1;
   mappedSeq = QosUtilsMapSeqControlToUniqueInteger (receivedSeq, endSeq);
-  for (i = m_buffer.begin (); i != m_buffer.end () && QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) < mappedSeq; i++)
+  /* cycle to right position for this packet */
+  for (i = m_buffer.begin (); i != m_buffer.end (); i++)
     {
-      ;
+      if (QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) >= mappedSeq)
+        {
+          //position found
+          break;
+        }
     }
-  {
-    m_buffer.insert (i, receivedSeq);
-  }
+  m_buffer.insert (i, receivedSeq);
 
   receivedSeq = 4050 * 16;
   mappedSeq = QosUtilsMapSeqControlToUniqueInteger (receivedSeq, endSeq);
-  for (i = m_buffer.begin (); i != m_buffer.end () && QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) < mappedSeq; i++)
+  /* cycle to right position for this packet */
+  for (i = m_buffer.begin (); i != m_buffer.end (); i++)
     {
-      ;
+      if (QosUtilsMapSeqControlToUniqueInteger ((*i), endSeq) >= mappedSeq)
+        {
+          //position found
+          break;
+        }
     }
-  {
-    m_buffer.insert (i, receivedSeq);
-  }
+  m_buffer.insert (i, receivedSeq);
 
   for (i = m_buffer.begin (), j = m_expectedBuffer.begin (); i != m_buffer.end (); i++, j++)
     {
       NS_TEST_EXPECT_MSG_EQ (*i, *j, "error in buffer order");
     }
 }
+
 
 //Test for block ack header
 class CtrlBAckResponseHeaderTest : public TestCase
@@ -275,6 +293,7 @@ CtrlBAckResponseHeaderTest::DoRun (void)
   NS_TEST_EXPECT_MSG_EQ (m_blockAckHdr.IsPacketReceived (35), false, "error in compressed bitmap");
   NS_TEST_EXPECT_MSG_EQ (m_blockAckHdr.IsPacketReceived (80), false, "error in compressed bitmap");
 }
+
 
 class BlockAckTestSuite : public TestSuite
 {

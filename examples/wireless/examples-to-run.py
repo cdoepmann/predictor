@@ -25,6 +25,13 @@ cpp_examples = [
     ("wifi-simple-infra", "True", "True"),
     ("wifi-simple-interference", "True", "True"),
     ("wifi-wired-bridging", "True", "True"),
+    ("power-adaptation-distance --manager=ns3::ParfWifiManager --outputFileName=parf --steps=5 --stepsSize=10", "True", "True"),
+    ("power-adaptation-distance --manager=ns3::AparfWifiManager --outputFileName=aparf --steps=5 --stepsSize=10", "True", "True"),
+    ("ofdm-ht-validation", "True", "True"),
+    ("ofdm-validation", "True", "True"),
+    ("ofdm-vht-validation", "True", "True"),
+    ("mixed-bg-network", "True", "True"),
+    ("wifi-tcp", "True", "True"),
 ]
 
 # A list of Python examples to run in order to ensure that they remain

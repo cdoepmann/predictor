@@ -17,22 +17,21 @@
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
-#include "regular-wifi-mac.h"
 
+#include "regular-wifi-mac.h"
 #include "ns3/log.h"
 #include "ns3/boolean.h"
 #include "ns3/pointer.h"
 #include "ns3/uinteger.h"
 #include "ns3/trace-source-accessor.h"
-
 #include "mac-rx-middle.h"
 #include "mac-tx-middle.h"
 #include "mac-low.h"
 #include "dcf.h"
 #include "dcf-manager.h"
 #include "wifi-phy.h"
-
-#include "msdu-aggregator.h"
+#include "msdu-standard-aggregator.h"
+#include "mpdu-standard-aggregator.h"
 
 namespace ns3 {
 
@@ -40,7 +39,10 @@ NS_LOG_COMPONENT_DEFINE ("RegularWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (RegularWifiMac);
 
-RegularWifiMac::RegularWifiMac ()
+RegularWifiMac::RegularWifiMac () :
+  m_htSupported (0),
+  m_vhtSupported (0),
+  m_erpSupported (0)
 {
   NS_LOG_FUNCTION (this);
   m_rxMiddle = new MacRxMiddle ();
@@ -57,13 +59,13 @@ RegularWifiMac::RegularWifiMac ()
   m_dca = CreateObject<DcaTxop> ();
   m_dca->SetLow (m_low);
   m_dca->SetManager (m_dcfManager);
-  m_dca->SetTxMiddle(m_txMiddle);
+  m_dca->SetTxMiddle (m_txMiddle);
   m_dca->SetTxOkCallback (MakeCallback (&RegularWifiMac::TxOk, this));
   m_dca->SetTxFailedCallback (MakeCallback (&RegularWifiMac::TxFailed, this));
 
-  // Construct the EDCAFs. The ordering is important - highest
-  // priority (Table 9-1 UP-to-AC mapping; IEEE 802.11-2012) must be created
-  // first.
+  //Construct the EDCAFs. The ordering is important - highest
+  //priority (Table 9-1 UP-to-AC mapping; IEEE 802.11-2012) must be created
+  //first.
   SetupEdcaQueue (AC_VO);
   SetupEdcaQueue (AC_VI);
   SetupEdcaQueue (AC_BE);
@@ -79,7 +81,6 @@ void
 RegularWifiMac::DoInitialize ()
 {
   NS_LOG_FUNCTION (this);
-
   m_dca->Initialize ();
 
   for (EdcaQueues::iterator i = m_edca.begin (); i != m_edca.end (); ++i)
@@ -121,7 +122,8 @@ RegularWifiMac::SetWifiRemoteStationManager (Ptr<WifiRemoteStationManager> stati
 {
   NS_LOG_FUNCTION (this << stationManager);
   m_stationManager = stationManager;
-  m_stationManager->SetHtSupported (GetHtSupported());
+  m_stationManager->SetHtSupported (GetHtSupported ());
+  m_stationManager->SetVhtSupported (GetVhtSupported ());
   m_low->SetWifiRemoteStationManager (stationManager);
 
   m_dca->SetWifiRemoteStationManager (stationManager);
@@ -138,13 +140,215 @@ RegularWifiMac::GetWifiRemoteStationManager () const
   return m_stationManager;
 }
 
+HtCapabilities
+RegularWifiMac::GetHtCapabilities (void) const
+{
+  HtCapabilities capabilities;
+  capabilities.SetHtSupported (1);
+  if (m_htSupported)
+    {
+      capabilities.SetLdpc (m_phy->GetLdpc ());
+      capabilities.SetSupportedChannelWidth (m_phy->GetChannelWidth () == 40);
+      capabilities.SetShortGuardInterval20 (m_phy->GetGuardInterval ());
+      capabilities.SetShortGuardInterval40 (m_phy->GetChannelWidth () == 40 && m_phy->GetGuardInterval ());
+      capabilities.SetGreenfield (m_phy->GetGreenfield ());
+      capabilities.SetMaxAmsduLength (1); //hardcoded for now (TBD)
+      capabilities.SetLSigProtectionSupport (!m_phy->GetGreenfield ());
+      capabilities.SetMaxAmpduLength (3); //hardcoded for now (TBD)
+      uint64_t maxSupportedRate = 0; //in bit/s
+      for (uint8_t i = 0; i < m_phy->GetNMcs (); i++)
+        {
+          WifiMode mcs = m_phy->GetMcs (i);
+          if (mcs.GetModulationClass () != WIFI_MOD_CLASS_HT)
+            {
+              continue;
+            }
+          capabilities.SetRxMcsBitmask (mcs.GetMcsValue ());
+          uint8_t nss = (mcs.GetMcsValue () / 8) + 1;
+          NS_ASSERT (nss > 0 && nss < 5);
+          if (mcs.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), nss) > maxSupportedRate)
+            {
+              maxSupportedRate = mcs.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), nss);
+              NS_LOG_DEBUG ("Updating maxSupportedRate to " << maxSupportedRate);
+            }
+        }
+      capabilities.SetRxHighestSupportedDataRate (maxSupportedRate / 1e6); //in Mbit/s
+      capabilities.SetTxMcsSetDefined (m_phy->GetNMcs () > 0);
+      capabilities.SetTxMaxNSpatialStreams (m_phy->GetSupportedTxSpatialStreams ());
+    }
+  return capabilities;
+}
+
+VhtCapabilities
+RegularWifiMac::GetVhtCapabilities (void) const
+{
+  VhtCapabilities capabilities;
+  capabilities.SetVhtSupported (1);
+  if (m_vhtSupported)
+    {
+      if (m_phy->GetChannelWidth () == 160)
+        {
+          capabilities.SetSupportedChannelWidthSet (1);
+        }
+      else
+        {
+          capabilities.SetSupportedChannelWidthSet (0);
+        }
+      capabilities.SetMaxMpduLength (2); //hardcoded for now (TBD)
+      capabilities.SetRxLdpc (m_phy->GetLdpc ());
+      capabilities.SetShortGuardIntervalFor80Mhz ((m_phy->GetChannelWidth () == 80) && m_phy->GetGuardInterval ());
+      capabilities.SetShortGuardIntervalFor160Mhz ((m_phy->GetChannelWidth () == 160) && m_phy->GetGuardInterval ());
+      capabilities.SetMaxAmpduLengthExponent (7); //hardcoded for now (TBD)
+      uint8_t maxMcs = 0;
+      for (uint8_t i = 0; i < m_phy->GetNMcs (); i++)
+        {
+          WifiMode mcs = m_phy->GetMcs (i);
+          if ((mcs.GetModulationClass () == WIFI_MOD_CLASS_VHT)
+              && (mcs.GetMcsValue () > maxMcs))
+            {
+              maxMcs = mcs.GetMcsValue ();
+            }
+        }
+      // Support same MaxMCS for each spatial stream
+      for (uint8_t nss = 1; nss <= m_phy->GetSupportedRxSpatialStreams (); nss++)
+        {
+          capabilities.SetRxMcsMap (maxMcs, nss);
+        }
+      for (uint8_t nss = 1; nss <= m_phy->GetSupportedTxSpatialStreams (); nss++)
+        {
+          capabilities.SetTxMcsMap (maxMcs, nss);
+        }
+    }
+  return capabilities;
+}
+
+void
+RegularWifiMac::SetVoMaxAmsduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_voMaxAmsduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetViMaxAmsduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_viMaxAmsduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetBeMaxAmsduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_beMaxAmsduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetBkMaxAmsduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_bkMaxAmsduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetVoMaxAmpduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_voMaxAmpduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetViMaxAmpduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_viMaxAmpduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetBeMaxAmpduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_beMaxAmpduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetBkMaxAmpduSize (uint32_t size)
+{
+  NS_LOG_FUNCTION (this << size);
+  m_bkMaxAmpduSize = size;
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::SetVoBlockAckThreshold (uint8_t threshold)
+{
+  NS_LOG_FUNCTION (this << threshold);
+  GetVOQueue ()->SetBlockAckThreshold (threshold);
+}
+
+void
+RegularWifiMac::SetViBlockAckThreshold (uint8_t threshold)
+{
+  NS_LOG_FUNCTION (this << threshold);
+  GetVIQueue ()->SetBlockAckThreshold (threshold);
+}
+
+void
+RegularWifiMac::SetBeBlockAckThreshold (uint8_t threshold)
+{
+  NS_LOG_FUNCTION (this << threshold);
+  GetBEQueue ()->SetBlockAckThreshold (threshold);
+}
+
+void
+RegularWifiMac::SetBkBlockAckThreshold (uint8_t threshold)
+{
+  NS_LOG_FUNCTION (this << threshold);
+  GetBKQueue ()->SetBlockAckThreshold (threshold);
+}
+
+void
+RegularWifiMac::SetVoBlockAckInactivityTimeout (uint16_t timeout)
+{
+  NS_LOG_FUNCTION (this << timeout);
+  GetVOQueue ()->SetBlockAckInactivityTimeout (timeout);
+}
+
+void
+RegularWifiMac::SetViBlockAckInactivityTimeout (uint16_t timeout)
+{
+  NS_LOG_FUNCTION (this << timeout);
+  GetVIQueue ()->SetBlockAckInactivityTimeout (timeout);
+}
+
+void
+RegularWifiMac::SetBeBlockAckInactivityTimeout (uint16_t timeout)
+{
+  NS_LOG_FUNCTION (this << timeout);
+  GetBEQueue ()->SetBlockAckInactivityTimeout (timeout);
+}
+
+void
+RegularWifiMac::SetBkBlockAckInactivityTimeout (uint16_t timeout)
+{
+  NS_LOG_FUNCTION (this << timeout);
+  GetBKQueue ()->SetBlockAckInactivityTimeout (timeout);
+}
+
 void
 RegularWifiMac::SetupEdcaQueue (enum AcIndex ac)
 {
   NS_LOG_FUNCTION (this << ac);
 
-  // Our caller shouldn't be attempting to setup a queue that is
-  // already configured.
+  //Our caller shouldn't be attempting to setup a queue that is
+  //already configured.
   NS_ASSERT (m_edca.find (ac) == m_edca.end ());
 
   Ptr<EdcaTxopN> edca = CreateObject<EdcaTxopN> ();
@@ -155,6 +359,7 @@ RegularWifiMac::SetupEdcaQueue (enum AcIndex ac)
   edca->SetTxFailedCallback (MakeCallback (&RegularWifiMac::TxFailed, this));
   edca->SetAccessCategory (ac);
   edca->CompleteConfig ();
+
   m_edca.insert (std::make_pair (ac, edca));
 }
 
@@ -247,7 +452,7 @@ RegularWifiMac::SetLinkDownCallback (Callback<void> linkDown)
 void
 RegularWifiMac::SetQosSupported (bool enable)
 {
-  NS_LOG_FUNCTION (this);
+  NS_LOG_FUNCTION (this << enable);
   m_qosSupported = enable;
 }
 
@@ -256,11 +461,49 @@ RegularWifiMac::GetQosSupported () const
 {
   return m_qosSupported;
 }
+
 void
 RegularWifiMac::SetHtSupported (bool enable)
 {
-  NS_LOG_FUNCTION (this);
+  NS_LOG_FUNCTION (this << enable);
   m_htSupported = enable;
+  if (enable)
+    {
+      SetQosSupported (true);
+    }
+  if (!enable && !m_vhtSupported)
+    {
+      DisableAggregation ();
+    }
+  else
+    {
+      EnableAggregation ();
+    }
+}
+
+bool
+RegularWifiMac::GetVhtSupported () const
+{
+  return m_vhtSupported;
+}
+
+void
+RegularWifiMac::SetVhtSupported (bool enable)
+{
+  NS_LOG_FUNCTION (this << enable);
+  m_vhtSupported = enable;
+  if (enable)
+    {
+      SetQosSupported (true);
+    }
+  if (!enable && !m_htSupported)
+    {
+      DisableAggregation ();
+    }
+  else
+    {
+      EnableAggregation ();
+    }
 }
 
 bool
@@ -268,8 +511,22 @@ RegularWifiMac::GetHtSupported () const
 {
   return m_htSupported;
 }
+
+bool
+RegularWifiMac::GetErpSupported () const
+{
+  return m_erpSupported;
+}
+
 void
-RegularWifiMac::SetCtsToSelfSupported(bool enable)
+RegularWifiMac::SetErpSupported (bool enable)
+{
+  NS_LOG_FUNCTION (this);
+  m_erpSupported = enable;
+}
+
+void
+RegularWifiMac::SetCtsToSelfSupported (bool enable)
 {
   NS_LOG_FUNCTION (this);
   m_low->SetCtsToSelfSupported (enable);
@@ -278,7 +535,7 @@ RegularWifiMac::SetCtsToSelfSupported(bool enable)
 bool
 RegularWifiMac::GetCtsToSelfSupported () const
 {
-   return  m_low->GetCtsToSelfSupported ();
+  return m_low->GetCtsToSelfSupported ();
 }
 
 void
@@ -321,6 +578,7 @@ RegularWifiMac::GetEifsNoDifs (void) const
 {
   return m_dcfManager->GetEifsNoDifs ();
 }
+
 void
 RegularWifiMac::SetRifs (Time rifs)
 {
@@ -331,7 +589,7 @@ RegularWifiMac::SetRifs (Time rifs)
 Time
 RegularWifiMac::GetRifs (void) const
 {
-  return m_low->GetRifs();
+  return m_low->GetRifs ();
 }
 
 void
@@ -445,13 +703,26 @@ RegularWifiMac::SetPromisc (void)
 }
 
 void
+RegularWifiMac::SetShortSlotTimeSupported (bool enable)
+{
+  NS_LOG_FUNCTION (this << enable);
+  m_shortSlotTimeSupported = enable;
+}
+
+bool
+RegularWifiMac::GetShortSlotTimeSupported (void) const
+{
+  return m_shortSlotTimeSupported;
+}
+
+void
 RegularWifiMac::Enqueue (Ptr<const Packet> packet,
                          Mac48Address to, Mac48Address from)
 {
-  // We expect RegularWifiMac subclasses which do support forwarding (e.g.,
-  // AP) to override this method. Therefore, we throw a fatal error if
-  // someone tries to invoke this method on a class which has not done
-  // this.
+  //We expect RegularWifiMac subclasses which do support forwarding (e.g.,
+  //AP) to override this method. Therefore, we throw a fatal error if
+  //someone tries to invoke this method on a class which has not done
+  //this.
   NS_FATAL_ERROR ("This MAC entity (" << this << ", " << GetAddress ()
                                       << ") does not support Enqueue() with from address");
 }
@@ -477,12 +748,12 @@ RegularWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
   Mac48Address to = hdr->GetAddr1 ();
   Mac48Address from = hdr->GetAddr2 ();
 
-  // We don't know how to deal with any frame that is not addressed to
-  // us (and odds are there is nothing sensible we could do anyway),
-  // so we ignore such frames.
+  //We don't know how to deal with any frame that is not addressed to
+  //us (and odds are there is nothing sensible we could do anyway),
+  //so we ignore such frames.
   //
-  // The derived class may also do some such filtering, but it doesn't
-  // hurt to have it here too as a backstop.
+  //The derived class may also do some such filtering, but it doesn't
+  //hurt to have it here too as a backstop.
   if (to != GetAddress ())
     {
       return;
@@ -490,8 +761,8 @@ RegularWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 
   if (hdr->IsMgt () && hdr->IsAction ())
     {
-      // There is currently only any reason for Management Action
-      // frames to be flying about if we are a QoS STA.
+      //There is currently only any reason for Management Action
+      //frames to be flying about if we are a QoS STA.
       NS_ASSERT (m_qosSupported);
 
       WifiActionHeader actionHdr;
@@ -508,31 +779,29 @@ RegularWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
                 MgtAddBaRequestHeader reqHdr;
                 packet->RemoveHeader (reqHdr);
 
-                // We've received an ADDBA Request. Our policy here is
-                // to automatically accept it, so we get the ADDBA
-                // Response on it's way immediately.
+                //We've received an ADDBA Request. Our policy here is
+                //to automatically accept it, so we get the ADDBA
+                //Response on it's way immediately.
                 SendAddBaResponse (&reqHdr, from);
-                // This frame is now completely dealt with, so we're done.
+                //This frame is now completely dealt with, so we're done.
                 return;
               }
-
             case WifiActionHeader::BLOCK_ACK_ADDBA_RESPONSE:
               {
                 MgtAddBaResponseHeader respHdr;
                 packet->RemoveHeader (respHdr);
 
-                // We've received an ADDBA Response. We assume that it
-                // indicates success after an ADDBA Request we have
-                // sent (we could, in principle, check this, but it
-                // seems a waste given the level of the current model)
-                // and act by locally establishing the agreement on
-                // the appropriate queue.
+                //We've received an ADDBA Response. We assume that it
+                //indicates success after an ADDBA Request we have
+                //sent (we could, in principle, check this, but it
+                //seems a waste given the level of the current model)
+                //and act by locally establishing the agreement on
+                //the appropriate queue.
                 AcIndex ac = QosUtilsMapTidToAc (respHdr.GetTid ());
                 m_edca[ac]->GotAddBaResponse (&respHdr, from);
-                // This frame is now completely dealt with, so we're done.
+                //This frame is now completely dealt with, so we're done.
                 return;
               }
-
             case WifiActionHeader::BLOCK_ACK_DELBA:
               {
                 MgtDelBaHeader delBaHdr;
@@ -540,30 +809,27 @@ RegularWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 
                 if (delBaHdr.IsByOriginator ())
                   {
-                    // This DELBA frame was sent by the originator, so
-                    // this means that an ingoing established
-                    // agreement exists in MacLow and we need to
-                    // destroy it.
+                    //This DELBA frame was sent by the originator, so
+                    //this means that an ingoing established
+                    //agreement exists in MacLow and we need to
+                    //destroy it.
                     m_low->DestroyBlockAckAgreement (from, delBaHdr.GetTid ());
                   }
                 else
                   {
-                    // We must have been the originator. We need to
-                    // tell the correct queue that the agreement has
-                    // been torn down
+                    //We must have been the originator. We need to
+                    //tell the correct queue that the agreement has
+                    //been torn down
                     AcIndex ac = QosUtilsMapTidToAc (delBaHdr.GetTid ());
                     m_edca[ac]->GotDelBaFrame (&delBaHdr, from);
                   }
-                // This frame is now completely dealt with, so we're done.
+                //This frame is now completely dealt with, so we're done.
                 return;
               }
-
             default:
               NS_FATAL_ERROR ("Unsupported Action field in Block Ack Action frame");
               return;
             }
-
-
         default:
           NS_FATAL_ERROR ("Unsupported Action frame received");
           return;
@@ -616,13 +882,12 @@ RegularWifiMac::SendAddBaResponse (const MgtAddBaRequestHeader *reqHdr,
       respHdr.SetDelayedBlockAck ();
     }
   respHdr.SetTid (reqHdr->GetTid ());
-  // For now there's not no control about limit of reception. We
-  // assume that receiver has no limit on reception. However we assume
-  // that a receiver sets a bufferSize in order to satisfy next
-  // equation: (bufferSize + 1) % 16 = 0 So if a recipient is able to
-  // buffer a packet, it should be also able to buffer all possible
-  // packet's fragments. See section 7.3.1.14 in IEEE802.11e for more
-  // details.
+  //For now there's not no control about limit of reception. We
+  //assume that receiver has no limit on reception. However we assume
+  //that a receiver sets a bufferSize in order to satisfy next
+  //equation: (bufferSize + 1) % 16 = 0 So if a recipient is able to
+  //buffer a packet, it should be also able to buffer all possible
+  //packet's fragments. See section 7.3.1.14 in IEEE802.11e for more details.
   respHdr.SetBufferSize (1023);
   respHdr.SetTimeout (reqHdr->GetTimeout ());
 
@@ -635,14 +900,14 @@ RegularWifiMac::SendAddBaResponse (const MgtAddBaRequestHeader *reqHdr,
   packet->AddHeader (respHdr);
   packet->AddHeader (actionHdr);
 
-  // We need to notify our MacLow object as it will have to buffer all
-  // correctly received packets for this Block Ack session
+  //We need to notify our MacLow object as it will have to buffer all
+  //correctly received packets for this Block Ack session
   m_low->CreateBlockAckAgreement (&respHdr, originator,
                                   reqHdr->GetStartingSequence ());
 
-  // It is unclear which queue this frame should go into. For now we
-  // bung it into the queue corresponding to the TID for which we are
-  // establishing an agreement, and push it to the head.
+  //It is unclear which queue this frame should go into. For now we
+  //bung it into the queue corresponding to the TID for which we are
+  //establishing an agreement, and push it to the head.
   m_edca[QosUtilsMapTidToAc (reqHdr->GetTid ())]->PushFront (packet, hdr);
 }
 
@@ -651,98 +916,215 @@ RegularWifiMac::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::RegularWifiMac")
     .SetParent<WifiMac> ()
+    .SetGroupName ("Wifi")
     .AddAttribute ("QosSupported",
-                   "This Boolean attribute is set to enable 802.11e/WMM-style QoS support at this STA",
+                   "This Boolean attribute is set to enable 802.11e/WMM-style QoS support at this STA.",
                    BooleanValue (false),
                    MakeBooleanAccessor (&RegularWifiMac::SetQosSupported,
                                         &RegularWifiMac::GetQosSupported),
                    MakeBooleanChecker ())
     .AddAttribute ("HtSupported",
-                   "This Boolean attribute is set to enable 802.11n support at this STA",
+                   "This Boolean attribute is set to enable 802.11n support at this STA.",
                    BooleanValue (false),
                    MakeBooleanAccessor (&RegularWifiMac::SetHtSupported,
                                         &RegularWifiMac::GetHtSupported),
                    MakeBooleanChecker ())
-   .AddAttribute ("CtsToSelfSupported",
-                   "Use CTS to Self when using a rate that is not in the basic set rate",
+    .AddAttribute ("VhtSupported",
+                   "This Boolean attribute is set to enable 802.11ac support at this STA.",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&RegularWifiMac::SetVhtSupported,
+                                        &RegularWifiMac::GetVhtSupported),
+                   MakeBooleanChecker ())
+    .AddAttribute ("CtsToSelfSupported",
+                   "Use CTS to Self when using a rate that is not in the basic rate set.",
                    BooleanValue (false),
                    MakeBooleanAccessor (&RegularWifiMac::SetCtsToSelfSupported,
                                         &RegularWifiMac::GetCtsToSelfSupported),
-                    MakeBooleanChecker ())
-    .AddAttribute ("DcaTxop", "The DcaTxop object",
+                   MakeBooleanChecker ())
+    .AddAttribute ("VO_MaxAmsduSize",
+                   "Maximum length in bytes of an A-MSDU for AC_VO access class.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetVoMaxAmsduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("VI_MaxAmsduSize",
+                   "Maximum length in bytes of an A-MSDU for AC_VI access class.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetViMaxAmsduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("BE_MaxAmsduSize",
+                   "Maximum length in bytes of an A-MSDU for AC_BE access class.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBeMaxAmsduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("BK_MaxAmsduSize",
+                   "Maximum length in bytes of an A-MSDU for AC_BK access class.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBkMaxAmsduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("VO_MaxAmpduSize",
+                   "Maximum length in bytes of an A-MPDU for AC_VO access class.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetVoMaxAmpduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("VI_MaxAmpduSize",
+                   "Maximum length in bytes of an A-MPDU for AC_VI access class.",
+                   UintegerValue (65535),
+                   MakeUintegerAccessor (&RegularWifiMac::SetViMaxAmpduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("BE_MaxAmpduSize",
+                   "Maximum length in bytes of an A-MPDU for AC_BE access class.",
+                   UintegerValue (65535),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBeMaxAmpduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("BK_MaxAmpduSize",
+                   "Maximum length in bytes of an A-MPDU for AC_BK access class.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBkMaxAmpduSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("VO_BlockAckThreshold",
+                   "If number of packets in VO queue reaches this value, "
+                   "block ack mechanism is used. If this value is 0, block ack is never used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetVoBlockAckThreshold),
+                   MakeUintegerChecker<uint8_t> (0, 64))
+    .AddAttribute ("VI_BlockAckThreshold",
+                   "If number of packets in VI queue reaches this value, "
+                   "block ack mechanism is used. If this value is 0, block ack is never used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetViBlockAckThreshold),
+                   MakeUintegerChecker<uint8_t> (0, 64))
+    .AddAttribute ("BE_BlockAckThreshold",
+                   "If number of packets in BE queue reaches this value, "
+                   "block ack mechanism is used. If this value is 0, block ack is never used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBeBlockAckThreshold),
+                   MakeUintegerChecker<uint8_t> (0, 64))
+    .AddAttribute ("BK_BlockAckThreshold",
+                   "If number of packets in BK queue reaches this value, "
+                   "block ack mechanism is used. If this value is 0, block ack is never used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBkBlockAckThreshold),
+                   MakeUintegerChecker<uint8_t> (0, 64))
+    .AddAttribute ("VO_BlockAckInactivityTimeout",
+                   "Represents max time (blocks of 1024 micro seconds) allowed for block ack"
+                   "inactivity for AC_VO. If this value isn't equal to 0 a timer start after that a"
+                   "block ack setup is completed and will be reset every time that a block ack"
+                   "frame is received. If this value is 0, block ack inactivity timeout won't be used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetVoBlockAckInactivityTimeout),
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("VI_BlockAckInactivityTimeout",
+                   "Represents max time (blocks of 1024 micro seconds) allowed for block ack"
+                   "inactivity for AC_VI. If this value isn't equal to 0 a timer start after that a"
+                   "block ack setup is completed and will be reset every time that a block ack"
+                   "frame is received. If this value is 0, block ack inactivity timeout won't be used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetViBlockAckInactivityTimeout),
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("BE_BlockAckInactivityTimeout",
+                   "Represents max time (blocks of 1024 micro seconds) allowed for block ack"
+                   "inactivity for AC_BE. If this value isn't equal to 0 a timer start after that a"
+                   "block ack setup is completed and will be reset every time that a block ack"
+                   "frame is received. If this value is 0, block ack inactivity timeout won't be used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBeBlockAckInactivityTimeout),
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("BK_BlockAckInactivityTimeout",
+                   "Represents max time (blocks of 1024 micro seconds) allowed for block ack"
+                   "inactivity for AC_BK. If this value isn't equal to 0 a timer start after that a"
+                   "block ack setup is completed and will be reset every time that a block ack"
+                   "frame is received. If this value is 0, block ack inactivity timeout won't be used.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&RegularWifiMac::SetBkBlockAckInactivityTimeout),
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("ShortSlotTimeSupported",
+                   "Whether or not short slot time is supported (only used by ERP APs or STAs).",
+                   BooleanValue (true),
+                   MakeBooleanAccessor (&WifiMac::GetShortSlotTimeSupported,
+                                        &WifiMac::SetShortSlotTimeSupported),
+                   MakeBooleanChecker ())
+    .AddAttribute ("DcaTxop",
+                   "The DcaTxop object.",
                    PointerValue (),
                    MakePointerAccessor (&RegularWifiMac::GetDcaTxop),
                    MakePointerChecker<DcaTxop> ())
     .AddAttribute ("VO_EdcaTxopN",
-                   "Queue that manages packets belonging to AC_VO access class",
+                   "Queue that manages packets belonging to AC_VO access class.",
                    PointerValue (),
                    MakePointerAccessor (&RegularWifiMac::GetVOQueue),
                    MakePointerChecker<EdcaTxopN> ())
     .AddAttribute ("VI_EdcaTxopN",
-                   "Queue that manages packets belonging to AC_VI access class",
+                   "Queue that manages packets belonging to AC_VI access class.",
                    PointerValue (),
                    MakePointerAccessor (&RegularWifiMac::GetVIQueue),
                    MakePointerChecker<EdcaTxopN> ())
     .AddAttribute ("BE_EdcaTxopN",
-                   "Queue that manages packets belonging to AC_BE access class",
+                   "Queue that manages packets belonging to AC_BE access class.",
                    PointerValue (),
                    MakePointerAccessor (&RegularWifiMac::GetBEQueue),
                    MakePointerChecker<EdcaTxopN> ())
     .AddAttribute ("BK_EdcaTxopN",
-                   "Queue that manages packets belonging to AC_BK access class",
+                   "Queue that manages packets belonging to AC_BK access class.",
                    PointerValue (),
                    MakePointerAccessor (&RegularWifiMac::GetBKQueue),
                    MakePointerChecker<EdcaTxopN> ())
-    .AddTraceSource ( "TxOkHeader",
-                      "The header of successfully transmitted packet",
+    .AddTraceSource ("TxOkHeader",
+                     "The header of successfully transmitted packet.",
                      MakeTraceSourceAccessor (&RegularWifiMac::m_txOkCallback),
                      "ns3::WifiMacHeader::TracedCallback")
     .AddTraceSource ("TxErrHeader",
-                     "The header of unsuccessfully transmitted packet",
+                     "The header of unsuccessfully transmitted packet.",
                      MakeTraceSourceAccessor (&RegularWifiMac::m_txErrCallback),
                      "ns3::WifiMacHeader::TracedCallback")
   ;
-
   return tid;
 }
 
 void
 RegularWifiMac::FinishConfigureStandard (enum WifiPhyStandard standard)
 {
-  uint32_t cwmin;
-  uint32_t cwmax;
-
+  NS_LOG_FUNCTION (this << standard);
+  uint32_t cwmin = 0;
+  uint32_t cwmax = 0;
   switch (standard)
     {
-    case WIFI_PHY_STANDARD_holland:
-    case WIFI_PHY_STANDARD_80211a:
-    case WIFI_PHY_STANDARD_80211g:
-    case WIFI_PHY_STANDARD_80211_10MHZ:
-    case WIFI_PHY_STANDARD_80211_5MHZ:
+    case WIFI_PHY_STANDARD_80211ac:
+      SetVhtSupported (true);
     case WIFI_PHY_STANDARD_80211n_5GHZ:
     case WIFI_PHY_STANDARD_80211n_2_4GHZ:
+      SetHtSupported (true);
+    case WIFI_PHY_STANDARD_80211g:
+      m_erpSupported = true;
+    case WIFI_PHY_STANDARD_holland:
+    case WIFI_PHY_STANDARD_80211a:
+    case WIFI_PHY_STANDARD_80211_10MHZ:
+    case WIFI_PHY_STANDARD_80211_5MHZ:
       cwmin = 15;
       cwmax = 1023;
       break;
-
     case WIFI_PHY_STANDARD_80211b:
       cwmin = 31;
       cwmax = 1023;
       break;
-
     default:
       NS_FATAL_ERROR ("Unsupported WifiPhyStandard in RegularWifiMac::FinishConfigureStandard ()");
     }
 
-  // The special value of AC_BE_NQOS which exists in the Access
-  // Category enumeration allows us to configure plain old DCF.
-  ConfigureDcf (m_dca, cwmin, cwmax, AC_BE_NQOS);
+  ConfigureContentionWindow (cwmin, cwmax);
+}
 
-  // Now we configure the EDCA functions
+void
+RegularWifiMac::ConfigureContentionWindow (uint32_t cwMin, uint32_t cwMax)
+{
+  //The special value of AC_BE_NQOS which exists in the Access
+  //Category enumeration allows us to configure plain old DCF.
+  ConfigureDcf (m_dca, cwMin, cwMax, AC_BE_NQOS);
+
+  //Now we configure the EDCA functions
   for (EdcaQueues::iterator i = m_edca.begin (); i != m_edca.end (); ++i)
-    {
-      ConfigureDcf (i->second, cwmin, cwmax, i->first);
-    }
+  {
+    ConfigureDcf (i->second, cwMin, cwMax, i->first);
+  }
 }
 
 void
@@ -759,4 +1141,73 @@ RegularWifiMac::TxFailed (const WifiMacHeader &hdr)
   m_txErrCallback (hdr);
 }
 
-} // namespace ns3
+void
+RegularWifiMac::ConfigureAggregation (void)
+{
+  NS_LOG_FUNCTION (this);
+  if (GetVOQueue ()->GetMsduAggregator () != 0)
+    {
+      GetVOQueue ()->GetMsduAggregator ()->SetMaxAmsduSize (m_voMaxAmsduSize);
+    }
+  if (GetVIQueue ()->GetMsduAggregator () != 0)
+    {
+      GetVIQueue ()->GetMsduAggregator ()->SetMaxAmsduSize (m_viMaxAmsduSize);
+    }
+  if (GetBEQueue ()->GetMsduAggregator () != 0)
+    {
+      GetBEQueue ()->GetMsduAggregator ()->SetMaxAmsduSize (m_beMaxAmsduSize);
+    }
+  if (GetBKQueue ()->GetMsduAggregator () != 0)
+    {
+      GetBKQueue ()->GetMsduAggregator ()->SetMaxAmsduSize (m_bkMaxAmsduSize);
+    }
+  if (GetVOQueue ()->GetMpduAggregator () != 0)
+    {
+      GetVOQueue ()->GetMpduAggregator ()->SetMaxAmpduSize (m_voMaxAmpduSize);
+    }
+  if (GetVIQueue ()->GetMpduAggregator () != 0)
+    {
+      GetVIQueue ()->GetMpduAggregator ()->SetMaxAmpduSize (m_viMaxAmpduSize);
+    }
+  if (GetBEQueue ()->GetMpduAggregator () != 0)
+    {
+      GetBEQueue ()->GetMpduAggregator ()->SetMaxAmpduSize (m_beMaxAmpduSize);
+    }
+  if (GetBKQueue ()->GetMpduAggregator () != 0)
+    {
+      GetBKQueue ()->GetMpduAggregator ()->SetMaxAmpduSize (m_bkMaxAmpduSize);
+    }
+}
+
+void
+RegularWifiMac::EnableAggregation (void)
+{
+  NS_LOG_FUNCTION (this);
+  for (EdcaQueues::iterator i = m_edca.begin (); i != m_edca.end (); ++i)
+  {
+    if (i->second->GetMsduAggregator () == 0)
+      {
+        Ptr<MsduStandardAggregator> msduAggregator = CreateObject<MsduStandardAggregator> ();
+        i->second->SetMsduAggregator (msduAggregator);
+      }
+    if (i->second->GetMpduAggregator () == 0)
+      {
+        Ptr<MpduStandardAggregator> mpduAggregator = CreateObject<MpduStandardAggregator> ();
+        i->second->SetMpduAggregator (mpduAggregator);
+      }
+  }
+  ConfigureAggregation ();
+}
+
+void
+RegularWifiMac::DisableAggregation (void)
+{
+  NS_LOG_FUNCTION (this);
+  for (EdcaQueues::iterator i = m_edca.begin (); i != m_edca.end (); ++i)
+  {
+    i->second->SetMsduAggregator (0);
+    i->second->SetMpduAggregator (0);
+  }
+}
+
+} //namespace ns3

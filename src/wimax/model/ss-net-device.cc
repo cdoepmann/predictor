@@ -61,6 +61,7 @@ SubscriberStationNetDevice::GetTypeId (void)
     TypeId ("ns3::SubscriberStationNetDevice")
 
     .SetParent<WimaxNetDevice> ()
+    .SetGroupName ("Wimax")
 
     .AddConstructor<SubscriberStationNetDevice> ()
 
@@ -914,7 +915,7 @@ SubscriberStationNetDevice::DoReceive (Ptr<Packet> packet)
         }
       else if (GetInitialRangingConnection () != 0 && cid == GetInitialRangingConnection ()->GetCid () && !fragmentation)
         {
-          m_traceSSRx (packet, GetMacAddress (), &cid);
+          m_traceSSRx (packet, GetMacAddress (), cid);
           packet->RemoveHeader (msgType);
           switch (msgType.GetType ())
             {
@@ -933,7 +934,7 @@ SubscriberStationNetDevice::DoReceive (Ptr<Packet> packet)
         }
       else if (m_basicConnection != 0 && cid == m_basicConnection->GetCid () && !fragmentation)
         {
-          m_traceSSRx (packet, GetMacAddress (), &cid);
+          m_traceSSRx (packet, GetMacAddress (), cid);
           packet->RemoveHeader (msgType);
           switch (msgType.GetType ())
             {
@@ -952,7 +953,7 @@ SubscriberStationNetDevice::DoReceive (Ptr<Packet> packet)
         }
       else if (m_primaryConnection != 0 && cid == m_primaryConnection->GetCid () && !fragmentation)
         {
-          m_traceSSRx (packet, GetMacAddress (), &cid);
+          m_traceSSRx (packet, GetMacAddress (), cid);
           packet->RemoveHeader (msgType);
           switch (msgType.GetType ())
             {
@@ -1042,7 +1043,7 @@ SubscriberStationNetDevice::DoReceive (Ptr<Packet> packet)
         }
       else if (cid.IsMulticast ())
         {
-          m_traceSSRx (packet, GetMacAddress (), &cid);
+          m_traceSSRx (packet, GetMacAddress (), cid);
           ForwardUp (packet, m_baseStationId, GetMacAddress ()); // source shall be BS's address or sender SS's?
         }
       else if (IsPromisc ())

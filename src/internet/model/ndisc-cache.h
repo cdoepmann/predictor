@@ -38,6 +38,7 @@ namespace ns3
 
 class NetDevice;
 class Ipv6Interface;
+class Ipv6Header;
 
 /**
  * \class NdiscCache
@@ -132,6 +133,11 @@ public:
   void PrintNdiscCache (Ptr<OutputStreamWrapper> stream);
 
   /**
+   * \brief Pair of a packet and an Ipv4 header.
+   */
+  typedef std::pair<Ptr<Packet>, Ipv6Header> Ipv6PayloadHeaderPair;
+
+  /**
    * \class Entry
    * \brief A record that holds information about an NdiscCache entry.
    */
@@ -148,14 +154,14 @@ public:
      * \brief Changes the state to this entry to INCOMPLETE.
      * \param p packet that wait to be sent
      */
-    void MarkIncomplete (Ptr<Packet> p);
+    void MarkIncomplete (Ipv6PayloadHeaderPair p);
 
     /**
      * \brief Changes the state to this entry to REACHABLE.
      * \param mac MAC address
      * \return the list of packet waiting
      */
-    std::list<Ptr<Packet> > MarkReachable (Address mac);
+    std::list<Ipv6PayloadHeaderPair> MarkReachable (Address mac);
 
     /**
      * \brief Changes the state to this entry to PROBE.
@@ -167,7 +173,7 @@ public:
      * \param mac L2 address
      * \return the list of packet waiting
      */
-    std::list<Ptr<Packet> > MarkStale (Address mac);
+    std::list<Ipv6PayloadHeaderPair> MarkStale (Address mac);
 
     /**
      * \brief Changes the state to this entry to STALE.
@@ -185,10 +191,15 @@ public:
     void MarkDelay ();
 
     /**
+     * \brief Change the state to this entry to PERMANENT.
+     */
+    void MarkPermanent ();
+
+    /**
      * \brief Add a packet (or replace old value) in the queue.
      * \param p packet to add
      */
-    void AddWaitingPacket (Ptr<Packet> p);
+    void AddWaitingPacket (Ipv6PayloadHeaderPair p);
 
     /**
      * \brief Clear the waiting packet list.
@@ -226,6 +237,12 @@ public:
     bool IsProbe () const;
 
     /**
+     * \brief Is the entry PERMANENT
+     * \return true if the entry is in PERMANENT state, false otherwise
+     */
+    bool IsPermanent () const;
+
+    /**
      * \brief Get the MAC address of this entry.
      * \return the L2 address
      */
@@ -250,22 +267,6 @@ public:
     void SetRouter (bool router);
 
     /**
-     * \brief Get the number of NS retransmit.
-     * \return number of NS that have been retransmit
-     */
-    uint8_t GetNSRetransmit () const;
-
-    /**
-     * \brief Increment NS retransmit.
-     */
-    void IncNSRetransmit ();
-
-    /**
-     * \brief Reset NS retransmit (=0).
-     */
-    void ResetNSRetransmit ();
-
-    /**
      * \brief Get the time of last reachability confirmation.
      * \return time
      */
@@ -282,19 +283,9 @@ public:
     void StartReachableTimer ();
 
     /**
-     * \brief Stop the reachable timer.
-     */
-    void StopReachableTimer ();
-
-    /**
      * \brief Start retransmit timer.
      */
     void StartRetransmitTimer ();
-
-    /**
-     * \brief Stop retransmit timer.
-     */
-    void StopRetransmitTimer ();
 
     /**
      * \brief Start probe timer.
@@ -302,19 +293,14 @@ public:
     void StartProbeTimer ();
 
     /**
-     * \brief Stop probe timer.
-     */
-    void StopProbeTimer ();
-
-    /**
      * \brief Start delay timer.
      */
     void StartDelayTimer ();
 
     /**
-     * \brief Stop delay timer.
+     * \brief Stop NUD timer and reset the NUD retransmission counter
      */
-    void StopDelayTimer ();
+    void StopNudTimer ();
 
     /**
      * \brief Function called when reachable timer timeout.
@@ -359,7 +345,8 @@ private:
       REACHABLE, /**< Mapping exists between IPv6 and L2 addresses */
       STALE, /**< Mapping is stale */
       DELAY, /**< Try to wait contact from remote host */
-      PROBE /**< Try to contact IPv6 address to know again its L2 address */
+      PROBE, /**< Try to contact IPv6 address to know again its L2 address */
+      PERMANENT /**< Permanent Mapping exists between IPv6 and L2 addresses */
     };
 
     /**
@@ -380,7 +367,7 @@ private:
     /**
      * \brief The list of packet waiting.
      */
-    std::list<Ptr<Packet> > m_waiting;
+    std::list<Ipv6PayloadHeaderPair> m_waiting;
 
     /**
      * \brief Type of node (router or host).
@@ -388,24 +375,9 @@ private:
     bool m_router;
 
     /**
-     * \brief Reachable timer (used for NUD in REACHABLE state).
+     * \brief Timer (used for NUD).
      */
-    Timer m_reachableTimer;
-
-    /**
-     * \brief Retransmission timer (used for NUD in INCOMPLETE state).
-     */
-    Timer m_retransTimer;
-
-    /**
-     * \brief Probe timer (used for NUD in PROBE state).
-     */
-    Timer m_probeTimer;
-
-    /**
-     * \brief Delay timer (used for NUD when in DELAY state).
-     */
-    Timer m_delayTimer;
+    Timer m_nudTimer;
 
     /**
      * \brief Last time we see a reachability confirmation.

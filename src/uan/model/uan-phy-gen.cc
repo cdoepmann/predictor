@@ -62,7 +62,8 @@ TypeId
 UanPhyCalcSinrDefault::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanPhyCalcSinrDefault")
-    .SetParent<Object> ()
+    .SetParent<UanPhyCalcSinr> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanPhyCalcSinrDefault> ()
   ;
   return tid;
@@ -109,7 +110,8 @@ TypeId
 UanPhyCalcSinrFhFsk::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanPhyCalcSinrFhFsk")
-    .SetParent<Object> ()
+    .SetParent<UanPhyCalcSinr> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanPhyCalcSinrFhFsk> ()
     .AddAttribute ("NumberOfHops",
                    "Number of frequencies in hopping pattern.",
@@ -215,7 +217,8 @@ TypeId
 UanPhyPerGenDefault::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanPhyPerGenDefault")
-    .SetParent<Object> ()
+    .SetParent<UanPhyPer> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanPhyPerGenDefault> ()
     .AddAttribute ("Threshold", "SINR cutoff for good packet reception.",
                    DoubleValue (8),
@@ -253,7 +256,8 @@ UanPhyPerUmodem::~UanPhyPerUmodem ()
 TypeId UanPhyPerUmodem::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanPhyPerUmodem")
-    .SetParent<Object> ()
+    .SetParent<UanPhyPer> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanPhyPerUmodem> ()
   ;
   return tid;
@@ -431,6 +435,7 @@ UanPhyGen::GetTypeId (void)
 
   static TypeId tid = TypeId ("ns3::UanPhyGen")
     .SetParent<UanPhy> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanPhyGen> ()
     .AddAttribute ("CcaThreshold",
                    "Aggregate energy of incoming signals to move to CCA Busy state dB.",
@@ -804,7 +809,7 @@ UanPhyGen::GetChannel (void) const
 }
 
 Ptr<UanNetDevice>
-UanPhyGen::GetDevice (void)
+UanPhyGen::GetDevice (void) const
 {
   return m_device;
 }

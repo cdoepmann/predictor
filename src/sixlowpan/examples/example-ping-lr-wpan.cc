@@ -22,7 +22,7 @@
 #include <fstream>
 #include "ns3/core-module.h"
 #include "ns3/internet-module.h"
-#include "ns3/applications-module.h"
+#include "ns3/internet-apps-module.h"
 #include "ns3/ipv6-static-routing-helper.h"
 #include "ns3/mobility-module.h"
 #include "ns3/spectrum-module.h"
@@ -49,13 +49,6 @@ int main (int argc, char** argv)
   NodeContainer nodes;
   nodes.Create(2);
 
-  LrWpanHelper lrWpanHelper;
-  // Add and install the LrWpanNetDevice for each node
-  NetDeviceContainer lrwpanDevices = lrWpanHelper.Install(nodes);
-
-  // Fake PAN association and short address assignment.
-  lrWpanHelper.AssociateToPan (lrwpanDevices, 0);
-
   MobilityHelper mobility;
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
@@ -68,6 +61,12 @@ int main (int argc, char** argv)
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (nodes);
   
+  LrWpanHelper lrWpanHelper;
+  // Add and install the LrWpanNetDevice for each node
+  NetDeviceContainer lrwpanDevices = lrWpanHelper.Install(nodes);
+
+  // Fake PAN association and short address assignment.
+  lrWpanHelper.AssociateToPan (lrwpanDevices, 0);
 
   InternetStackHelper internetv6;
   internetv6.Install (nodes);

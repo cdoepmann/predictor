@@ -17,6 +17,7 @@
  *
  * Author: Matias Richart <mrichart@fing.edu.uy>
  */
+
 #ifndef APARF_WIFI_MANAGER_H
 #define APARF_WIFI_MANAGER_H
 
@@ -61,24 +62,8 @@ public:
     Spread
   };
 
-  /**
-   * TracedCallback signature for power change events.
-   *
-   * \param [in] power The new power.
-   * \param [in] address The remote station MAC address.
-   */
-  typedef void (*PowerChangeTracedCallback)(const uint8_t power, const Mac48Address remoteAddress);
-
-  /**
-   * TracedCallback signature for rate change events.
-   *
-   * \param [in] rate The new rate.
-   * \param [in] address The remote station MAC address.
-   */
-  typedef void (*RateChangeTracedCallback)(const uint32_t rate, const Mac48Address remoteAddress);
-
 private:
-  // overriden from base class
+  //overriden from base class
   virtual WifiRemoteStation * DoCreateStation (void) const;
   virtual void DoReportRxOk (WifiRemoteStation *station,
                              double rxSnr, WifiMode txMode);
@@ -90,7 +75,7 @@ private:
                                double ackSnr, WifiMode ackMode, double dataSnr);
   virtual void DoReportFinalRtsFailed (WifiRemoteStation *station);
   virtual void DoReportFinalDataFailed (WifiRemoteStation *station);
-  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station, uint32_t size);
+  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station);
   virtual WifiTxVector DoGetRtsTxVector (WifiRemoteStation *station);
   virtual bool IsLowLatency (void) const;
 
@@ -102,18 +87,24 @@ private:
 
   uint32_t m_succesMax1; //!< The minimum number of successful transmissions in \"High\" state to try a new power or rate.
   uint32_t m_succesMax2; //!< The minimum number of successful transmissions in \"Low\" state to try a new power or rate.
-  uint32_t m_failMax; //!< The minimum number of failed transmissions to try a new power or rate.
-  uint32_t m_powerMax; //!< The maximum number of power changes.
-  uint32_t m_powerInc; //!< Step size for increment the power.
-  uint32_t m_powerDec; //!< Step size for decrement the power.
-  uint32_t m_rateInc; //!< Step size for increment the rate.
-  uint32_t m_rateDec; //!< Step size for decrement the rate.
+  uint32_t m_failMax;    //!< The minimum number of failed transmissions to try a new power or rate.
+  uint32_t m_powerMax;   //!< The maximum number of power changes.
+  uint32_t m_powerInc;   //!< Step size for increment the power.
+  uint32_t m_powerDec;   //!< Step size for decrement the power.
+  uint32_t m_rateInc;    //!< Step size for increment the rate.
+  uint32_t m_rateDec;    //!< Step size for decrement the rate.
+
   /**
-   * Number of power levels.
+   * Minimal power level.
    * Differently form rate, power levels do not depend on the remote station.
    * The levels depend only on the physical layer of the device.
    */
-  uint32_t m_nPower;
+  uint32_t m_minPower;  
+
+  /**
+   * Maximal power level.
+   */
+  uint32_t m_maxPower;
 
   /**
    * The trace source fired when the transmission power change
@@ -126,6 +117,6 @@ private:
 
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* APARF_WIFI_MANAGER_H */

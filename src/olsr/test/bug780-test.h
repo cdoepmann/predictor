@@ -23,27 +23,32 @@
 #include "ns3/nstime.h"
 #include "ns3/node-container.h"
 
-namespace ns3
-{
-namespace olsr
-{
-  /** See \bugid{780} */
+namespace ns3 {
+namespace olsr {
+/** See \bugid{780} */
 class Bug780Test : public TestCase
 {
 public:
-  Bug780Test (); 
+  Bug780Test ();
   ~Bug780Test ();
 private:
-  /// Unique PCAP files prefix for this test
-  static const char * const PREFIX;
   /// Total simulation time
   const Time m_time;
   /// Create & configure test network
   void CreateNodes ();
-  /// Compare traces with reference ones
-  void CheckResults ();
   /// Go
   void DoRun ();
+  /// Send one ping
+  void SendPing ();
+  /// Receive echo reply
+  /// \param socket the socket
+  void Receive (Ptr<Socket> socket);
+  /// Socket
+  Ptr<Socket> m_socket;
+  /// Sequence number
+  uint16_t m_seq;
+  /// Received ECHO Reply counter
+  uint16_t m_recvCount;
 };
 
 }

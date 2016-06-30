@@ -17,6 +17,7 @@
  *
  * Author: Ghada Badawy <gbadawy@gmail.com>
  */
+
 #include "ampdu-tag.h"
 #include "ns3/tag.h"
 #include "ns3/uinteger.h"
@@ -30,6 +31,7 @@ AmpduTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::AmpduTag")
     .SetParent<Tag> ()
+    .SetGroupName ("Wifi")
     .AddConstructor<AmpduTag> ()
     .AddAttribute ("Ampdu Exists", "The value that indicates that the packet contains an AMPDU",
                    UintegerValue (false),
@@ -101,4 +103,4 @@ AmpduTag::Print (std::ostream &os) const
   os << "A-MPDU exists=" << m_ampdu;
 }
 
-} // namespace ns3
+} //namespace ns3

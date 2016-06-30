@@ -22,9 +22,6 @@ def build(bld):
     obj = bld.create_ns3_program('wifi-wired-bridging', ['internet', 'mobility', 'wifi', 'csma', 'bridge', 'applications'])
     obj.source = 'wifi-wired-bridging.cc'
 
-    obj = bld.create_ns3_program('simple-wifi-frame-aggregation', ['internet', 'mobility', 'wifi', 'applications'])
-    obj.source = 'simple-wifi-frame-aggregation.cc'
-
     obj = bld.create_ns3_program('multirate', ['internet', 'mobility', 'wifi', 'stats', 'flow-monitor', 'olsr', 'applications', 'point-to-point'])
     obj.source = 'multirate.cc'
 
@@ -49,11 +46,20 @@ def build(bld):
     obj = bld.create_ns3_program('ofdm-ht-validation', ['core', 'mobility', 'wifi', 'config-store', 'stats'])
     obj.source = 'ofdm-ht-validation.cc'
 
+    obj = bld.create_ns3_program('ofdm-vht-validation', ['core', 'mobility', 'wifi', 'config-store', 'stats'])
+    obj.source = 'ofdm-vht-validation.cc'
+
     obj = bld.create_ns3_program('wifi-hidden-terminal', ['internet', 'mobility', 'wifi', 'applications', 'propagation', 'flow-monitor'])
     obj.source = 'wifi-hidden-terminal.cc'
 
     obj = bld.create_ns3_program('ht-wifi-network', ['core','internet', 'mobility', 'wifi', 'applications', 'propagation'])
     obj.source = 'ht-wifi-network.cc'
+
+    obj = bld.create_ns3_program('vht-wifi-network', ['core','internet', 'mobility', 'wifi', 'applications', 'propagation'])
+    obj.source = 'vht-wifi-network.cc'
+
+    obj = bld.create_ns3_program('wifi-timing-attributes', ['core','internet', 'mobility', 'wifi', 'applications', 'propagation'])
+    obj.source = 'wifi-timing-attributes.cc'
 
     obj = bld.create_ns3_program('wifi-sleep', ['core', 'network', 'internet', 'mobility', 'wifi', 'applications', 'energy', 'config-store'])
     obj.source = 'wifi-sleep.cc'
@@ -66,3 +72,18 @@ def build(bld):
 
     obj = bld.create_ns3_program('rate-adaptation-distance', ['core', 'mobility', 'wifi', 'applications', 'flow-monitor'])
     obj.source = 'rate-adaptation-distance.cc'
+
+    obj = bld.create_ns3_program('wifi-aggregation', ['internet', 'mobility', 'wifi', 'applications'])
+    obj.source = 'wifi-aggregation.cc'
+
+    obj = bld.create_ns3_program('simple-ht-hidden-stations', ['internet', 'mobility', 'wifi', 'applications'])    
+    obj.source = 'simple-ht-hidden-stations.cc'
+
+    obj = bld.create_ns3_program('80211n-mimo', ['core','internet', 'mobility', 'wifi', 'applications', 'propagation'])
+    obj.source = '80211n-mimo.cc'
+
+    obj = bld.create_ns3_program('mixed-bg-network', ['internet', 'mobility', 'wifi', 'applications'])    
+    obj.source = 'mixed-bg-network.cc'
+
+    obj = bld.create_ns3_program('wifi-tcp', ['internet', 'mobility', 'wifi', 'applications'])    
+    obj.source = 'wifi-tcp.cc'

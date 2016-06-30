@@ -38,12 +38,14 @@ PointToPointRemoteChannel::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::PointToPointRemoteChannel")
     .SetParent<PointToPointChannel> ()
+    .SetGroupName ("PointToPoint")
     .AddConstructor<PointToPointRemoteChannel> ()
   ;
   return tid;
 }
 
 PointToPointRemoteChannel::PointToPointRemoteChannel ()
+  : PointToPointChannel ()
 {
 }
 

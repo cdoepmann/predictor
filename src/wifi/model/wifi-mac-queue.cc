@@ -16,14 +16,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- * Author: Mirko Banchi <mk.banchi@gmail.com>
+ * Authors: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
+ *          Mirko Banchi <mk.banchi@gmail.com>
  */
 
 #include "ns3/simulator.h"
 #include "ns3/packet.h"
 #include "ns3/uinteger.h"
-
 #include "wifi-mac-queue.h"
 #include "qos-blocked-destinations.h"
 
@@ -45,13 +44,14 @@ WifiMacQueue::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::WifiMacQueue")
     .SetParent<Object> ()
+    .SetGroupName ("Wifi")
     .AddConstructor<WifiMacQueue> ()
     .AddAttribute ("MaxPacketNumber", "If a packet arrives when there are already this number of packets, it is dropped.",
                    UintegerValue (400),
                    MakeUintegerAccessor (&WifiMacQueue::m_maxSize),
                    MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("MaxDelay", "If a packet stays longer than this delay in the queue, it is dropped.",
-                   TimeValue (Seconds (10.0)),
+                   TimeValue (MilliSeconds (500.0)),
                    MakeTimeAccessor (&WifiMacQueue::m_maxDelay),
                    MakeTimeChecker ())
   ;
@@ -115,7 +115,7 @@ WifiMacQueue::Cleanup (void)
 
   Time now = Simulator::Now ();
   uint32_t n = 0;
-  for (PacketQueueI i = m_queue.begin (); i != m_queue.end ();)
+  for (PacketQueueI i = m_queue.begin (); i != m_queue.end (); )
     {
       if (i->tstamp + m_maxDelay > now)
         {
@@ -202,7 +202,7 @@ WifiMacQueue::PeekByTidAndAddress (WifiMacHeader *hdr, uint8_t tid,
                   && it->hdr.GetQosTid () == tid)
                 {
                   *hdr = it->hdr;
-                  *timestamp=it->tstamp;
+                  *timestamp = it->tstamp;
                   return it->packet;
                 }
             }
@@ -221,6 +221,7 @@ WifiMacQueue::IsEmpty (void)
 uint32_t
 WifiMacQueue::GetSize (void)
 {
+  Cleanup ();
   return m_size;
 }
 
@@ -341,4 +342,4 @@ WifiMacQueue::PeekFirstAvailable (WifiMacHeader *hdr, Time &timestamp,
   return 0;
 }
 
-} // namespace ns3
+} //namespace ns3

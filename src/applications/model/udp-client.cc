@@ -44,6 +44,7 @@ UdpClient::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UdpClient")
     .SetParent<Application> ()
+    .SetGroupName("Applications")
     .AddConstructor<UdpClient> ()
     .AddAttribute ("MaxPackets",
                    "The maximum number of packets the application will send",
@@ -138,6 +139,7 @@ UdpClient::StartApplication (void)
     }
 
   m_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+  m_socket->SetAllowBroadcast (true);
   m_sendEvent = Simulator::Schedule (Seconds (0.0), &UdpClient::Send, this);
 }
 

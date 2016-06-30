@@ -22,6 +22,12 @@
 #include "assert.h"
 #include "log.h"
 
+/**
+ * \file
+ * \ingroup highprec
+ * Implementation of the ns3::int64x64_t type using a native int128_t type.
+ */
+
 namespace ns3 {
 
 // Note:  Logging in this file is largely avoided due to the
@@ -38,7 +44,7 @@ NS_LOG_COMPONENT_DEFINE ("int64x64-128");
  * \param [in]  sb The signed value of the second operand.
  * \param [out] ua The unsigned magnitude of the first operand.
  * \param [out] ub The unsigned magnitude of the second operand.
- * \returns True if the result will be negative.
+ * \returns \c true if the result will be negative.
  */
 static inline  
 bool

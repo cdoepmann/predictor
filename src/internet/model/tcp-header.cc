@@ -51,6 +51,34 @@ TcpHeader::~TcpHeader ()
 {
 }
 
+std::string
+TcpHeader::FlagsToString (uint8_t flags, const std::string& delimiter)
+{
+  static const char* flagNames[8] = {
+    "FIN",
+    "SYN",
+    "RST",
+    "PSH",
+    "ACK",
+    "URG",
+    "ECE",
+    "CWR"
+  };
+  std::string flagsDescription = "";
+  for (uint8_t i = 0; i < 8; ++i)
+    {
+      if (flags & (1 << i))
+        {
+          if (flagsDescription.length () > 0)
+            {
+              flagsDescription += delimiter;
+            }
+          flagsDescription.append (flagNames[i]);
+        }
+    }
+  return flagsDescription;
+}
+
 void
 TcpHeader::EnableChecksums (void)
 {
@@ -130,6 +158,18 @@ TcpHeader::GetLength () const
 }
 
 uint8_t
+TcpHeader::GetOptionLength () const
+{
+  return m_optionsLen;
+}
+
+uint8_t
+TcpHeader::GetMaxOptionLength () const
+{
+  return m_maxOptionsLen;
+}
+
+uint8_t
 TcpHeader::GetFlags () const
 {
   return m_flags;
@@ -147,9 +187,9 @@ TcpHeader::GetUrgentPointer () const
   return m_urgentPointer;
 }
 
-void 
-TcpHeader::InitializeChecksum (Ipv4Address source, 
-                               Ipv4Address destination,
+void
+TcpHeader::InitializeChecksum (const Ipv4Address &source,
+                               const Ipv4Address &destination,
                                uint8_t protocol)
 {
   m_source = source;
@@ -157,9 +197,9 @@ TcpHeader::InitializeChecksum (Ipv4Address source,
   m_protocol = protocol;
 }
 
-void 
-TcpHeader::InitializeChecksum (Ipv6Address source, 
-                               Ipv6Address destination,
+void
+TcpHeader::InitializeChecksum (const Ipv6Address &source,
+                               const Ipv6Address &destination,
                                uint8_t protocol)
 {
   m_source = source;
@@ -167,9 +207,9 @@ TcpHeader::InitializeChecksum (Ipv6Address source,
   m_protocol = protocol;
 }
 
-void 
-TcpHeader::InitializeChecksum (Address source, 
-                               Address destination,
+void
+TcpHeader::InitializeChecksum (const Address &source,
+                               const Address &destination,
                                uint8_t protocol)
 {
   m_source = source;
@@ -226,17 +266,18 @@ TcpHeader::IsChecksumOk (void) const
   return m_goodChecksum;
 }
 
-TypeId 
+TypeId
 TcpHeader::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::TcpHeader")
     .SetParent<Header> ()
+    .SetGroupName ("Internet")
     .AddConstructor<TcpHeader> ()
   ;
   return tid;
 }
 
-TypeId 
+TypeId
 TcpHeader::GetInstanceTypeId (void) const
 {
   return GetTypeId ();
@@ -249,44 +290,10 @@ TcpHeader::Print (std::ostream &os)  const
 
   if (m_flags != 0)
     {
-      os<<" [";
-      if ((m_flags & FIN) != 0)
-        {
-          os<<" FIN ";
-        }
-      if ((m_flags & SYN) != 0)
-        {
-          os<<" SYN ";
-        }
-      if ((m_flags & RST) != 0)
-        {
-          os<<" RST ";
-        }
-      if ((m_flags & PSH) != 0)
-        {
-          os<<" PSH ";
-        }
-      if ((m_flags & ACK) != 0)
-        {
-          os<<" ACK ";
-        }
-      if ((m_flags & URG) != 0)
-        {
-          os<<" URG ";
-        }
-      if ((m_flags & ECE) != 0)
-        {
-          os<<" ECE ";
-        }
-      if ((m_flags & CWR) != 0)
-        {
-          os<<" CWR ";
-        }
-
-      os<<"]";
+      os << " [" << FlagsToString (m_flags) << "]";
     }
 
-  os<<" Seq="<<m_sequenceNumber<<" Ack="<<m_ackNumber<<" Win="<<m_windowSize;
+  os << " Seq=" << m_sequenceNumber << " Ack=" << m_ackNumber << " Win=" << m_windowSize;
 
   TcpOptionList::const_iterator op;
 
@@ -331,13 +338,13 @@ TcpHeader::Serialize (Buffer::Iterator start)  const
 
   // padding to word alignment; add ENDs and/or pad values (they are the same)
   while (optionLen % 4)
-  {
-    i.WriteU8 (TcpOption::END);
-    ++optionLen;
-  }
+    {
+      i.WriteU8 (TcpOption::END);
+      ++optionLen;
+    }
 
   // Make checksum
-  if(m_calcChecksum)
+  if (m_calcChecksum)
     {
       uint16_t headerChecksum = CalculateHeaderChecksum (start.GetSize ());
       i = start;
@@ -359,7 +366,7 @@ TcpHeader::Deserialize (Buffer::Iterator start)
   m_ackNumber = i.ReadNtohU32 ();
   uint16_t field = i.ReadNtohU16 ();
   m_flags = field & 0x3F;
-  m_length = field>>12;
+  m_length = field >> 12;
   m_windowSize = i.ReadNtohU16 ();
   i.Next (2);
   m_urgentPointer = i.ReadNtohU16 ();
@@ -367,7 +374,7 @@ TcpHeader::Deserialize (Buffer::Iterator start)
   // Deserialize options if they exist
   m_options.clear ();
   uint32_t optionLen = (m_length - 5) * 4;
-  if (optionLen > 40)
+  if (optionLen > m_maxOptionsLen)
     {
       NS_LOG_ERROR ("Illegal TCP option length " << optionLen << "; options discarded");
       return 20;
@@ -381,7 +388,7 @@ TcpHeader::Deserialize (Buffer::Iterator start)
         {
           op = TcpOption::CreateOption (kind);
         }
-      else 
+      else
         {
           op = TcpOption::CreateOption (TcpOption::UNKNOWN);
           NS_LOG_WARN ("Option kind " << static_cast<int> (kind) << " unknown, skipping.");
@@ -420,7 +427,7 @@ TcpHeader::Deserialize (Buffer::Iterator start)
     }
 
   // Do checksum
-  if(m_calcChecksum)
+  if (m_calcChecksum)
     {
       uint16_t headerChecksum = CalculateHeaderChecksum (start.GetSize ());
       i = start;
@@ -511,14 +518,21 @@ bool
 operator== (const TcpHeader &lhs, const TcpHeader &rhs)
 {
   return (
-    lhs.m_sourcePort      == rhs.m_sourcePort      &&
-    lhs.m_destinationPort == rhs.m_destinationPort &&
-    lhs.m_sequenceNumber  == rhs.m_sequenceNumber  &&
-    lhs.m_ackNumber       == rhs.m_ackNumber       &&
-    lhs.m_flags           == rhs.m_flags           &&
-    lhs.m_windowSize      == rhs.m_windowSize      &&
-    lhs.m_urgentPointer   == rhs.m_urgentPointer
-    );
+           lhs.m_sourcePort      == rhs.m_sourcePort
+           && lhs.m_destinationPort == rhs.m_destinationPort
+           && lhs.m_sequenceNumber  == rhs.m_sequenceNumber
+           && lhs.m_ackNumber       == rhs.m_ackNumber
+           && lhs.m_flags           == rhs.m_flags
+           && lhs.m_windowSize      == rhs.m_windowSize
+           && lhs.m_urgentPointer   == rhs.m_urgentPointer
+           );
+}
+
+std::ostream&
+operator<< (std::ostream& os, TcpHeader const & tc)
+{
+  tc.Print (os);
+  return os;
 }
 
 } // namespace ns3

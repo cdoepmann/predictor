@@ -41,11 +41,37 @@ namespace ns3 {
  * as methods for serialization to and deserialization from a byte buffer.
  */
 
-class TcpHeader : public Header 
+class TcpHeader : public Header
 {
 public:
   TcpHeader ();
   virtual ~TcpHeader ();
+
+  /**
+   * \brief Print a TCP header into an output stream
+   *
+   * \param os output stream
+   * \param tc TCP header to print
+   * \return The ostream passed as first argument
+   */
+  friend std::ostream& operator<< (std::ostream& os, TcpHeader const & tc);
+
+  /**
+   * \brief Converts an integer into a human readable list of Tcp flags
+   *
+   * \param flags Bitfield of TCP flags to convert to a readable string
+   * \param delimiter String to insert between flags
+   *
+   * FIN=0x1, SYN=0x2, RST=0x4, PSH=0x8, ACK=0x10, URG=0x20, ECE=0x40, CWR=0x80
+   * TcpHeader::FlagsToString (0x1) should return the following string;
+   *     "FIN"
+   *
+   * TcpHeader::FlagsToString (0xff) should return the following string;
+   *     "FIN|SYN|RST|PSH|ACK|URG|ECE|CWR";
+   *
+   * \return the generated string
+   **/
+  static std::string FlagsToString (uint8_t flags, const std::string& delimiter = "|");
 
   /**
    * \brief Enable checksum calculation for TCP
@@ -160,6 +186,18 @@ public:
   Ptr<TcpOption> GetOption (uint8_t kind) const;
 
   /**
+   * \brief Get the total length of appended options
+   * \return the total length of options appended to this TcpHeader
+   */
+  uint8_t GetOptionLength () const;
+
+  /**
+   * \brief Get maximum option length
+   * \return the maximum option length
+   */
+  uint8_t GetMaxOptionLength () const;
+
+  /**
    * \brief Check if the header has the option specified
    * \param kind Option to check for
    * \return true if the header has the option, false otherwise
@@ -187,8 +225,8 @@ public:
    *        IP packet.
    *
    */
-  void InitializeChecksum (Ipv4Address source, 
-                           Ipv4Address destination,
+  void InitializeChecksum (const Ipv4Address &source,
+                           const Ipv4Address &destination,
                            uint8_t protocol);
 
   /**
@@ -205,8 +243,8 @@ public:
    *        IP packet.
    *
    */
-  void InitializeChecksum (Ipv6Address source, 
-                           Ipv6Address destination,
+  void InitializeChecksum (const Ipv6Address &source,
+                           const Ipv6Address &destination,
                            uint8_t protocol);
 
   /**
@@ -223,8 +261,8 @@ public:
    *        IP packet.
    *
    */
-  void InitializeChecksum (Address source, 
-                           Address destination,
+  void InitializeChecksum (const Address &source,
+                           const Address &destination,
                            uint8_t protocol);
 
   /**
@@ -302,11 +340,10 @@ private:
   bool m_calcChecksum;    //!< Flag to calculate checksum
   bool m_goodChecksum;    //!< Flag to indicate that checksum is correct
 
-
+  static const uint8_t m_maxOptionsLen = 40;         //!< Maximum options length
   typedef std::list< Ptr<TcpOption> > TcpOptionList; //!< List of TcpOption
-  TcpOptionList m_options; //!< TcpOption present in the header
-  uint8_t m_optionsLen; //!< Tcp options length.
-  static const uint8_t m_maxOptionsLen = 40; //!< Maximum options length
+  TcpOptionList m_options;     //!< TcpOption present in the header
+  uint8_t m_optionsLen;        //!< Tcp options length.
 };
 
 } // namespace ns3

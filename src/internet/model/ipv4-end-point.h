@@ -168,28 +168,19 @@ public:
                     uint8_t icmpType, uint8_t icmpCode,
                     uint32_t icmpInfo);
 
-private:
   /**
-   * \brief ForwardUp wrapper.
-   * \param p packet
-   * \param header the packet header
-   * \param sport source port
-   * \param incomingInterface incoming interface
+   * \brief Enable or Disable the endpoint Rx capability.
+   * \param enabled true if Rx is enabled
    */
-  void DoForwardUp (Ptr<Packet> p, const Ipv4Header& header, uint16_t sport,
-                    Ptr<Ipv4Interface> incomingInterface);
-  /**
-   * \brief ForwardIcmp wrapper.
-   * \param icmpSource source IP address
-   * \param icmpTtl time-to-live
-   * \param icmpType ICMP type
-   * \param icmpCode ICMP code
-   * \param icmpInfo ICMP info
-   */
-  void DoForwardIcmp (Ipv4Address icmpSource, uint8_t icmpTtl,
-                      uint8_t icmpType, uint8_t icmpCode,
-                      uint32_t icmpInfo);
+  void SetRxEnabled (bool enabled);
 
+  /**
+   * \brief Checks if the endpoint can receive packets.
+   * \returns true if the endpoint can receive packets.
+   */
+  bool IsRxEnabled (void);
+
+private:
   /**
    * \brief The local address.
    */
@@ -229,6 +220,11 @@ private:
    * \brief The destroy callback.
    */
   Callback<void> m_destroyCallback;
+
+  /**
+   * \brief true if the endpoint can receive packets.
+   */
+  bool m_rxEnabled;
 };
 
 } // namespace ns3

@@ -74,8 +74,13 @@ TypeId
 LrWpanPhy::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::LrWpanPhy")
-    .SetParent<Object> ()
+    .SetParent<SpectrumPhy> ()
+    .SetGroupName ("LrWpan")
     .AddConstructor<LrWpanPhy> ()
+    .AddTraceSource ("TrxStateValue",
+                     "The state of the transceiver",
+                     MakeTraceSourceAccessor (&LrWpanPhy::m_trxState),
+                     "ns3::TracedValueCallback::LrWpanPhyEnumeration")
     .AddTraceSource ("TrxState",
                      "The state of the transceiver",
                      MakeTraceSourceAccessor (&LrWpanPhy::m_trxStateLogger),
@@ -105,7 +110,7 @@ LrWpanPhy::GetTypeId (void)
                      "completely received from the channel medium "
                      "by the device",
                      MakeTraceSourceAccessor (&LrWpanPhy::m_phyRxEndTrace),
-                     "ns3::LrWpanPhy::RxEndTracedCallback")
+                     "ns3::Packet::SinrTracedCallback")
     .AddTraceSource ("PhyRxDrop",
                      "Trace source indicating a packet has been "
                      "dropped by the device during reception",
@@ -193,7 +198,7 @@ LrWpanPhy::DoDispose (void)
 }
 
 Ptr<NetDevice>
-LrWpanPhy::GetDevice (void)
+LrWpanPhy::GetDevice (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_device;
@@ -274,19 +279,37 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
   NS_LOG_FUNCTION (this << spectrumRxParams);
   LrWpanSpectrumValueHelper psdHelper;
 
-
-  Ptr<LrWpanSpectrumSignalParameters> lrWpanRxParams = DynamicCast<LrWpanSpectrumSignalParameters> (spectrumRxParams);
-  NS_ASSERT (lrWpanRxParams != 0);
-  Ptr<Packet> p = (lrWpanRxParams->packetBurst->GetPackets ()).front ();
-  NS_ASSERT (p != 0);
-
   if (!m_edRequest.IsExpired ())
     {
       // Update the average receive power during ED.
       Time now = Simulator::Now ();
-      m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd ()) * (now - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
+      m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel) * (now - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
       m_edPower.lastUpdate = now;
     }
+
+  Ptr<LrWpanSpectrumSignalParameters> lrWpanRxParams = DynamicCast<LrWpanSpectrumSignalParameters> (spectrumRxParams);
+
+  if (lrWpanRxParams == 0)
+    {
+      CheckInterference ();
+      m_signal->AddSignal (spectrumRxParams->psd);
+
+      // Update peak power if CCA is in progress.
+      if (!m_ccaRequest.IsExpired ())
+        {
+          double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel);
+          if (m_ccaPeakPower < power)
+            {
+              m_ccaPeakPower = power;
+            }
+        }
+
+      Simulator::Schedule (spectrumRxParams->duration, &LrWpanPhy::EndRx, this, spectrumRxParams);
+      return;
+    }
+
+  Ptr<Packet> p = (lrWpanRxParams->packetBurst->GetPackets ()).front ();
+  NS_ASSERT (p != 0);
 
   // Prevent PHY from receiving another packet while switching the transceiver state.
   if (m_trxState == IEEE_802_15_4_PHY_RX_ON && !m_setTRXState.IsRunning ())
@@ -307,12 +330,12 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 
       // Add any incoming packet to the current interference before checking the
       // SINR.
-      NS_LOG_DEBUG (this << " receiving packet with power: " << 10 * log10(LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd)) + 30 << "dBm");
+      NS_LOG_DEBUG (this << " receiving packet with power: " << 10 * log10(LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd, m_phyPIBAttributes.phyCurrentChannel)) + 30 << "dBm");
       m_signal->AddSignal (lrWpanRxParams->psd);
       Ptr<SpectrumValue> interferenceAndNoise = m_signal->GetSignalPsd ();
       *interferenceAndNoise -= *lrWpanRxParams->psd;
       *interferenceAndNoise += *m_noise;
-      double sinr = LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd) / LrWpanSpectrumValueHelper::TotalAvgPower (interferenceAndNoise);
+      double sinr = LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd, m_phyPIBAttributes.phyCurrentChannel) / LrWpanSpectrumValueHelper::TotalAvgPower (interferenceAndNoise, m_phyPIBAttributes.phyCurrentChannel);
 
       // Std. 802.15.4-2006, appendix E, Figure E.2
       // At SNR < -5 the BER is less than 10e-1.
@@ -357,7 +380,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
   // Update peak power if CCA is in progress.
   if (!m_ccaRequest.IsExpired ())
     {
-      double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd ());
+      double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel);
       if (m_ccaPeakPower < power)
         {
           m_ccaPeakPower = power;
@@ -366,7 +389,8 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 
   // Always call EndRx to update the interference.
   // \todo: Do we need to keep track of these events to unschedule them when disposing off the PHY?
-  Simulator::Schedule (lrWpanRxParams->duration, &LrWpanPhy::EndRx, this, lrWpanRxParams);
+
+  Simulator::Schedule (spectrumRxParams->duration, &LrWpanPhy::EndRx, this, spectrumRxParams);
 }
 
 void
@@ -390,7 +414,7 @@ LrWpanPhy::CheckInterference (void)
           Ptr<SpectrumValue> interferenceAndNoise = m_signal->GetSignalPsd ();
           *interferenceAndNoise -= *currentRxParams->psd;
           *interferenceAndNoise += *m_noise;
-          double sinr = LrWpanSpectrumValueHelper::TotalAvgPower (currentRxParams->psd) / LrWpanSpectrumValueHelper::TotalAvgPower (interferenceAndNoise);
+          double sinr = LrWpanSpectrumValueHelper::TotalAvgPower (currentRxParams->psd, m_phyPIBAttributes.phyCurrentChannel) / LrWpanSpectrumValueHelper::TotalAvgPower (interferenceAndNoise, m_phyPIBAttributes.phyCurrentChannel);
           double per = 1.0 - m_errorModel->GetChunkSuccessRate (sinr, chunkSize);
 
           // The LQI is the total packet success rate scaled to 0-255.
@@ -416,26 +440,36 @@ LrWpanPhy::CheckInterference (void)
 }
 
 void
-LrWpanPhy::EndRx (Ptr<LrWpanSpectrumSignalParameters> params)
+LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
 {
   NS_LOG_FUNCTION (this);
-  NS_ASSERT (params != 0);
+
+  Ptr<LrWpanSpectrumSignalParameters> params = DynamicCast<LrWpanSpectrumSignalParameters> (par);
 
   if (!m_edRequest.IsExpired ())
     {
       // Update the average receive power during ED.
       Time now = Simulator::Now ();
-      m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd ()) * (now - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
+      m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel) * (now - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
       m_edPower.lastUpdate = now;
     }
 
-  CheckInterference ();
+  Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
+  if (currentRxParams == params)
+    {
+      CheckInterference ();
+    }
 
   // Update the interference.
-  m_signal->RemoveSignal (params->psd);
+  m_signal->RemoveSignal (par->psd);
 
-  // If this is the end of the currently received packet, check if reception was successfull.
-  Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
+  if (params == 0)
+    {
+      NS_LOG_LOGIC ("Node: " << m_device->GetAddress() << " Removing interferent: " << *(par->psd));
+      return;
+    }
+
+  // If this is the end of the currently received packet, check if reception was successful.
   if (currentRxParams == params)
     {
       Ptr<Packet> currentPacket = currentRxParams->packetBurst->GetPackets ().front ();
@@ -872,7 +906,7 @@ LrWpanPhy::PlmeSetAttributeRequest (LrWpanPibAttributeIdentifier id,
           }
         if (m_phyPIBAttributes.phyCurrentChannel != attribute->phyCurrentChannel)
           {
-            // Cancel a pending tranceiver state change.
+            // Cancel a pending transceiver state change.
             // Switch off the transceiver.
             // TODO: Is switching off the transceiver the right choice?
             m_trxState = IEEE_802_15_4_PHY_TRX_OFF;
@@ -902,6 +936,8 @@ LrWpanPhy::PlmeSetAttributeRequest (LrWpanPibAttributeIdentifier id,
                   }
               }
             m_phyPIBAttributes.phyCurrentChannel = attribute->phyCurrentChannel;
+            LrWpanSpectrumValueHelper psdHelper;
+            m_txPsd = psdHelper.CreateTxPowerSpectralDensity (m_phyPIBAttributes.phyTransmitPower, m_phyPIBAttributes.phyCurrentChannel);
           }
         break;
       }
@@ -1043,7 +1079,7 @@ LrWpanPhy::EndEd (void)
 {
   NS_LOG_FUNCTION (this);
 
-  m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd ()) * (Simulator::Now () - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
+  m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel) * (Simulator::Now () - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
 
   uint8_t energyLevel;
 
@@ -1077,7 +1113,7 @@ LrWpanPhy::EndCca (void)
   LrWpanPhyEnumeration sensedChannelState = IEEE_802_15_4_PHY_UNSPECIFIED;
 
   // Update peak power.
-  double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd ());
+  double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel);
   if (m_ccaPeakPower < power)
     {
       m_ccaPeakPower = power;

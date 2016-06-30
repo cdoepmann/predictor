@@ -59,6 +59,7 @@ public:
   Ptr<Packet> Recv (uint32_t maxSize, uint32_t flags);
   Ptr<Packet> RecvFrom (uint32_t maxSize, uint32_t flags, Address &fromAddress);
   int GetSockName (Address &address) const;
+  int GetPeerName (Address &address) const;
   bool SetAllowBroadcast (bool allowBroadcast);
   bool GetAllowBroadcast () const;
 

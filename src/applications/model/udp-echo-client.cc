@@ -40,6 +40,7 @@ UdpEchoClient::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UdpEchoClient")
     .SetParent<Application> ()
+    .SetGroupName("Applications")
     .AddConstructor<UdpEchoClient> ()
     .AddAttribute ("MaxPackets", 
                    "The maximum number of packets the application will send",
@@ -146,7 +147,7 @@ UdpEchoClient::StartApplication (void)
     }
 
   m_socket->SetRecvCallback (MakeCallback (&UdpEchoClient::HandleRead, this));
-
+  m_socket->SetAllowBroadcast (true);
   ScheduleTransmit (Seconds (0.));
 }
 

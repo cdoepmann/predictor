@@ -39,13 +39,13 @@ SpectrumValue::SpectrumValue (Ptr<const SpectrumModel> sof)
 }
 
 double&
-SpectrumValue:: operator[] (size_t index)
+SpectrumValue::operator[] (size_t index)
 {
   return m_values.at (index);
 }
 
 const double&
-SpectrumValue:: operator[] (size_t index) const
+SpectrumValue::operator[] (size_t index) const
 {
   return m_values.at (index);
 }
@@ -416,6 +416,12 @@ SpectrumValue::Copy () const
 }
 
 
+/**
+ * \brief Output stream operator
+ * \param os output stream
+ * \param pvf the SpectrumValue to print
+ * \return an output stream
+ */
 std::ostream&
 operator << (std::ostream& os, const SpectrumValue& pvf)
 {
@@ -598,28 +604,28 @@ Log (const SpectrumValue& arg)
 }
 
 SpectrumValue&
-SpectrumValue:: operator+= (const SpectrumValue& rhs)
+SpectrumValue::operator+= (const SpectrumValue& rhs)
 {
   Add (rhs);
   return *this;
 }
 
 SpectrumValue&
-SpectrumValue:: operator-= (const SpectrumValue& rhs)
+SpectrumValue::operator-= (const SpectrumValue& rhs)
 {
   Subtract (rhs);
   return *this;
 }
 
 SpectrumValue&
-SpectrumValue:: operator*= (const SpectrumValue& rhs)
+SpectrumValue::operator*= (const SpectrumValue& rhs)
 {
   Multiply (rhs);
   return *this;
 }
 
 SpectrumValue&
-SpectrumValue:: operator/= (const SpectrumValue& rhs)
+SpectrumValue::operator/= (const SpectrumValue& rhs)
 {
   Divide (rhs);
   return *this;
@@ -627,28 +633,28 @@ SpectrumValue:: operator/= (const SpectrumValue& rhs)
 
 
 SpectrumValue&
-SpectrumValue:: operator+= (double rhs)
+SpectrumValue::operator+= (double rhs)
 {
   Add (rhs);
   return *this;
 }
 
 SpectrumValue&
-SpectrumValue:: operator-= (double rhs)
+SpectrumValue::operator-= (double rhs)
 {
   Subtract (rhs);
   return *this;
 }
 
 SpectrumValue&
-SpectrumValue:: operator*= (double rhs)
+SpectrumValue::operator*= (double rhs)
 {
   Multiply (rhs);
   return *this;
 }
 
 SpectrumValue&
-SpectrumValue:: operator/= (double rhs)
+SpectrumValue::operator/= (double rhs)
 {
   Divide (rhs);
   return *this;
@@ -656,7 +662,7 @@ SpectrumValue:: operator/= (double rhs)
 
 
 SpectrumValue&
-SpectrumValue:: operator= (double rhs)
+SpectrumValue::operator= (double rhs)
 {
   Values::iterator it1 = m_values.begin ();
 
@@ -671,7 +677,7 @@ SpectrumValue:: operator= (double rhs)
 
 
 SpectrumValue
-SpectrumValue:: operator<< (int n) const
+SpectrumValue::operator<< (int n) const
 {
   SpectrumValue res = *this;
   res.ShiftLeft (n);
@@ -679,7 +685,7 @@ SpectrumValue:: operator<< (int n) const
 }
 
 SpectrumValue
-SpectrumValue:: operator>> (int n) const
+SpectrumValue::operator>> (int n) const
 {
   SpectrumValue res = *this;
   res.ShiftRight (n);

@@ -66,7 +66,11 @@ struct DeferredRouteOutputTag : public Tag
   static TypeId
   GetTypeId ()
   {
-    static TypeId tid = TypeId ("ns3::dsdv::DeferredRouteOutputTag").SetParent<Tag> ();
+    static TypeId tid = TypeId ("ns3::dsdv::DeferredRouteOutputTag")
+      .SetParent<Tag> ()
+      .SetGroupName ("Dsdv")
+      .AddConstructor<DeferredRouteOutputTag> ()
+      ;
     return tid;
   }
 
@@ -106,6 +110,7 @@ RoutingProtocol::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::dsdv::RoutingProtocol")
     .SetParent<Ipv4RoutingProtocol> ()
+    .SetGroupName ("Dsdv")
     .AddConstructor<RoutingProtocol> ()
     .AddAttribute ("PeriodicUpdateInterval","Periodic interval between exchange of full routing tables among nodes. ",
                    TimeValue (Seconds (15)),
@@ -226,8 +231,13 @@ RoutingProtocol::DoDispose ()
 void
 RoutingProtocol::PrintRoutingTable (Ptr<OutputStreamWrapper> stream) const
 {
-  *stream->GetStream () << "Node: " << m_ipv4->GetObject<Node> ()->GetId () << " Time: " << Simulator::Now ().GetSeconds () << "s ";
+  *stream->GetStream () << "Node: " << m_ipv4->GetObject<Node> ()->GetId ()
+                        << ", Time: " << Now().As (Time::S)
+                        << ", Local time: " << GetObject<Node> ()->GetLocalTime ().As (Time::S)
+                        << ", DSDV Routing table" << std::endl;
+
   m_routingTable.Print (stream);
+  *stream->GetStream () << std::endl;
 }
 
 void

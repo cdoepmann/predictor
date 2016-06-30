@@ -39,16 +39,17 @@ Ipv4PacketProbe::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv4PacketProbe")
     .SetParent<Probe> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv4PacketProbe> ()
     .AddTraceSource ( "Output",
                       "The packet plus its IPv4 object and interface "
                       "that serve as the output for this probe",
                       MakeTraceSourceAccessor (&Ipv4PacketProbe::m_output),
-                      "ns3::Ipv4PacketProbe::TracedCallback")
+                      "ns3::Ipv4L3Protocol::TxRxTracedCallback")
     .AddTraceSource ( "OutputBytes",
                       "The number of bytes in the packet",
                       MakeTraceSourceAccessor (&Ipv4PacketProbe::m_outputBytes),
-                      "ns3::Packet::PacketSizeTracedCallback")
+                      "ns3::Packet::SizeTracedCallback")
   ;
   return tid;
 }

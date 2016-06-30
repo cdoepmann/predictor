@@ -17,6 +17,7 @@
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
+
 #include "capability-information.h"
 #include "ns3/log.h"
 
@@ -37,6 +38,7 @@ CapabilityInformation::SetEss (void)
   Set (0);
   Clear (1);
 }
+
 void
 CapabilityInformation::SetIbss (void)
 {
@@ -45,17 +47,52 @@ CapabilityInformation::SetIbss (void)
   Set (1);
 }
 
+void
+CapabilityInformation::SetShortPreamble (bool shortPreamble)
+{
+  NS_LOG_FUNCTION (this);
+  if (shortPreamble)
+    {
+      Set (5);
+    }
+}
+
+void
+CapabilityInformation::SetShortSlotTime (bool shortSlotTime)
+{
+  NS_LOG_FUNCTION (this);
+  if (shortSlotTime)
+    {
+      Set (10);
+    }
+}
+
 bool
 CapabilityInformation::IsEss (void) const
 {
   NS_LOG_FUNCTION (this);
   return Is (0);
 }
+
 bool
 CapabilityInformation::IsIbss (void) const
 {
   NS_LOG_FUNCTION (this);
   return Is (1);
+}
+
+bool
+CapabilityInformation::IsShortPreamble (void) const
+{
+  NS_LOG_FUNCTION (this);
+  return Is (5);
+}
+
+bool
+CapabilityInformation::IsShortSlotTime (void) const
+{
+  NS_LOG_FUNCTION (this);
+  return Is (10);
 }
 
 void
@@ -82,13 +119,13 @@ CapabilityInformation::Is (uint8_t n) const
   return (m_capability & mask) == mask;
 }
 
-
 uint32_t
 CapabilityInformation::GetSerializedSize (void) const
 {
   NS_LOG_FUNCTION (this);
   return 2;
 }
+
 Buffer::Iterator
 CapabilityInformation::Serialize (Buffer::Iterator start) const
 {
@@ -96,6 +133,7 @@ CapabilityInformation::Serialize (Buffer::Iterator start) const
   start.WriteHtolsbU16 (m_capability);
   return start;
 }
+
 Buffer::Iterator
 CapabilityInformation::Deserialize (Buffer::Iterator start)
 {
@@ -104,5 +142,4 @@ CapabilityInformation::Deserialize (Buffer::Iterator start)
   return start;
 }
 
-
-} // namespace ns3
+} //namespace ns3

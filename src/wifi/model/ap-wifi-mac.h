@@ -16,16 +16,21 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- * Author: Mirko Banchi <mk.banchi@gmail.com>
+ * Authors: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
+ *          Mirko Banchi <mk.banchi@gmail.com>
  */
+
 #ifndef AP_WIFI_MAC_H
 #define AP_WIFI_MAC_H
 
 #include "regular-wifi-mac.h"
+#include "capability-information.h"
 #include "ht-capabilities.h"
+#include "ht-operations.h"
+#include "vht-capabilities.h"
 #include "amsdu-subframe-header.h"
 #include "supported-rates.h"
+#include "erp-information.h"
 #include "ns3/random-variable-stream.h"
 
 namespace ns3 {
@@ -77,6 +82,7 @@ public:
    * frames without altering the source address.
    */
   virtual void Enqueue (Ptr<const Packet> packet, Mac48Address to, Mac48Address from);
+
   virtual bool SupportsSendFrom (void) const;
 
   /**
@@ -95,16 +101,31 @@ public:
    * Start beacon transmission immediately.
    */
   void StartBeaconing (void);
+  /**
+   * Determine whether short slot time should be enabled or not in the BSS.
+   * Typically, true is returned only when there is no non-erp stations associated
+   * to the AP, and that short slot time is supported by the AP and by all other
+   * ERP stations that are associated to the AP. Otherwise, false is returned.
+   */
+  bool GetShortSlotTimeEnabled (void) const;
+  /**
+   * Determine whether short preamble should be enabled or not in the BSS.
+   * Typically, true is returned only when the AP and all associated 
+   * stations support short PLCP preamble.
+   */
+  bool GetShortPreambleEnabled (void) const;
 
- /**
-  * Assign a fixed random variable stream number to the random variables
-  * used by this model.  Return the number of streams (possibly zero) that
-  * have been assigned.
-  *
-  * \param stream first stream index to use
-  * \return the number of stream indices assigned by this model
-  */
+  /**
+   * Assign a fixed random variable stream number to the random variables
+   * used by this model.  Return the number of streams (possibly zero) that
+   * have been assigned.
+   *
+   * \param stream first stream index to use
+   *
+   * \return the number of stream indices assigned by this model
+   */
   int64_t AssignStreams (int64_t stream);
+
 
 private:
   virtual void Receive (Ptr<Packet> packet, const WifiMacHeader *hdr);
@@ -113,7 +134,7 @@ private:
    * (i.e. we received an ACK from the receiver).  If the packet
    * was an association response to the receiver, we record that
    * the receiver is now associated with us.
-   * 
+   *
    * \param hdr the header of the packet that we successfully sent
    */
   virtual void TxOk (const WifiMacHeader &hdr);
@@ -138,7 +159,6 @@ private:
    */
   virtual void DeaggregateAmsduAndForward (Ptr<Packet> aggregatedPacket,
                                            const WifiMacHeader *hdr);
-
   /**
    * Forward the packet down to DCF/EDCAF (enqueue the packet). This method
    * is a wrapper for ForwardDown with traffic id.
@@ -177,11 +197,23 @@ private:
    */
   void SendOneBeacon (void);
   /**
-   * Return the HT capability of the current AP.
-   * 
-   * \return the HT capability that we support
+   * Return the Capability information of the current AP.
+   *
+   * \return the Capability information that we support
    */
-  HtCapabilities GetHtCapabilities (void) const;
+  CapabilityInformation GetCapabilities (void) const;
+  /**
+   * Return the ERP information of the current AP.
+   *
+   * \return the ERP information that we support
+   */
+  ErpInformation GetErpInformation (void) const;
+  /**
+   * Return the HT operations of the current AP.
+   *
+   * \return the HT operations that we support
+   */
+  HtOperations GetHtOperations (void) const;
   /**
    * Return an instance of SupportedRates that contains all rates that we support
    * including HT rates.
@@ -201,17 +233,29 @@ private:
    * \return true if beacons are periodically generated, false otherwise
    */
   bool GetBeaconGeneration (void) const;
+  /**
+   * Return whether protection for non-ERP stations is used in the BSS.
+   *
+   * \return true if protection for non-ERP stations is used in the BSS, 
+   *         false otherwise
+   */
+  bool GetUseNonErpProtection (void) const;
+
   virtual void DoDispose (void);
   virtual void DoInitialize (void);
 
-  Ptr<DcaTxop> m_beaconDca; //!< Dedicated DcaTxop for beacons
-  Time m_beaconInterval; //!< Interval between beacons
-  bool m_enableBeaconGeneration; //!< Flag if beacons are being generated
-  EventId m_beaconEvent; //!< Event to generate one beacon
+  Ptr<DcaTxop> m_beaconDca;                  //!< Dedicated DcaTxop for beacons
+  Time m_beaconInterval;                     //!< Interval between beacons
+  bool m_enableBeaconGeneration;             //!< Flag whether beacons are being generated
+  EventId m_beaconEvent;                     //!< Event to generate one beacon
   Ptr<UniformRandomVariable> m_beaconJitter; //!< UniformRandomVariable used to randomize the time of the first beacon
-  bool m_enableBeaconJitter; //!< Flag if the first beacon should be generated at random time
+  bool m_enableBeaconJitter;                 //!< Flag whether the first beacon should be generated at random time
+  std::list<Mac48Address> m_staList;         //!< List of all stations currently associated to the AP
+  std::list<Mac48Address> m_nonErpStations;  //!< List of all non-ERP stations currently associated to the AP
+  std::list<Mac48Address> m_nonHtStations;   //!< List of all non-HT stations currently associated to the AP
+  bool m_enableNonErpProtection;             //!< Flag whether protection mechanism is used or not when non-ERP STAs are present within the BSS
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* AP_WIFI_MAC_H */

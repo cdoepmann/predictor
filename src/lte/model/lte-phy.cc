@@ -60,6 +60,7 @@ LtePhy::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::LtePhy")
     .SetParent<Object> ()
+    .SetGroupName("Lte")
   ;
   return tid;
 }
@@ -93,7 +94,7 @@ LtePhy::SetDevice (Ptr<LteNetDevice> d)
 
 
 Ptr<LteNetDevice>
-LtePhy::GetDevice ()
+LtePhy::GetDevice () const
 {
   NS_LOG_FUNCTION (this);
   return m_netDevice;

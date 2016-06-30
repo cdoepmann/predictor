@@ -17,6 +17,7 @@
  *
  * Author: Mathieu Lacage, <mathieu.lacage@sophia.inria.fr>
  */
+
 #ifndef YANS_WIFI_CHANNEL_H
 #define YANS_WIFI_CHANNEL_H
 
@@ -27,6 +28,7 @@
 #include "wifi-mode.h"
 #include "wifi-preamble.h"
 #include "wifi-tx-vector.h"
+#include "yans-wifi-phy.h"
 #include "ns3/nstime.h"
 
 namespace ns3 {
@@ -34,7 +36,15 @@ namespace ns3 {
 class NetDevice;
 class PropagationLossModel;
 class PropagationDelayModel;
-class YansWifiPhy;
+
+struct Parameters
+{
+  double rxPowerDbm;
+  enum mpduType type;
+  Time duration;
+  WifiTxVector txVector;
+  WifiPreamble preamble;
+};
 
 /**
  * \brief A Yans wifi channel
@@ -56,7 +66,7 @@ public:
   YansWifiChannel ();
   virtual ~YansWifiChannel ();
 
-  // inherited from Channel.
+  //inherited from Channel.
   virtual uint32_t GetNDevices (void) const;
   virtual Ptr<NetDevice> GetDevice (uint32_t i) const;
 
@@ -82,7 +92,7 @@ public:
    * \param txPowerDbm the tx power associated to the packet
    * \param txVector the TXVECTOR associated to the packet
    * \param preamble the preamble associated to the packet
-   * \param packetType the type of packet, used for A-MPDU to say whether it's the last MPDU or not
+   * \param mpdutype the type of the MPDU as defined in WifiPhy::mpduType.
    * \param duration the transmission duration associated to the packet
    *
    * This method should not be invoked by normal users. It is
@@ -91,26 +101,26 @@ public:
    * e.g. PHYs that are operating on the same channel.
    */
   void Send (Ptr<YansWifiPhy> sender, Ptr<const Packet> packet, double txPowerDbm,
-             WifiTxVector txVector, WifiPreamble preamble, uint8_t packetType, Time duration) const;
+             WifiTxVector txVector, WifiPreamble preamble, enum mpduType mpdutype, Time duration) const;
 
- /**
-  * Assign a fixed random variable stream number to the random variables
-  * used by this model.  Return the number of streams (possibly zero) that
-  * have been assigned.
-  *
-  * \param stream first stream index to use
-  * \return the number of stream indices assigned by this model
-  */
+  /**
+   * Assign a fixed random variable stream number to the random variables
+   * used by this model.  Return the number of streams (possibly zero) that
+   * have been assigned.
+   *
+   * \param stream first stream index to use
+   *
+   * \return the number of stream indices assigned by this model
+   */
   int64_t AssignStreams (int64_t stream);
 
-private:
-  //YansWifiChannel& operator = (const YansWifiChannel &);
-  //YansWifiChannel (const YansWifiChannel &);
 
+private:
   /**
    * A vector of pointers to YansWifiPhy.
    */
   typedef std::vector<Ptr<YansWifiPhy> > PhyList;
+
   /**
    * This method is scheduled by Send for each associated YansWifiPhy.
    * The method then calls the corresponding YansWifiPhy that the first
@@ -122,16 +132,13 @@ private:
    * \param txVector the TXVECTOR of the packet
    * \param preamble the type of preamble being used to send the packet
    */
-  void Receive (uint32_t i, Ptr<Packet> packet, double *atts,
-                WifiTxVector txVector, WifiPreamble preamble) const;
+  void Receive (uint32_t i, Ptr<Packet> packet, struct Parameters parameters) const;
 
-
-  PhyList m_phyList; //!< List of YansWifiPhys connected to this YansWifiChannel
-  Ptr<PropagationLossModel> m_loss; //!< Propagation loss model
-  Ptr<PropagationDelayModel> m_delay; //!< Propagation delay model
+  PhyList m_phyList;                   //!< List of YansWifiPhys connected to this YansWifiChannel
+  Ptr<PropagationLossModel> m_loss;    //!< Propagation loss model
+  Ptr<PropagationDelayModel> m_delay;  //!< Propagation delay model
 };
 
-} // namespace ns3
-
+} //namespace ns3
 
 #endif /* YANS_WIFI_CHANNEL_H */

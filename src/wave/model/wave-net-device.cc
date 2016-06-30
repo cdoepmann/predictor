@@ -41,6 +41,7 @@ WaveNetDevice::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::WaveNetDevice")
     .SetParent<NetDevice> ()
+    .SetGroupName ("Wave")
     .AddConstructor<WaveNetDevice> ()
     .AddAttribute ("Mtu", "The MAC-level Maximum Transmission Unit",
                    UintegerValue (MAX_MSDU_SIZE - LLC_SNAP_HEADER_LENGTH),
@@ -407,6 +408,7 @@ WaveNetDevice::SendX (Ptr<Packet> packet, const Address & dest, uint32_t protoco
             }
         }
       WifiTxVector txVector;
+      txVector.SetChannelWidth (10);
       txVector.SetTxPowerLevel (txInfo.txPowerLevel);
       txVector.SetMode (txInfo.dataRate);
       HigherLayerTxVectorTag tag = HigherLayerTxVectorTag (txVector, false);

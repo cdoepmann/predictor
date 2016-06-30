@@ -22,6 +22,7 @@
 
 #include <ns3/object-factory.h>
 #include <ns3/log.h>
+#include <ns3/node.h>
 #include <cfloat>
 #include <cmath>
 #include <ns3/simulator.h>
@@ -162,7 +163,6 @@ LteUePhy::LteUePhy (Ptr<LteSpectrumPhy> dlPhy, Ptr<LteSpectrumPhy> ulPhy)
 
   NS_ASSERT_MSG (Simulator::Now ().GetNanoSeconds () == 0,
                  "Cannot create UE devices after simulation started");
-  Simulator::ScheduleNow (&LteUePhy::SubframeIndication, this, 1, 1);
   Simulator::Schedule (m_ueMeasurementsFilterPeriod, &LteUePhy::ReportUeMeasurements, this);
 
   DoReset ();
@@ -190,6 +190,7 @@ LteUePhy::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::LteUePhy")
     .SetParent<LtePhy> ()
+    .SetGroupName("Lte")
     .AddConstructor<LteUePhy> ()
     .AddAttribute ("TxPower",
                    "Transmission power in dBm",
@@ -301,6 +302,25 @@ void
 LteUePhy::DoInitialize ()
 {
   NS_LOG_FUNCTION (this);
+  bool haveNodeId = false;
+  uint32_t nodeId = 0;
+  if (m_netDevice != 0)
+    {
+      Ptr<Node> node = m_netDevice->GetNode ();
+      if (node != 0)
+        {
+          nodeId = node->GetId ();
+          haveNodeId = true;
+        }
+    }
+  if (haveNodeId)
+    {
+      Simulator::ScheduleWithContext (nodeId, Seconds (0), &LteUePhy::SubframeIndication, this, 1, 1);
+    }
+  else
+    {
+      Simulator::ScheduleNow (&LteUePhy::SubframeIndication, this, 1, 1);
+    }  
   LtePhy::DoInitialize ();
 }
 
@@ -558,9 +578,15 @@ LteUePhy::GenerateCqiRsrpRsrq (const SpectrumValue& sinr)
               // store measurements
               std::map <uint16_t, UeMeasurementsElement>::iterator itMeasMap;
               itMeasMap = m_ueMeasurementsMap.find ((*itPss).cellId);
-              NS_ASSERT (itMeasMap != m_ueMeasurementsMap.end ());
-              (*itMeasMap).second.rsrqSum += rsrq_dB;
-              (*itMeasMap).second.rsrqNum++;
+              if (itMeasMap != m_ueMeasurementsMap.end ())
+                {
+                  (*itMeasMap).second.rsrqSum += rsrq_dB;
+                  (*itMeasMap).second.rsrqNum++;
+                }
+              else
+                {
+                  NS_LOG_WARN ("race condition of bug 2091 occurred");
+                }
             }
 
           itPss++;

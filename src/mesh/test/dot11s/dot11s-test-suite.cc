@@ -216,50 +216,37 @@ void
 PeerLinkFrameStartTest::DoRun ()
 {
   {
-    PeerLinkFrameStart a;
-    PeerLinkFrameStart::PlinkFrameStartFields fields;
-    fields.subtype = (uint8_t)(WifiActionHeader::PEER_LINK_OPEN);
+    PeerLinkOpenStart a;
+    PeerLinkOpenStart::PlinkOpenStartFields fields;
     fields.capability = 0;
-    fields.aid = 101;
-    fields.reasonCode = 12;
     fields.meshId = IeMeshId ("qwertyuiop");
-    a.SetPlinkFrameStart (fields);
+    a.SetPlinkOpenStart (fields);
     Ptr<Packet> packet = Create<Packet> ();
     packet->AddHeader (a);
-    PeerLinkFrameStart b;
-    b.SetPlinkFrameSubtype ((uint8_t)(WifiActionHeader::PEER_LINK_OPEN));
+    PeerLinkOpenStart b;
     packet->RemoveHeader (b);
     NS_TEST_EXPECT_MSG_EQ (a, b, "PEER_LINK_OPEN works");
   }
   {
-    PeerLinkFrameStart a;
-    PeerLinkFrameStart::PlinkFrameStartFields fields;
-    fields.subtype = (uint8_t)(WifiActionHeader::PEER_LINK_CONFIRM);
+    PeerLinkConfirmStart a;
+    PeerLinkConfirmStart::PlinkConfirmStartFields fields;
     fields.capability = 0;
     fields.aid = 1234;
-    fields.reasonCode = 12;
-    fields.meshId = IeMeshId ("qwerty");
-    a.SetPlinkFrameStart (fields);
+    a.SetPlinkConfirmStart (fields);
     Ptr<Packet> packet = Create<Packet> ();
     packet->AddHeader (a);
-    PeerLinkFrameStart b;
-    b.SetPlinkFrameSubtype ((uint8_t)(WifiActionHeader::PEER_LINK_CONFIRM));
+    PeerLinkConfirmStart b;
     packet->RemoveHeader (b);
     NS_TEST_EXPECT_MSG_EQ (a, b, "PEER_LINK_CONFIRM works");
   }
   {
-    PeerLinkFrameStart a;
-    PeerLinkFrameStart::PlinkFrameStartFields fields;
-    fields.subtype = (uint8_t)(WifiActionHeader::PEER_LINK_CLOSE);
-    fields.capability = 0;
-    fields.aid = 10;
+    PeerLinkCloseStart a;
+    PeerLinkCloseStart::PlinkCloseStartFields fields;
     fields.meshId = IeMeshId ("qqq");
-    fields.reasonCode = 12;
-    a.SetPlinkFrameStart (fields);
+    a.SetPlinkCloseStart (fields);
     Ptr<Packet> packet = Create<Packet> ();
     packet->AddHeader (a);
-    PeerLinkFrameStart b;
-    b.SetPlinkFrameSubtype ((uint8_t)(WifiActionHeader::PEER_LINK_CLOSE));
+    PeerLinkCloseStart b;
     packet->RemoveHeader (b);
     NS_TEST_EXPECT_MSG_EQ (a, b, "PEER_LINK_CLOSE works");
   }

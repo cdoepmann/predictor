@@ -17,18 +17,18 @@
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
+
 #ifndef CONSTANT_RATE_WIFI_MANAGER_H
 #define CONSTANT_RATE_WIFI_MANAGER_H
 
 #include <stdint.h>
-
 #include "wifi-remote-station-manager.h"
 
 namespace ns3 {
 
 /**
  * \ingroup wifi
- * \brief use constant rates for data and control transmissions
+ * \brief use constant rates for data and RTS transmissions
  *
  * This class uses always the same transmission rate for every
  * packet sent.
@@ -40,8 +40,9 @@ public:
   ConstantRateWifiManager ();
   virtual ~ConstantRateWifiManager ();
 
+
 private:
-  // overriden from base class
+  //overriden from base class
   virtual WifiRemoteStation* DoCreateStation (void) const;
   virtual void DoReportRxOk (WifiRemoteStation *station,
                              double rxSnr, WifiMode txMode);
@@ -53,16 +54,14 @@ private:
                                double ackSnr, WifiMode ackMode, double dataSnr);
   virtual void DoReportFinalRtsFailed (WifiRemoteStation *station);
   virtual void DoReportFinalDataFailed (WifiRemoteStation *station);
-  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station, uint32_t size);
+  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station);
   virtual WifiTxVector DoGetRtsTxVector (WifiRemoteStation *station);
   virtual bool IsLowLatency (void) const;
 
   WifiMode m_dataMode; //!< Wifi mode for unicast DATA frames
-  WifiMode m_ctlMode; //!< Wifi mode for request control frames
+  WifiMode m_ctlMode;  //!< Wifi mode for RTS frames
 };
 
-} // namespace ns3
-
-
+} //namespace ns3
 
 #endif /* CONSTANT_RATE_WIFI_MANAGER_H */

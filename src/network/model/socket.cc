@@ -37,7 +37,8 @@ TypeId
 Socket::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::Socket")
-    .SetParent<Object> ();
+    .SetParent<Object> ()
+    .SetGroupName("Network");
   return tid;
 }
 
@@ -509,6 +510,38 @@ Socket::IsIpv6RecvHopLimit (void) const
   return m_ipv6RecvHopLimit;
 }
 
+void
+Socket::Ipv6JoinGroup (Ipv6Address address, Ipv6MulticastFilterMode filterMode, std::vector<Ipv6Address> sourceAddresses)
+{
+  NS_LOG_FUNCTION (this<<address<<&filterMode<<&sourceAddresses);
+  NS_ASSERT_MSG (false,"Ipv6JoinGroup not implemented on this socket");
+}
+
+void
+Socket::Ipv6JoinGroup (Ipv6Address address)
+{
+  NS_LOG_FUNCTION (this<<address);
+
+  // Join Group. Note that joining a group with no sources means joining without source restrictions.
+  std::vector<Ipv6Address> sourceAddresses;
+  Ipv6JoinGroup (address, EXCLUDE, sourceAddresses);
+}
+
+void
+Socket::Ipv6LeaveGroup (void)
+{
+  NS_LOG_FUNCTION (this);
+  if(m_ipv6MulticastGroupAddress.IsAny () )
+    {
+      NS_LOG_INFO (" The socket was not bound to any group.");
+      return;
+    }
+  // Leave Group. Note that joining a group with no sources means leaving it.
+  std::vector<Ipv6Address> sourceAddresses;
+  Ipv6JoinGroup (m_ipv6MulticastGroupAddress, INCLUDE, sourceAddresses);
+  m_ipv6MulticastGroupAddress = Ipv6Address::GetAny ();
+}
+
 /***************************************************************
  *           Socket Tags
  ***************************************************************/
@@ -539,6 +572,7 @@ SocketAddressTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SocketAddressTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<SocketAddressTag> ()
   ;
   return tid;
@@ -599,6 +633,7 @@ SocketIpTtlTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SocketIpTtlTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<SocketIpTtlTag> ()
   ;
   return tid;
@@ -657,6 +692,7 @@ SocketIpv6HopLimitTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SocketIpv6HopLimitTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<SocketIpv6HopLimitTag> ()
   ;
   return tid;
@@ -718,6 +754,7 @@ SocketSetDontFragmentTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SocketSetDontFragmentTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<SocketSetDontFragmentTag> ();
   return tid;
 }
@@ -773,6 +810,7 @@ SocketIpTosTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SocketIpTosTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<SocketIpTosTag> ()
     ;
   return tid;
@@ -829,6 +867,7 @@ SocketIpv6TclassTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SocketIpv6TclassTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network") 
     .AddConstructor<SocketIpv6TclassTag> ()
     ;
   return tid;

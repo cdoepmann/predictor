@@ -70,7 +70,8 @@ TypeId
 UanMacAloha::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanMacAloha")
-    .SetParent<Object> ()
+    .SetParent<UanMac> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanMacAloha> ()
   ;
   return tid;

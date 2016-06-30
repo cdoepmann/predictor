@@ -32,6 +32,7 @@ MobilityModel::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::MobilityModel")
     .SetParent<Object> ()
+    .SetGroupName ("Mobility")
     .AddAttribute ("Position", "The current position of the mobility model.",
                    TypeId::ATTR_SET | TypeId::ATTR_GET,
                    VectorValue (Vector (0.0, 0.0, 0.0)),
@@ -46,7 +47,7 @@ MobilityModel::GetTypeId (void)
     .AddTraceSource ("CourseChange", 
                      "The value of the position and/or velocity vector changed",
                      MakeTraceSourceAccessor (&MobilityModel::m_courseChangeTrace),
-                     "ns3::MobilityModel::CourseChangeTracedCallback")
+                     "ns3::MobilityModel::TracedCallback")
   ;
   return tid;
 }

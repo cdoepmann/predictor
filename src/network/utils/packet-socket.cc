@@ -40,6 +40,7 @@ PacketSocket::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::PacketSocket")
     .SetParent<Socket> ()
+    .SetGroupName("Network")
     .AddConstructor<PacketSocket> ()
     .AddTraceSource ("Drop", "Drop packet due to receive buffer overflow",
                      MakeTraceSourceAccessor (&PacketSocket::m_dropTrace),
@@ -468,12 +469,12 @@ int
 PacketSocket::GetSockName (Address &address) const
 {
   NS_LOG_FUNCTION (this << address);
-  PacketSocketAddress ad = PacketSocketAddress::ConvertFrom (address);
+  PacketSocketAddress ad;
 
   ad.SetProtocol (m_protocol);
   if (m_isSingleDevice)
     {
-      Ptr<NetDevice> device = m_node->GetDevice (ad.GetSingleDevice ());
+      Ptr<NetDevice> device = m_node->GetDevice (m_device);
       ad.SetPhysicalAddress (device->GetAddress ());
       ad.SetSingleDevice (m_device);
     }
@@ -483,6 +484,22 @@ PacketSocket::GetSockName (Address &address) const
       ad.SetAllDevices ();
     }
   address = ad;
+
+  return 0;
+}
+
+int
+PacketSocket::GetPeerName (Address &address) const
+{
+  NS_LOG_FUNCTION (this << address);
+
+  if (m_state != STATE_CONNECTED)
+    {
+      m_errno = ERROR_NOTCONN;
+      return -1;
+    }
+
+  address = m_destAddr;
 
   return 0;
 }
@@ -544,6 +561,7 @@ PacketSocketTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::PacketSocketTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<PacketSocketTag> ()
   ;
   return tid;
@@ -607,6 +625,7 @@ DeviceNameTag::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::DeviceNameTag")
     .SetParent<Tag> ()
+    .SetGroupName("Network")
     .AddConstructor<DeviceNameTag> ();
   return tid;
 }

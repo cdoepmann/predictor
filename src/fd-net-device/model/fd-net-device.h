@@ -36,37 +36,39 @@
 #include "ns3/unix-fd-reader.h"
 #include "ns3/system-mutex.h"
 
-#include <string.h>
+#include <utility>
+#include <queue>
 
 namespace ns3 {
 
-class FdNetDeviceFdReader : public FdReader
-{
-public:
-  /**
-   * Constructor for the FdNetDevice.
-   */
-  FdNetDeviceFdReader ();
-
-  /**
-   * Set size of the read buffer.
-   *
-   */
-  void SetBufferSize (uint32_t bufferSize);
-
-private:
-  FdReader::Data DoRead (void);
-  
-  uint32_t m_bufferSize;
-};
-
-class Node;
 
 /**
  * \defgroup fd-net-device File Descriptor Network Device
  * This section documents the API of the ns-3 fd-net-device module.
  * For a generic functional description, please refer to the ns-3 manual.
  */
+
+/**
+ * \ingroup fd-net-device
+ * \brief This class performs the actual data reading from the sockets.
+ */
+class FdNetDeviceFdReader : public FdReader
+{
+public:
+  FdNetDeviceFdReader ();
+
+  /**
+   * Set size of the read buffer.
+   */
+  void SetBufferSize (uint32_t bufferSize);
+
+private:
+  FdReader::Data DoRead (void);
+
+  uint32_t m_bufferSize; //!< size of the read buffer
+};
+
+class Node;
 
 /**
  * \ingroup fd-net-device
@@ -82,6 +84,10 @@ class Node;
 class FdNetDevice : public NetDevice
 {
 public:
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
 
   /**
@@ -170,15 +176,27 @@ public:
   virtual bool SupportsSendFrom () const;
   virtual Address GetMulticast (Ipv6Address addr) const;
 
+  /**
+   * Set if the NetDevice is able to send Broadcast messages
+   * \param broadcast true if the NetDevice can send Broadcast
+   */
   virtual void SetIsBroadcast (bool broadcast);
+  /**
+   * Set if the NetDevice is able to send Multicast messages
+   * \param multicast true if the NetDevice can send Multicast
+   */
   virtual void SetIsMulticast (bool multicast);
 
 protected:
   virtual void DoDispose (void);
 
 private:
-  // private copy constructor as sugested in:
-  // http://www.nsnam.org/wiki/NS-3_Python_Bindings#.22invalid_use_of_incomplete_type.22
+  /**
+   * \brief Copy constructor
+   *
+   * Defined and unimplemented to avoid misuse as suggested in
+   * http://www.nsnam.org/wiki/NS-3_Python_Bindings#.22invalid_use_of_incomplete_type.22
+   */
   FdNetDevice (FdNetDevice const &);
 
   /**
@@ -199,7 +217,7 @@ private:
   /**
    * Forward the frame to the appropriate callback for processing
    */
-  void ForwardUp (uint8_t *buf, ssize_t len);
+  void ForwardUp (void);
 
   /**
    * Start Sending a Packet Down the Wire.
@@ -208,6 +226,9 @@ private:
    */
   bool TransmitStart (Ptr<Packet> p);
 
+  /**
+   * Notify that the link is up and ready
+   */
   void NotifyLinkUp (void);
 
   /**
@@ -215,7 +236,7 @@ private:
    */
   Ptr<Node> m_node;
 
-  /*
+  /**
    * a copy of the node id so the read thread doesn't have to GetNode() in
    * in order to find the node ID.  Thread unsafe reference counting in
    * multithreaded apps is not a good thing.
@@ -278,14 +299,13 @@ private:
   /**
    * Number of packets that were received and scheduled for read but not yeat read.
    */
-  uint32_t m_pendingReadCount;
-  
+  std::queue< std::pair<uint8_t *, ssize_t> > m_pendingQueue;
+
   /**
    * Maximum number of packets that can be received and scheduled for read but not yeat read.
    */
   uint32_t m_maxPendingReads;
-  
-   
+
   /**
    * Mutex to increase pending read counter.
    */
@@ -301,7 +321,13 @@ private:
    */
   Time m_tStop;
 
+  /**
+   * NetDevice start event
+   */
   EventId m_startEvent;
+  /**
+   * NetDevice stop event
+   */
   EventId m_stopEvent;
 
   /**
@@ -360,6 +386,8 @@ private:
   /**
    * The trace source fired when the phy layer drops a packet as it tries
    * to transmit it.
+   *
+   * \todo Remove: this TracedCallback is never invoked.
    *
    * \see class CallBackTraceSource
    */

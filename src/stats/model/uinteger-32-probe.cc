@@ -38,11 +38,12 @@ Uinteger32Probe::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Uinteger32Probe")
     .SetParent<Probe> ()
+    .SetGroupName ("Stats")
     .AddConstructor<Uinteger32Probe> ()
     .AddTraceSource ( "Output",
                       "The uint32_t that serves as output for this probe",
                       MakeTraceSourceAccessor (&Uinteger32Probe::m_output),
-                     "ns3::TracedValue::Uint32Callback")
+                     "ns3::TracedValueCallback::Uint32")
   ;
   return tid;
 }

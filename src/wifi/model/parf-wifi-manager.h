@@ -50,24 +50,9 @@ public:
 
   virtual void SetupPhy (Ptr<WifiPhy> phy);
 
-  /**
-   * TracedCallback signature for power change events.
-   *
-   * \param [in] power The new power.
-   * \param [in] address The remote station MAC address.
-   */
-  typedef void (*PowerChangeTracedCallback)(const uint8_t power, const Mac48Address remoteAddress);
-
-  /**
-   * TracedCallback signature for rate change events.
-   *
-   * \param [in] rate The new rate.
-   * \param [in] address The remote station MAC address.
-   */
-  typedef void (*RateChangeTracedCallback)(const uint32_t rate, const Mac48Address remoteAddress);
 
 private:
-  // overriden from base class
+  //overriden from base class
   virtual WifiRemoteStation * DoCreateStation (void) const;
   virtual void DoReportRxOk (WifiRemoteStation *station,
                              double rxSnr, WifiMode txMode);
@@ -79,7 +64,7 @@ private:
                                double ackSnr, WifiMode ackMode, double dataSnr);
   virtual void DoReportFinalRtsFailed (WifiRemoteStation *station);
   virtual void DoReportFinalDataFailed (WifiRemoteStation *station);
-  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station, uint32_t size);
+  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station);
   virtual WifiTxVector DoGetRtsTxVector (WifiRemoteStation *station);
   virtual bool IsLowLatency (void) const;
 
@@ -89,15 +74,20 @@ private:
    */
   void CheckInit (ParfWifiRemoteStation *station);
 
-
   uint32_t m_attemptThreshold; //!< The minimum number of transmission attempts to try a new power or rate. The 'timer' threshold in the ARF algorithm.
   uint32_t m_successThreshold; //!< The minimum number of successful transmissions to try a new power or rate.
+  
   /**
-   * Number of power levels.
+   * Minimal power level.
    * In contrast to rate, power levels do not depend on the remote station.
    * The levels depend only on the physical layer of the device.
    */
-  uint32_t m_nPower;
+  uint32_t m_minPower;
+
+  /**
+   * Maximal power level.
+   */
+  uint32_t m_maxPower;
 
   /**
    * The trace source fired when the transmission power changes....
@@ -110,6 +100,6 @@ private:
 
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* PARF_WIFI_MANAGER_H */

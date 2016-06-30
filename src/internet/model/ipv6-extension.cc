@@ -50,6 +50,7 @@ TypeId Ipv6Extension::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6Extension")
     .SetParent<Object> ()
+    .SetGroupName ("Internet")
     .AddAttribute ("ExtensionNumber", "The IPv6 extension number.",
                    UintegerValue (0),
                    MakeUintegerAccessor (&Ipv6Extension::GetExtensionNumber),
@@ -192,6 +193,7 @@ TypeId Ipv6ExtensionHopByHop::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionHopByHop")
     .SetParent<Ipv6Extension> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionHopByHop> ()
   ;
   return tid;
@@ -251,6 +253,7 @@ TypeId Ipv6ExtensionDestination::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionDestination")
     .SetParent<Ipv6Extension> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionDestination> ()
   ;
   return tid;
@@ -310,6 +313,7 @@ TypeId Ipv6ExtensionFragment::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionFragment")
     .SetParent<Ipv6Extension> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionFragment> ()
   ;
   return tid;
@@ -417,12 +421,9 @@ uint8_t Ipv6ExtensionFragment::Process (Ptr<Packet>& packet,
   return 0;
 }
 
-void Ipv6ExtensionFragment::GetFragments (Ptr<Packet> packet, uint32_t maxFragmentSize, std::list<Ptr<Packet> >& listFragments)
+void Ipv6ExtensionFragment::GetFragments (Ptr<Packet> packet, Ipv6Header ipv6Header, uint32_t maxFragmentSize, std::list<Ipv6PayloadHeaderPair>& listFragments)
 {
   Ptr<Packet> p = packet->Copy ();
-
-  Ipv6Header ipv6Header;
-  p->RemoveHeader (ipv6Header);
 
   uint8_t nextHeader = ipv6Header.GetNextHeader ();
   uint8_t ipv6HeaderSize = ipv6Header.GetSerializedSize ();
@@ -575,11 +576,12 @@ void Ipv6ExtensionFragment::GetFragments (Ptr<Packet> packet, uint32_t maxFragme
         }
 
       ipv6Header.SetPayloadLength (fragment->GetSize ());
-      fragment->AddHeader (ipv6Header);
 
       std::ostringstream oss;
+      oss << ipv6Header;
       fragment->Print (oss);
-      listFragments.push_back (fragment);
+
+      listFragments.push_back (Ipv6PayloadHeaderPair (fragment, ipv6Header));
     }
   while (moreFragment);
 
@@ -735,6 +737,7 @@ TypeId Ipv6ExtensionRouting::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionRouting")
     .SetParent<Ipv6Extension> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionRouting> ()
   ;
   return tid;
@@ -828,6 +831,7 @@ TypeId Ipv6ExtensionRoutingDemux::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionRoutingDemux")
     .SetParent<Object> ()
+    .SetGroupName ("Internet")
     .AddAttribute ("Routing Extensions", "The set of IPv6 Routing extensions registered with this demux.",
                    ObjectVectorValue (),
                    MakeObjectVectorAccessor (&Ipv6ExtensionRoutingDemux::m_extensionsRouting),
@@ -890,6 +894,7 @@ TypeId Ipv6ExtensionLooseRouting::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionLooseRouting")
     .SetParent<Ipv6ExtensionRouting> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionLooseRouting> ()
   ;
   return tid;
@@ -1013,7 +1018,6 @@ uint8_t Ipv6ExtensionLooseRouting::Process (Ptr<Packet>& packet,
       return routingHeader.GetSerializedSize ();
     }
 
-  routingHeader.SetLength (88);
   ipv6header.SetHopLimit (hopLimit - 1);
   p->AddHeader (routingHeader);
 
@@ -1054,6 +1058,7 @@ TypeId Ipv6ExtensionESP::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionESP")
     .SetParent<Ipv6Extension> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionESP> ()
   ;
   return tid;
@@ -1099,6 +1104,7 @@ TypeId Ipv6ExtensionAH::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::Ipv6ExtensionAH")
     .SetParent<Ipv6Extension> ()
+    .SetGroupName ("Internet")
     .AddConstructor<Ipv6ExtensionAH> ()
   ;
   return tid;

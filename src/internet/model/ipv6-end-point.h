@@ -177,27 +177,19 @@ public:
   void ForwardIcmp (Ipv6Address src, uint8_t ttl, uint8_t type,
                     uint8_t code, uint32_t info);
 
+  /**
+   * \brief Enable or Disable the endpoint Rx capability.
+   * \param enabled true if Rx is enabled
+   */
+  void SetRxEnabled (bool enabled);
+
+  /**
+   * \brief Checks if the endpoint can receive packets.
+   * \returns true if the endpoint can receive packets.
+   */
+  bool IsRxEnabled (void);
+
 private:
-  /**
-   * \brief ForwardUp wrapper.
-   * \param p packet
-   * \param header the packet header
-   * \param sport source port
-   * \param incomingInterface incoming interface
-   */
-  void DoForwardUp (Ptr<Packet> p, Ipv6Header header, uint16_t sport, Ptr<Ipv6Interface> incomingInterface);
-
-  /**
-   * \brief ForwardIcmp wrapper.
-   * \param src source IPv6 address
-   * \param ttl time-to-live
-   * \param type ICMPv6 type
-   * \param code ICMPv6 code
-   * \param info ICMPv6 info
-   */
-  void DoForwardIcmp (Ipv6Address src, uint8_t ttl, uint8_t type,
-                      uint8_t code, uint32_t info);
-
   /**
    * \brief The local address.
    */
@@ -237,6 +229,11 @@ private:
    * \brief The destroy callback.
    */
   Callback<void> m_destroyCallback;
+
+  /**
+   * \brief true if the endpoint can receive packets.
+   */
+  bool m_rxEnabled;
 };
 
 } /* namespace ns3 */

@@ -239,10 +239,10 @@ private:
  * are conflicting, as, according to the Friis formula, 
  * \f$\lim_{d \to 0 }  P_r = +\infty \f$;
  * so if, for \f$ d = 0 \f$, we use a fixed loss value, we end up with an infinitely large
- * discontinuity, which as we discussed can cause undesireable
+ * discontinuity, which as we discussed can cause undesirable
  * simulation artifacts.
  *
- * To avoid these artifact, this implmentation of the Friis model
+ * To avoid these artifact, this implementation of the Friis model
  * provides an attribute called MinLoss which allows to specify the
  * minimum total loss (in dB) returned by the model. This is used in
  * such a way that 
@@ -350,7 +350,7 @@ private:
  *
  * Two-ray ground reflection model.
  *
- * \f$ Pr = \frac{Pt * Gt * Gr * (ht^2 * hr^2)}{d^4 * L} \f$
+ * \f$ Pr = \frac{P_t * G_t * G_r * (H_t^2 * H_r^2)}{d^4 * L} \f$
  *
  * The original equation in Rappaport's book assumes L = 1.
  * To be consistent with the free space equation, L is added here.
@@ -364,7 +364,7 @@ private:
  *
  * The crossover distance, below which Friis is used, is calculated as follows:
  *
- * \f$ dCross = \frac{(4 * pi * Ht * Hr)}{lambda} \f$
+ * \f$ dCross = \frac{(4 * \pi * H_t * H_r)}{\lambda} \f$
  *
  * In the implementation,  \f$ \lambda \f$ is calculated as 
  * \f$ \frac{C}{f} \f$, where  \f$ C = 299792458\f$ m/s is the speed of light in
@@ -629,17 +629,24 @@ private:
  * \ingroup propagation
  *
  * \brief Nakagami-m fast fading propagation loss model.
+ * 
+ * This propagation loss model implements the Nakagami-m fast fading
+ * model, which accounts for the variations in signal strength due to multipath
+ * fading. The model does not account for the path loss due to the
+ * distance traveled by the signal, hence for typical simulation usage it
+ * is recommended to consider using it in combination with other models
+ * that take into account this aspect. 
  *
  * The Nakagami-m distribution is applied to the power level. The probability
  * density function is defined as
- * \f[ p(x; m, \omega) = \frac{2 m^m}{\Gamma(m) \omega^m} x^{2m - 1} e^{-\frac{m}{\omega} x^2} = 2 x \cdot p_{\text{Gamma}}(x^2, m, \frac{m}{\omega}) \f]
+ * \f[ p(x; m, \omega) = \frac{2 m^m}{\Gamma(m) \omega^m} x^{2m - 1} e^{-\frac{m}{\omega} x^2}  \f]
  * with \f$ m \f$ the fading depth parameter and \f$ \omega \f$ the average received power.
  *
  * It is implemented by either a ns3::GammaRandomVariable or a 
  * ns3::ErlangRandomVariable random variable.
  *
- * Like in ns3::ThreeLogDistancePropagationLossModel, the m parameter is varied
- * over three distance fields:
+ * The implementation of the model allows to specify different values of the m parameter (and hence different fading profiles)
+ * for three different distance ranges:
  * \f[ \underbrace{0 \cdots\cdots}_{m_0} \underbrace{d_1 \cdots\cdots}_{m_1} \underbrace{d_2 \cdots\cdots}_{m_2} \infty \f]
  *
  * For m = 1 the Nakagami-m distribution equals the Rayleigh distribution. Thus

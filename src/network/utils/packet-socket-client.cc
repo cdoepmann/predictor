@@ -44,6 +44,7 @@ PacketSocketClient::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::PacketSocketClient")
     .SetParent<Application> ()
+    .SetGroupName("Network")
     .AddConstructor<PacketSocketClient> ()
     .AddAttribute ("MaxPackets",
                    "The maximum number of packets the application will send (zero means infinite)",
@@ -61,7 +62,7 @@ PacketSocketClient::GetTypeId (void)
                    MakeUintegerChecker<uint32_t> ())
     .AddTraceSource ("Tx", "A packet has been sent",
                      MakeTraceSourceAccessor (&PacketSocketClient::m_txTrace),
-                     "ns3::Packet::PacketAddressTracedCallback")
+                     "ns3::Packet::AddressTracedCallback")
   ;
   return tid;
 }

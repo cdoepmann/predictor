@@ -17,6 +17,7 @@
  *
  * Author: Mathieu Lacage, <mathieu.lacage@sophia.inria.fr>
  */
+
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
 #include "ns3/mobility-model.h"
@@ -26,7 +27,6 @@
 #include "ns3/pointer.h"
 #include "ns3/object-factory.h"
 #include "yans-wifi-channel.h"
-#include "yans-wifi-phy.h"
 #include "ns3/propagation-loss-model.h"
 #include "ns3/propagation-delay-model.h"
 
@@ -41,6 +41,7 @@ YansWifiChannel::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::YansWifiChannel")
     .SetParent<WifiChannel> ()
+    .SetGroupName ("Wifi")
     .AddConstructor<YansWifiChannel> ()
     .AddAttribute ("PropagationLossModel", "A pointer to the propagation loss model attached to this channel.",
                    PointerValue (),
@@ -57,6 +58,7 @@ YansWifiChannel::GetTypeId (void)
 YansWifiChannel::YansWifiChannel ()
 {
 }
+
 YansWifiChannel::~YansWifiChannel ()
 {
   NS_LOG_FUNCTION_NOARGS ();
@@ -68,6 +70,7 @@ YansWifiChannel::SetPropagationLossModel (Ptr<PropagationLossModel> loss)
 {
   m_loss = loss;
 }
+
 void
 YansWifiChannel::SetPropagationDelayModel (Ptr<PropagationDelayModel> delay)
 {
@@ -76,7 +79,7 @@ YansWifiChannel::SetPropagationDelayModel (Ptr<PropagationDelayModel> delay)
 
 void
 YansWifiChannel::Send (Ptr<YansWifiPhy> sender, Ptr<const Packet> packet, double txPowerDbm,
-                       WifiTxVector txVector, WifiPreamble preamble, uint8_t packetType, Time duration) const
+                       WifiTxVector txVector, WifiPreamble preamble, enum mpduType mpdutype, Time duration) const
 {
   Ptr<MobilityModel> senderMobility = sender->GetMobility ()->GetObject<MobilityModel> ();
   NS_ASSERT (senderMobility != 0);
@@ -85,7 +88,7 @@ YansWifiChannel::Send (Ptr<YansWifiPhy> sender, Ptr<const Packet> packet, double
     {
       if (sender != (*i))
         {
-          // For now don't account for inter channel interference
+          //For now don't account for inter channel interference
           if ((*i)->GetChannelNumber () != sender->GetChannelNumber ())
             {
               continue;
@@ -108,24 +111,24 @@ YansWifiChannel::Send (Ptr<YansWifiPhy> sender, Ptr<const Packet> packet, double
               dstNode = dstNetDevice->GetObject<NetDevice> ()->GetNode ()->GetId ();
             }
 
-          double *atts = new double[3];
-          *atts = rxPowerDbm;
-          *(atts+1)= packetType;
-          *(atts+2)= duration.GetNanoSeconds();
+          struct Parameters parameters;
+          parameters.rxPowerDbm = rxPowerDbm;
+          parameters.type = mpdutype;
+          parameters.duration = duration;
+          parameters.txVector = txVector;
+          parameters.preamble = preamble;
 
           Simulator::ScheduleWithContext (dstNode,
                                           delay, &YansWifiChannel::Receive, this,
-                                          j, copy, atts, txVector, preamble);
+                                          j, copy, parameters);
         }
     }
 }
 
 void
-YansWifiChannel::Receive (uint32_t i, Ptr<Packet> packet, double *atts,
-                          WifiTxVector txVector, WifiPreamble preamble) const
+YansWifiChannel::Receive (uint32_t i, Ptr<Packet> packet, struct Parameters parameters) const
 {
-  m_phyList[i]->StartReceivePacket (packet, *atts, txVector, preamble,*(atts+1), NanoSeconds(*(atts+2)));
-  delete[] atts;
+  m_phyList[i]->StartReceivePreambleAndHeader (packet, parameters.rxPowerDbm, parameters.txVector, parameters.preamble, parameters.type, parameters.duration);
 }
 
 uint32_t
@@ -133,6 +136,7 @@ YansWifiChannel::GetNDevices (void) const
 {
   return m_phyList.size ();
 }
+
 Ptr<NetDevice>
 YansWifiChannel::GetDevice (uint32_t i) const
 {
@@ -153,4 +157,4 @@ YansWifiChannel::AssignStreams (int64_t stream)
   return (currentStream - stream);
 }
 
-} // namespace ns3
+} //namespace ns3

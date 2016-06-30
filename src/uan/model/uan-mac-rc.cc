@@ -209,6 +209,7 @@ UanMacRc::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanMacRc")
     .SetParent<UanMac> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanMacRc> ()
     .AddAttribute ("RetryRate",
                    "Number of retry attempts per second (of RTS/GWPING).",
@@ -253,11 +254,11 @@ UanMacRc::GetTypeId (void)
     .AddTraceSource ("Enqueue",
                      "A  (data) packet arrived at MAC for transmission.",
                      MakeTraceSourceAccessor (&UanMacRc::m_enqueueLogger),
-                     "ns3::UanMac::PacketModeTracedCallback")
+                     "ns3::UanMacRc::QueueTracedCallback")
     .AddTraceSource ("Dequeue",
                      "A  (data) packet was passed down to PHY from MAC.",
                      MakeTraceSourceAccessor (&UanMacRc::m_dequeueLogger),
-                     "ns3::UanMac::PacketModeTracedCallback")
+                     "ns3::UanMacRc::QueueTracedCallback")
     .AddTraceSource ("RX",
                      "A packet was destined for and received at this MAC layer.",
                      MakeTraceSourceAccessor (&UanMacRc::m_rxLogger),

@@ -62,6 +62,7 @@ UdpTraceClient::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UdpTraceClient")
     .SetParent<Application> ()
+    .SetGroupName("Applications")
     .AddConstructor<UdpTraceClient> ()
     .AddAttribute ("RemoteAddress",
                    "The destination Address of the outbound packets",
@@ -261,6 +262,7 @@ UdpTraceClient::StartApplication (void)
         }
     }
   m_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+  m_socket->SetAllowBroadcast (true);
   m_sendEvent = Simulator::Schedule (Seconds (0.0), &UdpTraceClient::Send, this);
 }
 

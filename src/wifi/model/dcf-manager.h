@@ -47,8 +47,17 @@ class DcfState
 {
 public:
   DcfState ();
-
   virtual ~DcfState ();
+
+  /**
+   * \return whether this DCF state is an EDCA state
+   *
+   * This method, which must be overridden in derived classes,
+   * indicates whether DCF or EDCAF rules should be used for this
+   * channel access function. This affects the behavior of DcfManager
+   * when dealing with this instance. 
+   */
+  virtual bool IsEdca (void) const = 0;
 
   /**
    * \param aifsn the number of slots which make up an AIFS for a specific DCF.
@@ -118,6 +127,7 @@ public:
    */
   bool IsAccessRequested (void) const;
 
+
 private:
   friend class DcfManager;
 
@@ -169,7 +179,6 @@ private:
    */
   void NotifyWakeUp (void);
 
-
   /**
    * Called by DcfManager to notify a DcfState subclass
    * that access to the medium is granted and can
@@ -213,7 +222,7 @@ private:
   */
   virtual void DoNotifySleep (void) = 0;
   /**
-  * Called by DcfManager to notify a DcfState subclass that the device 
+  * Called by DcfManager to notify a DcfState subclass that the device
   * has begun to wake up.
   *
   * The subclass is expected to restart a new backoff by
@@ -224,15 +233,16 @@ private:
 
   uint32_t m_aifsn;
   uint32_t m_backoffSlots;
-  // the backoffStart variable is used to keep track of the
-  // time at which a backoff was started or the time at which
-  // the backoff counter was last updated.
+  //the backoffStart variable is used to keep track of the
+  //time at which a backoff was started or the time at which
+  //the backoff counter was last updated.
   Time m_backoffStart;
   uint32_t m_cwMin;
   uint32_t m_cwMax;
   uint32_t m_cw;
   bool m_accessRequested;
 };
+
 
 /**
  * \brief Manage a set of ns3::DcfState
@@ -288,7 +298,6 @@ public:
    * one of the Notify methods has been invoked.
    */
   void SetSifs (Time sifs);
-
   /**
    * \param eifsNoDifs the duration of a EIFS minus the duration of DIFS.
    *
@@ -403,6 +412,8 @@ public:
    * Notify that CTS timer has resetted.
    */
   void NotifyCtsTimeoutResetNow ();
+
+
 private:
   /**
    * Update backoff slots for all DcfStates.
@@ -413,6 +424,7 @@ private:
    *
    * \param a
    * \param b
+   *
    * \return the most recent time
    */
   Time MostRecent (Time a, Time b) const;
@@ -422,6 +434,7 @@ private:
    * \param a
    * \param b
    * \param c
+   *
    * \return the most recent time
    */
   Time MostRecent (Time a, Time b, Time c) const;
@@ -432,6 +445,7 @@ private:
    * \param b
    * \param c
    * \param d
+   *
    * \return the most recent time
    */
   Time MostRecent (Time a, Time b, Time c, Time d) const;
@@ -444,6 +458,7 @@ private:
    * \param d
    * \param e
    * \param f
+   *
    * \return the most recent time
    */
   Time MostRecent (Time a, Time b, Time c, Time d, Time e, Time f) const;
@@ -457,6 +472,7 @@ private:
    * \param e
    * \param f
    * \param g
+   *
    * \return the most recent time
    */
   Time MostRecent (Time a, Time b, Time c, Time d, Time e, Time f, Time g) const;
@@ -464,8 +480,7 @@ private:
    * Access will never be granted to the medium _before_
    * the time returned by this method.
    *
-   * \returns the absolute time at which access could start to
-   * be granted
+   * \returns the absolute time at which access could start to be granted
    */
   Time GetAccessGrantStart (void) const;
   /**
@@ -473,6 +488,7 @@ private:
    * started for the given DcfState.
    *
    * \param state
+   *
    * \return the time when the backoff procedure started
    */
   Time GetBackoffStartFor (DcfState *state);
@@ -481,10 +497,13 @@ private:
    * ended (or will ended) for the given DcfState.
    *
    * \param state
+   *
    * \return the time when the backoff procedure ended (or will ended)
    */
   Time GetBackoffEndFor (DcfState *state);
+
   void DoRestartAccessTimeoutIfNeeded (void);
+
   /**
    * Called when access timeout should occur
    * (e.g. backoff procedure expired).
@@ -533,6 +552,6 @@ private:
   LowDcfListener* m_lowListener;
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* DCF_MANAGER_H */

@@ -261,7 +261,11 @@ RoutingStats::RoutingStats ()
   : m_RxBytes (0),
     m_cumulativeRxBytes (0),
     m_RxPkts (0),
-    m_cumulativeRxPkts (0)
+    m_cumulativeRxPkts (0),
+    m_TxBytes (0),
+    m_cumulativeTxBytes (0),
+    m_TxPkts (0),
+    m_cumulativeTxPkts (0)
 {
 }
 
@@ -562,6 +566,9 @@ RoutingHelper::SetupRoutingProtocol (NodeContainer & c)
 
   switch (m_protocol)
     {
+    case 0:
+      m_protocolName = "NONE";
+      break;
     case 1:
       if (m_routingTables != 0)
         {
@@ -570,21 +577,13 @@ RoutingHelper::SetupRoutingProtocol (NodeContainer & c)
       list.Add (olsr, 100);
       m_protocolName = "OLSR";
       break;
-    case 0:
     case 2:
       if (m_routingTables != 0)
         {
           aodv.PrintRoutingTableAllAt (rtt, rtw);
         }
       list.Add (aodv, 100);
-      if (m_protocol == 0)
-        {
-          m_protocolName = "NONE";
-        }
-      else
-        {
-          m_protocolName = "AODV";
-        }
+      m_protocolName = "AODV";
       break;
     case 3:
       if (m_routingTables != 0)
@@ -595,10 +594,12 @@ RoutingHelper::SetupRoutingProtocol (NodeContainer & c)
       m_protocolName = "DSDV";
       break;
     case 4:
+      // setup is later
       m_protocolName = "DSR";
       break;
     default:
       NS_FATAL_ERROR ("No such protocol:" << m_protocol);
+      break;
     }
 
   if (m_protocol < 4)
@@ -1325,7 +1326,7 @@ VanetRoutingExperiment::VanetRoutingExperiment ()
     // 1=802.11p
     m_80211mode (1),
     m_traceFile (""),
-    m_logFile ("low_ct-unterstrass-1day.filt.5.adj.log"),
+    m_logFile ("low99-ct-unterstrass-1day.filt.7.adj.log"),
     m_mobility (1),
     m_nNodes (156),
     m_TotalSimTime (300.01),
@@ -1528,11 +1529,11 @@ static ns3::GlobalValue g_phyMode ("VRCphyMode",
                                    ns3::MakeStringChecker ());
 static ns3::GlobalValue g_traceFile ("VRCtraceFile",
                                      "Mobility trace filename",
-                                     ns3::StringValue ("./src/wave/examples/low_ct-unterstrass-1day.filt.5.adj.mob"),
+                                     ns3::StringValue ("./src/wave/examples/low99-ct-unterstrass-1day.filt.7.adj.mob"),
                                      ns3::MakeStringChecker ());
 static ns3::GlobalValue g_logFile ("VRClogFile",
                                    "Log filename",
-                                   ns3::StringValue ("low_ct-unterstrass-1day.filt.5.adj.log"),
+                                   ns3::StringValue ("low99-ct-unterstrass-1day.filt.7.adj.log"),
                                    ns3::MakeStringChecker ());
 static ns3::GlobalValue g_rate ("VRCrate",
                                 "Data rate",
@@ -2279,8 +2280,8 @@ VanetRoutingExperiment::SetupAdhocDevices ()
   wavePhy.Set ("TxPowerStart",DoubleValue (m_txp));
   wavePhy.Set ("TxPowerEnd", DoubleValue (m_txp));
 
-  // Add a non-QoS upper mac, and disable rate control
-  NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default ();
+  // Add an upper mac and disable rate control
+  WifiMacHelper wifiMac;
   wifiMac.SetType ("ns3::AdhocWifiMac");
   QosWaveMacHelper waveMac = QosWaveMacHelper::Default ();
 

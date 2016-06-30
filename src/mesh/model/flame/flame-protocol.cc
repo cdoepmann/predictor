@@ -46,7 +46,11 @@ NS_OBJECT_ENSURE_REGISTERED (FlameProtocol);
 TypeId
 FlameTag::GetTypeId ()
 {
-  static TypeId tid = TypeId ("ns3::flame::FlameTag").SetParent<Tag> ().AddConstructor<FlameTag> ();
+  static TypeId tid = TypeId ("ns3::flame::FlameTag")
+    .SetParent<Tag> ()
+    .SetGroupName ("Mesh")
+    .AddConstructor<FlameTag> ()
+    ;
   return tid;
 }
 
@@ -110,6 +114,7 @@ FlameProtocol::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::flame::FlameProtocol")
     .SetParent<MeshL2RoutingProtocol> ()
+    .SetGroupName ("Mesh")
     .AddConstructor<FlameProtocol> ()
     .AddAttribute ( "BroadcastInterval",
                     "How often we must send broadcast packets",

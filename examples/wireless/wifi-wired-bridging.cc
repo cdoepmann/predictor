@@ -24,7 +24,7 @@
 //      +-----+      +-----+            +-----+      +-----+
 //      | STA |      | STA |            | STA |      | STA | 
 //      +-----+      +-----+            +-----+      +-----+
-//    192.168.0.3  192.168.0.4        192.168.0.5  192.168.0.6
+//    192.168.0.2  192.168.0.3        192.168.0.5  192.168.0.6
 //      --------     --------           --------     --------
 //      WIFI STA     WIFI STA           WIFI STA     WIFI STA
 //      --------     --------           --------     --------
@@ -37,7 +37,7 @@
 //             ##############           ##############
 //                 BRIDGE                   BRIDGE
 //             ##############           ############## 
-//               192.168.0.1              192.168.0.2
+//               192.168.0.1              192.168.0.4
 //               +---------+              +---------+
 //               | AP Node |              | AP Node |
 //               +---------+              +---------+
@@ -110,8 +110,8 @@ int main (int argc, char *argv[])
       Ipv4InterfaceContainer apInterface;
       MobilityHelper mobility;
       BridgeHelper bridge;
-      WifiHelper wifi = WifiHelper::Default ();
-      NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default ();
+      WifiHelper wifi;
+      WifiMacHelper wifiMac;
       YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default ();
       wifiPhy.SetChannel (wifiChannel.Create ());
 

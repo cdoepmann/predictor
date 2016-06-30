@@ -136,6 +136,13 @@ public:
                      MakeEnumChecker (TEST_A, "TestA",
                                       TEST_B, "TestB",
                                       TEST_C, "TestC"))
+      .AddAttribute ("TestEnumSetGet", "help text",
+                     EnumValue (TEST_B),
+                     MakeEnumAccessor (&AttributeObjectTest::DoSetEnum,
+                                       &AttributeObjectTest::DoGetEnum),
+                     MakeEnumChecker (TEST_A, "TestA",
+                                      TEST_B, "TestB",
+                                      TEST_C, "TestC"))
       .AddAttribute ("TestRandom", "help text",
                      StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"),
                      MakePointerAccessor (&AttributeObjectTest::m_random),
@@ -188,7 +195,7 @@ public:
                      MakeValueClassTestChecker ())
       .AddTraceSource ("Source1", "help test",
                        MakeTraceSourceAccessor (&AttributeObjectTest::m_intSrc1),
-                       "ns3::TracedValue::Int8Callback")
+                       "ns3::TracedValueCallback::Int8")
       .AddTraceSource ("Source2", "help text",
                        MakeTraceSourceAccessor (&AttributeObjectTest::m_cb),
                        "ns3::AttributeObjectTest::NumericTracedCallback")
@@ -228,6 +235,7 @@ public:
     NS_UNUSED (m_uint8);
     NS_UNUSED (m_float);
     NS_UNUSED (m_enum);
+    NS_UNUSED (m_enumSetGet);
   }
 
   virtual ~AttributeObjectTest (void) {};
@@ -255,6 +263,8 @@ private:
   Ptr<Derived> DoGetVector (uint32_t i) const { return m_vector2[i]; }
   bool DoSetIntSrc (int8_t v) { m_intSrc2 = v; return true; }
   int8_t DoGetIntSrc (void) const { return m_intSrc2; }
+  bool DoSetEnum (Test_e v) { m_enumSetGet = v; return true; }
+  Test_e DoGetEnum (void) const { return m_enumSetGet; }
 
   bool m_boolTestA;
   bool m_boolTest;
@@ -264,6 +274,7 @@ private:
   uint8_t m_uint8;
   float m_float;
   enum Test_e m_enum;
+  enum Test_e m_enumSetGet;
   Ptr<RandomVariableStream> m_random;
   std::vector<Ptr<Derived> > m_vector1;
   std::vector<Ptr<Derived> > m_vector2;
@@ -272,7 +283,7 @@ private:
   TracedValue<int8_t> m_intSrc1;
   TracedValue<int8_t> m_intSrc2;
 
-  typedef void (* NumericTracedCallback) (const double, const int, const float);
+  typedef void (* NumericTracedCallback) (double, int, float);
   TracedCallback<double, int, float> m_cb;
   TracedValue<ValueClassTest> m_valueSrc;
   Ptr<Derived> m_ptr;
@@ -654,6 +665,22 @@ AttributeTestCase<EnumValue>::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe() via EnumValue");
 
   //
+  // When the object is first created, the Attribute should have the default 
+  // value.
+  //
+  ok = CheckGetCodePaths (p, "TestEnumSetGet", "TestB", EnumValue (AttributeObjectTest::TEST_B));
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by default value");
+
+  //
+  // Set the Attribute using the EnumValue type.
+  //
+  ok = p->SetAttributeFailSafe ("TestEnumSetGet", EnumValue (AttributeObjectTest::TEST_C));
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() to TEST_C");
+
+  ok = CheckGetCodePaths (p, "TestEnumSetGet", "TestC", EnumValue (AttributeObjectTest::TEST_C));
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe() via EnumValue");
+
+  //
   // Set the Attribute using the StringValue type.
   //
   ok = p->SetAttributeFailSafe ("TestEnum", StringValue ("TestB"));
@@ -692,6 +719,9 @@ AttributeTestCase<TimeValue>::DoRun (void)
   p = CreateObject<AttributeObjectTest> ();
   NS_TEST_ASSERT_MSG_NE (p, 0, "Unable to CreateObject");
 
+  // The test vectors assume ns resolution
+  Time::SetResolution (Time::NS);
+  
   //
   // Set value
   //
@@ -699,13 +729,13 @@ AttributeTestCase<TimeValue>::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to 5s");
 
   ok = CheckGetCodePaths (p, "TestTimeWithBounds", "+5000000000.0ns", TimeValue (Seconds (5)));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe() (5s) via TimeValue");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe(5s) via TimeValue");
 
   ok = p->SetAttributeFailSafe ("TestTimeWithBounds", StringValue ("3s"));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to 5s");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to 3s");
 
   ok = CheckGetCodePaths (p, "TestTimeWithBounds", "+3000000000.0ns", TimeValue (Seconds (3)));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe() (3s) via StringValue");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe(3s) via StringValue");
 
   
   //
@@ -717,16 +747,16 @@ AttributeTestCase<TimeValue>::DoRun (void)
   // Set the Attribute at the positive limit
   //
   ok = p->SetAttributeFailSafe ("TestTimeWithBounds", TimeValue (Seconds (10)));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to 10");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to 10s");
 
   ok = CheckGetCodePaths (p, "TestTimeWithBounds", "+10000000000.0ns", TimeValue (Seconds (10)));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe() (positive limit) via StringValue");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe(10s [positive limit]) via StringValue");
 
   //
   // Set the Attribute past the positive limit.
   //
   ok = p->SetAttributeFailSafe ("TestTimeWithBounds", TimeValue (Seconds (11)));
-  NS_TEST_ASSERT_MSG_EQ (ok, false, "Unexpectedly could SetAttributeFailSafe() via TimeValue to 11");
+  NS_TEST_ASSERT_MSG_EQ (ok, false, "Unexpectedly could SetAttributeFailSafe() via TimeValue to 11s [greater than positive limit]");
 
   ok = CheckGetCodePaths (p, "TestTimeWithBounds", "+10000000000.0ns", TimeValue (Seconds (10)));
   NS_TEST_ASSERT_MSG_EQ (ok, true, "Error in SetAttributeFailSafe() but value changes");
@@ -735,16 +765,16 @@ AttributeTestCase<TimeValue>::DoRun (void)
   // Set the Attribute at the negative limit.
   //
   ok = p->SetAttributeFailSafe ("TestTimeWithBounds", TimeValue (Seconds (-5)));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to -5");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Could not SetAttributeFailSafe() via TimeValue to -5s");
 
   ok = CheckGetCodePaths (p, "TestTimeWithBounds", "-5000000000.0ns", TimeValue (Seconds (-5)));
-  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe() (negative limit) via StringValue");
+  NS_TEST_ASSERT_MSG_EQ (ok, true, "Attribute not set properly by SetAttributeFailSafe(-5s [negative limit]) via StringValue");
 
   //
   // Set the Attribute past the negative limit.
   //
   ok = p->SetAttributeFailSafe ("TestTimeWithBounds", TimeValue (Seconds (-6)));
-  NS_TEST_ASSERT_MSG_EQ (ok, false, "Unexpectedly could SetAttributeFailSafe() via TimeValue to -6");
+  NS_TEST_ASSERT_MSG_EQ (ok, false, "Unexpectedly could SetAttributeFailSafe() via TimeValue to -6s");
 
   ok = CheckGetCodePaths (p, "TestTimeWithBounds", "-5000000000.0ns", TimeValue (Seconds (-5)));
   NS_TEST_ASSERT_MSG_EQ (ok, true, "Error in SetAttributeFailSafe() but value changes");

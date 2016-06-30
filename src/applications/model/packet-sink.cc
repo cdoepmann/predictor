@@ -43,6 +43,7 @@ PacketSink::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::PacketSink")
     .SetParent<Application> ()
+    .SetGroupName("Applications")
     .AddConstructor<PacketSink> ()
     .AddAttribute ("Local",
                    "The Address on which to Bind the rx socket.",
@@ -57,7 +58,7 @@ PacketSink::GetTypeId (void)
     .AddTraceSource ("Rx",
                      "A packet has been received",
                      MakeTraceSourceAccessor (&PacketSink::m_rxTrace),
-                     "ns3::Packet::PacketAddressTracedCallback")
+                     "ns3::Packet::AddressTracedCallback")
   ;
   return tid;
 }

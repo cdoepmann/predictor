@@ -45,6 +45,7 @@ OcbWifiMac::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::OcbWifiMac")
     .SetParent<RegularWifiMac> ()
+    .SetGroupName ("Wave")
     .AddConstructor<OcbWifiMac> ()
   ;
   return tid;
@@ -189,7 +190,7 @@ OcbWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
       // Any value greater than 7 is invalid and likely indicates that
       // the packet had no QoS tag, so we revert to zero, which'll
       // mean that AC_BE is used.
-      if (tid >= 7)
+      if (tid > 7)
         {
           tid = 0;
         }
@@ -200,6 +201,10 @@ OcbWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
       hdr.SetTypeData ();
     }
 
+  if (m_htSupported || m_vhtSupported)
+    {
+      hdr.SetNoOrder ();
+    }
   hdr.SetAddr1 (to);
   hdr.SetAddr2 (GetAddress ());
   hdr.SetAddr3 (WILDCARD_BSSID);

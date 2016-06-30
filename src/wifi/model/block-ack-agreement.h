@@ -17,6 +17,7 @@
  *
  * Author: Mirko Banchi <mk.banchi@gmail.com>
  */
+
 #ifndef BLOCK_ACK_AGREEMENT_H
 #define BLOCK_ACK_AGREEMENT_H
 
@@ -31,6 +32,8 @@ namespace ns3 {
 class BlockAckAgreement
 {
   friend class MacLow;
+
+
 public:
   BlockAckAgreement ();
   /**
@@ -59,6 +62,12 @@ public:
    * \param seq the starting sequence number
    */
   void SetStartingSequence (uint16_t seq);
+  /**
+   * Set starting sequence control.
+   *
+   * \param seq the starting sequence control
+   */
+  void SetStartingSequenceControl (uint16_t seq);
   /**
    * Set Block ACK policy to immediate ACK.
    */
@@ -110,7 +119,7 @@ public:
    */
   uint16_t GetStartingSequence (void) const;
   /**
-   * Return the starting squence control
+   * Return the starting sequence control
    *
    * \return starting sequence control
    */
@@ -149,6 +158,7 @@ public:
    */
   bool IsHtSupported (void) const;
 
+
 protected:
   Mac48Address m_peer;       //!< Peer address
   uint8_t m_amsduSupported;  //!< Flag whether MSDU aggregation is supported
@@ -159,9 +169,9 @@ protected:
   uint16_t m_startingSeq;    //!< Starting squence control
   uint16_t m_winEnd;         //!< Ending sequence number
   uint8_t m_htSupported;     //!< Flag whether HT is supported
-  EventId m_inactivityEvent; //!<
+  EventId m_inactivityEvent;
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* BLOCK_ACK_AGREEMENT_H */

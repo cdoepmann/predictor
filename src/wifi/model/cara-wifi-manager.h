@@ -17,6 +17,7 @@
  *
  * Author: Federico Maguolo <maguolof@dei.unipd.it>
  */
+
 #ifndef CARA_WIFI_MANAGER_H
 #define CARA_WIFI_MANAGER_H
 
@@ -42,8 +43,9 @@ public:
   CaraWifiManager ();
   virtual ~CaraWifiManager ();
 
+
 private:
-  // overriden from base class
+  //overriden from base class
   virtual WifiRemoteStation * DoCreateStation (void) const;
   virtual void DoReportRxOk (WifiRemoteStation *station,
                              double rxSnr, WifiMode txMode);
@@ -55,7 +57,7 @@ private:
                                double ackSnr, WifiMode ackMode, double dataSnr);
   virtual void DoReportFinalRtsFailed (WifiRemoteStation *station);
   virtual void DoReportFinalDataFailed (WifiRemoteStation *station);
-  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station, uint32_t size);
+  virtual WifiTxVector DoGetDataTxVector (WifiRemoteStation *station);
   virtual WifiTxVector DoGetRtsTxVector (WifiRemoteStation *station);
   virtual bool DoNeedRts (WifiRemoteStation *station,
                           Ptr<const Packet> packet, bool normally);
@@ -67,6 +69,6 @@ private:
   uint32_t m_probeThreshold;
 };
 
-} // namespace ns3
+} //namespace ns3
 
 #endif /* CARA_WIFI_MANAGER_H */

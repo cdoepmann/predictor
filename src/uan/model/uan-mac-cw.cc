@@ -77,7 +77,8 @@ TypeId
 UanMacCw::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::UanMacCw")
-    .SetParent<Object> ()
+    .SetParent<UanMac> ()
+    .SetGroupName ("Uan")
     .AddConstructor<UanMacCw> ()
     .AddAttribute ("CW",
                    "The MAC parameter CW.",

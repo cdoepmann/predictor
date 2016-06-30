@@ -46,6 +46,12 @@ NS_LOG_COMPONENT_DEFINE ("MultiModelSpectrumChannel");
 NS_OBJECT_ENSURE_REGISTERED (MultiModelSpectrumChannel);
 
 
+/**
+ * \brief Output stream operator
+ * \param lhs output stream
+ * \param rhs the TxSpectrumModelInfoMap to print
+ * \return an output stream
+ */
 std::ostream& operator<< (std::ostream& lhs, TxSpectrumModelInfoMap_t& rhs)
 {
   for (TxSpectrumModelInfoMap_t::iterator it = rhs.begin ();
@@ -97,6 +103,7 @@ MultiModelSpectrumChannel::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::MultiModelSpectrumChannel")
     .SetParent<SpectrumChannel> ()
+    .SetGroupName ("Spectrum")
     .AddConstructor<MultiModelSpectrumChannel> ()
     .AddAttribute ("MaxLossDb",
                    "If a single-frequency PropagationLossModel is used, "
@@ -411,6 +418,7 @@ MultiModelSpectrumChannel::GetDevice (uint32_t i) const
             {
               return (*phyIt)->GetDevice ();
             }
+          j++;
         }
     }
   NS_FATAL_ERROR ("m_numDevice > actual number of devices");

@@ -51,6 +51,7 @@ Node::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::Node")
     .SetParent<Object> ()
+    .SetGroupName("Network")
     .AddConstructor<Node> ()
     .AddAttribute ("DeviceList", "The list of devices associated to this Node.",
                    ObjectVectorValue (),
@@ -107,6 +108,13 @@ Node::GetId (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_id;
+}
+
+Time
+Node::GetLocalTime (void) const
+{
+  NS_LOG_FUNCTION (this);
+  return Simulator::Now ();
 }
 
 uint32_t

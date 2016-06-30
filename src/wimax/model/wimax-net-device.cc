@@ -56,6 +56,9 @@ TypeId WimaxNetDevice::GetTypeId (void)
     TypeId ("ns3::WimaxNetDevice")
 
     .SetParent<NetDevice> ()
+    .SetGroupName ("Wimax")
+
+    // No AddConstructor because this is an abstract class.
 
     .AddAttribute ("Mtu", "The MAC-level Maximum Transmission Unit",
                    UintegerValue (DEFAULT_MSDU_SIZE),
@@ -123,12 +126,12 @@ TypeId WimaxNetDevice::GetTypeId (void)
     .AddTraceSource ("Rx",
                      "Receive trace",
                      MakeTraceSourceAccessor (&WimaxNetDevice::m_traceRx),
-                     "ns3::Packet::TracedCallback")
+                     "ns3::WimaxNetDevice::TxRxTracedCallback")
 
     .AddTraceSource ("Tx",
                      "Transmit trace",
                      MakeTraceSourceAccessor (&WimaxNetDevice::m_traceTx),
-                     "ns3::Packet::TracedCallback");
+                     "ns3::WimaxNetDevice::TxRxTracedCallback");
   return tid;
 }
 

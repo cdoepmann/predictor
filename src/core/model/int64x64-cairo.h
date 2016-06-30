@@ -25,6 +25,11 @@
 
 #include "cairo-wideint-private.h"
 
+/**
+ * \file
+ * \ingroup highprec
+ * Declaration of the ns3::int64x64_t type using the Cairo implementation.
+ */
 
 namespace ns3 {
 
@@ -120,7 +125,7 @@ public:
   /**
    * Construct from an integral type.
    *
-   * \param [in] v integer value to represent
+   * \param [in] v Integer value to represent
    */
   inline int64x64_t (const int v)
   {

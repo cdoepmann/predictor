@@ -17,6 +17,7 @@
  *
  * Author: Ghada Badawy <gbadawy@gmail.com>
  */
+
 #ifndef MPDU_STANDARD_AGGREGATOR_H
 #define MPDU_STANDARD_AGGREGATOR_H
 
@@ -35,24 +36,35 @@ public:
   static TypeId GetTypeId (void);
   MpduStandardAggregator ();
   ~MpduStandardAggregator ();
+
+  virtual void SetMaxAmpduSize (uint32_t maxSize);
+  virtual uint32_t GetMaxAmpduSize (void) const;
   /**
    * \param packet packet we have to insert into <i>aggregatedPacket</i>.
    * \param aggregatedPacket packet that will contain <i>packet</i>, if aggregation is possible.
-   * \return true if <i>packet</i> can be aggregated to <i>aggregatedPacket</i>, false otherwise.
+   *
+   * \return true if <i>packet</i> can be aggregated to <i>aggregatedPacket</i>,
+   *         false otherwise.
    *
    * This method performs an MPDU aggregation.
    * Returns true if <i>packet</i> can be aggregated to <i>aggregatedPacket</i>, false otherwise.
    */
   virtual bool Aggregate (Ptr<const Packet> packet, Ptr<Packet> aggregatedPacket);
   /**
+  * This method performs a VHT single MPDU aggregation.
+  */
+  virtual void AggregateVhtSingleMpdu (Ptr<const Packet> packet, Ptr<Packet> aggregatedPacket);
+  /**
    * Adds A-MPDU subframe header and padding to each MPDU that is part of an A-MPDU before it is sent.
    */
-  virtual void AddHeaderAndPad (Ptr<Packet> packet, bool last);
+  virtual void AddHeaderAndPad (Ptr<Packet> packet, bool last, bool vhtSingleMpdu);
   /**
    * \param packetSize size of the packet we want to insert into <i>aggregatedPacket</i>.
    * \param aggregatedPacket packet that will contain the packet of size <i>packetSize</i>, if aggregation is possible.
    * \param blockAckSize size of the piggybacked block ack request
-   * \return true if the packet of size <i>packetSize</i> can be aggregated to <i>aggregatedPacket</i>, false otherwise.
+   *
+   * \return true if the packet of size <i>packetSize</i> can be aggregated to <i>aggregatedPacket</i>,
+   *         false otherwise.
    *
    * This method is used to determine if a packet could be aggregated to an A-MPDU without exceeding the maximum packet size.
    */
@@ -65,10 +77,11 @@ public:
    */
   virtual uint32_t CalculatePadding (Ptr<const Packet> packet);
 
+
 private:
   uint32_t m_maxAmpduLength; //!< Maximum length in bytes of A-MPDUs
 };
 
-}  // namespace ns3
+} //namespace ns3
 
 #endif /* MPDU_STANDARD_AGGREGATOR_H */

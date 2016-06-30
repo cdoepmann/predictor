@@ -20,6 +20,12 @@
 #include "simulator-impl.h"
 #include "log.h"
 
+/**
+ * \file
+ * \ingroup simulator
+ * Implementation of class ns3::SimulatorImpl.
+ */
+
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("SimulatorImpl");
@@ -31,6 +37,7 @@ SimulatorImpl::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::SimulatorImpl")
     .SetParent<Object> ()
+    .SetGroupName ("Core")
   ;
   return tid;
 }

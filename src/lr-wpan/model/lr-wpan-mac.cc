@@ -51,6 +51,7 @@ LrWpanMac::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::LrWpanMac")
     .SetParent<Object> ()
+    .SetGroupName ("LrWpan")
     .AddConstructor<LrWpanMac> ()
     .AddAttribute ("PanId", "16-bit identifier of the associated PAN",
                    UintegerValue (),
@@ -110,6 +111,10 @@ LrWpanMac::GetTypeId (void)
                      "packet sniffer attached to the device",
                      MakeTraceSourceAccessor (&LrWpanMac::m_promiscSnifferTrace),
                      "ns3::Packet::TracedCallback")
+    .AddTraceSource ("MacStateValue",
+                     "The state of LrWpan Mac",
+                     MakeTraceSourceAccessor (&LrWpanMac::m_lrWpanMacState),
+                     "ns3::TracedValueCallback::LrWpanMacState")
     .AddTraceSource ("MacState",
                      "The state of LrWpan Mac",
                      MakeTraceSourceAccessor (&LrWpanMac::m_macStateLogger),

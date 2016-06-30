@@ -17,6 +17,7 @@
  *
  * Author: Mathieu Lacage, <mathieu.lacage@sophia.inria.fr>
  */
+
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
 #include "ns3/mobility-model.h"
@@ -42,8 +43,9 @@ WifiChannel::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::WifiChannel")
     .SetParent<Channel> ()
+    .SetGroupName ("Wifi")
   ;
   return tid;
 }
 
-} // namespace ns3
+} //namespace ns3

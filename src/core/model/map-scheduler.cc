@@ -25,6 +25,12 @@
 #include "log.h"
 #include <string>
 
+/**
+ * \file
+ * \ingroup scheduler
+ * Implementation of ns3::MapScheduler class.
+ */
+
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("MapScheduler");
@@ -36,6 +42,7 @@ MapScheduler::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::MapScheduler")
     .SetParent<Scheduler> ()
+    .SetGroupName ("Core")
     .AddConstructor<MapScheduler> ()
   ;
   return tid;

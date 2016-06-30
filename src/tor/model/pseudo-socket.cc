@@ -128,6 +128,12 @@ PseudoSocket::GetSockName (Address &address) const
   return 0;
 }
 
+int
+PseudoSocket::GetPeerName (Address &address) const
+{
+  return 0;
+}
+
 bool
 PseudoSocket::SetAllowBroadcast (bool allowBroadcast)
 {
