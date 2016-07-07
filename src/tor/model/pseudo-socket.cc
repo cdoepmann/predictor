@@ -319,14 +319,14 @@ PseudoClientSocket::PseudoClientSocket (Time startTime)
   rng_think->SetAttribute ("Constant", DoubleValue (0));
   m_thinkTimeStream = rng_think;
 
-  m_leftToSend = PACKET_PAYLOAD_SIZE;
+  m_leftToSend = 0;
   m_leftToRead = 0;
   ttlbCallback = 0;
   ttfbCallback = 0;
   m_ttlbId = 0;
   m_ttfbId = 0;
 
-  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
+  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::RequestPage, this);
 }
 
 
@@ -337,9 +337,9 @@ PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream,
   ttfbCallback = 0;
   m_requestSizeStream = requestStream;
   m_thinkTimeStream = thinkStream;
-  m_leftToSend = PACKET_PAYLOAD_SIZE;
+  m_leftToSend = 0
 
-  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::NotifyDataRecv, this);
+  m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::RequestPage, this);
 }
 
 void
