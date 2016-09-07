@@ -32,6 +32,8 @@ TorApp::GetTypeId (void)
 TorApp::TorApp (void)
 {
   listen_socket = 0;
+  m_scheduleReadHead = 0;
+  m_scheduleWriteHead = 0;
 }
 
 TorApp::~TorApp (void)
@@ -249,6 +251,10 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
   max_read = min (max_read, socket->GetRxAvailable ());
   NS_LOG_LOGIC ("Read " << max_read << "/" << socket->GetRxAvailable () << " bytes from " << conn->GetRemote ());
 
+  if (m_readbucket.GetSize() <= 0 && m_scheduleReadHead == 0) {
+    m_scheduleReadHead = conn;
+  }
+
   if (max_read <= 0)
     {
       return;
@@ -381,6 +387,10 @@ TorApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
 
   NS_LOG_LOGIC ("Write max " << max_write << " bytes to " << conn->GetRemote ());
 
+  if (m_writebucket.GetSize() <= 0 && m_scheduleWriteHead == 0) {
+    m_scheduleWriteHead = conn;
+  }
+
   if (max_write <= 0)
     {
       return;
@@ -421,6 +431,8 @@ TorApp::HandleAccept (Ptr<Socket> s, const Address& from)
   s->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
   // s->SetSendCallback (MakeCallback(&TorApp::ConnWriteCallback, this));
   s->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
+  conn->ScheduleWrite();
+  conn->ScheduleRead();
 }
 
 
@@ -445,16 +457,37 @@ void
 TorApp::RefillReadCallback (int64_t prev_read_bucket)
 {
   NS_LOG_LOGIC ("read bucket was " << prev_read_bucket << ". Now " << m_readbucket.GetSize ());
-  Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
+  // Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
   if (prev_read_bucket <= 0 && m_readbucket.GetSize () > 0)
     {
       vector<Ptr<Connection> >::iterator it;
-      for ( it = connections.begin (); it != connections.end (); ++it )
-        {
-          Ptr<Connection> conn = *it;
-          NS_ASSERT (conn);
-          conn->ScheduleRead (Time ("10ns"));
+      vector<Ptr<Connection> >::iterator tmpit;
+      
+      if (m_scheduleReadHead == 0) {
+        tmpit = connections.begin();
+      } else {
+        for (it = connections.begin(); it != connections.end(); ++it) {
+          if (m_scheduleReadHead == *it) {
+            tmpit = it;
+            break;
+          }
         }
+      }
+      m_scheduleReadHead = 0;
+      it = tmpit;
+
+      while (it != connections.end()) {
+        Ptr<Connection> conn = *it;
+        NS_ASSERT(conn);
+        conn->ScheduleRead (Time ("10ns"));
+        it++;
+      }
+      for (it = connections.begin(); it != tmpit; ++it) {
+        Ptr<Connection> conn = *it;
+        NS_ASSERT (conn);
+        conn->ScheduleRead (Time ("10ns"));
+      }
+
     }
 }
 
@@ -466,12 +499,32 @@ TorApp::RefillWriteCallback (int64_t prev_write_bucket)
   if (prev_write_bucket <= 0 && m_writebucket.GetSize () > 0)
     {
       vector<Ptr<Connection> >::iterator it;
-      for ( it = connections.begin (); it != connections.end (); ++it )
-        {
-          Ptr<Connection> conn = *it;
-          NS_ASSERT (conn);
-          conn->ScheduleWrite ();
+      vector<Ptr<Connection> >::iterator tmpit;
+      
+      if (m_scheduleWriteHead == 0) {
+        tmpit = connections.begin();
+      } else {
+        for (it = connections.begin(); it != connections.end(); ++it) {
+          if (m_scheduleWriteHead == *it) {
+            tmpit = it;
+            break;
+          }
         }
+      }
+      m_scheduleWriteHead = 0;
+      it = tmpit;
+
+      while (it != connections.end()) {
+        Ptr<Connection> conn = *it;
+        NS_ASSERT(conn);
+        conn->ScheduleWrite ();
+        it++;
+      }
+      for (it = connections.begin(); it != tmpit; ++it) {
+        Ptr<Connection> conn = *it;
+        NS_ASSERT (conn);
+        conn->ScheduleWrite ();
+      }
     }
 }
 
