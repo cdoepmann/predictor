@@ -167,6 +167,9 @@ public:
   int m_windowStart;
   int m_windowIncrement;
 
+  Ptr<Connection> m_scheduleReadHead;
+  Ptr<Connection> m_scheduleWriteHead;
+
 protected:
   virtual void DoDispose (void);
 
