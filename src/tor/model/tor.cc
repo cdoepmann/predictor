@@ -461,33 +461,23 @@ TorApp::RefillReadCallback (int64_t prev_read_bucket)
   if (prev_read_bucket <= 0 && m_readbucket.GetSize () > 0)
     {
       vector<Ptr<Connection> >::iterator it;
-      vector<Ptr<Connection> >::iterator tmpit;
-      
-      if (m_scheduleReadHead == 0) {
-        tmpit = connections.begin();
-      } else {
-        for (it = connections.begin(); it != connections.end(); ++it) {
-          if (m_scheduleReadHead == *it) {
-            tmpit = it;
-            break;
-          }
-        }
-      }
-      m_scheduleReadHead = 0;
-      it = tmpit;
+      vector<Ptr<Connection> >::iterator headit;
 
-      while (it != connections.end()) {
+      headit = connections.begin();
+      if (m_scheduleReadHead != 0) {
+        headit = find(connections.begin(),connections.end(),m_scheduleReadHead);
+        m_scheduleReadHead = 0;
+      }
+
+      it = headit;
+      do {
         Ptr<Connection> conn = *it;
         NS_ASSERT(conn);
         conn->ScheduleRead (Time ("10ns"));
-        it++;
-      }
-      for (it = connections.begin(); it != tmpit; ++it) {
-        Ptr<Connection> conn = *it;
-        NS_ASSERT (conn);
-        conn->ScheduleRead (Time ("10ns"));
-      }
-
+        if (++it == connections.end ()) {
+          it = connections.begin ();
+        }
+      } while (it != headit);
     }
 }
 
@@ -499,32 +489,23 @@ TorApp::RefillWriteCallback (int64_t prev_write_bucket)
   if (prev_write_bucket <= 0 && m_writebucket.GetSize () > 0)
     {
       vector<Ptr<Connection> >::iterator it;
-      vector<Ptr<Connection> >::iterator tmpit;
-      
-      if (m_scheduleWriteHead == 0) {
-        tmpit = connections.begin();
-      } else {
-        for (it = connections.begin(); it != connections.end(); ++it) {
-          if (m_scheduleWriteHead == *it) {
-            tmpit = it;
-            break;
-          }
-        }
-      }
-      m_scheduleWriteHead = 0;
-      it = tmpit;
+      vector<Ptr<Connection> >::iterator headit;
 
-      while (it != connections.end()) {
+      headit = connections.begin();
+      if (m_scheduleWriteHead != 0) {
+        headit = find(connections.begin(),connections.end(),m_scheduleWriteHead);
+        m_scheduleWriteHead = 0;
+      }
+
+      it = headit;
+      do {
         Ptr<Connection> conn = *it;
         NS_ASSERT(conn);
         conn->ScheduleWrite ();
-        it++;
-      }
-      for (it = connections.begin(); it != tmpit; ++it) {
-        Ptr<Connection> conn = *it;
-        NS_ASSERT (conn);
-        conn->ScheduleWrite ();
-      }
+        if (++it == connections.end ()) {
+          it = connections.begin ();
+        }
+      } while (it != headit);
     }
 }
 
