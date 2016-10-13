@@ -407,7 +407,7 @@ public:
       {
         cell = cellMap[seq];
       }
-    wasRetransmit = true;
+    wasRetransmit = true; //implicitely assume that it is a retransmit
     return cell;
   }
 
