@@ -337,7 +337,7 @@ PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream,
   ttfbCallback = 0;
   m_requestSizeStream = requestStream;
   m_thinkTimeStream = thinkStream;
-  m_leftToSend = 0
+  m_leftToSend = 0;
 
   m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::RequestPage, this);
 }
