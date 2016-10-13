@@ -353,6 +353,8 @@ public:
   uint32_t dupackcnt;
   map< uint32_t, Ptr<Packet> > cellMap;
 
+  bool wasRetransmit;
+
   queue<uint32_t> ackq;
   queue<uint32_t> fwdq;
   EventId delFeedbackEvent;
@@ -374,13 +376,14 @@ public:
     dupackcnt = 0;
   }
 
+  // IMPORTANT: return value is now true if the cell is new, else false
+  // previous behavior was: true if tailSeq increases
   bool
   Add ( Ptr<Packet> cell, uint32_t seq )
   {
-    if (tailSeq < seq)
+    if (tailSeq < seq && cellMap.find(seq) == cellMap.end())
       {
         cellMap[seq] = cell;
-        uint32_t tmpSeq = tailSeq;
         while (cellMap.find (tailSeq + 1) != cellMap.end ())
           {
             ++tailSeq;
@@ -391,10 +394,7 @@ public:
             headSeq = virtHeadSeq = cellMap.begin ()->first;
           }
 
-        if (tmpSeq < tailSeq)
-          {
-            return true;
-          }
+        return true;
       }
     return false;
   }
@@ -407,6 +407,7 @@ public:
       {
         cell = cellMap[seq];
       }
+    wasRetransmit = true; //implicitely assume that it is a retransmit
     return cell;
   }
 
@@ -420,13 +421,24 @@ public:
         ++nextTxSeq;
       }
 
-    if (highestTxSeq < nextTxSeq)
+    if (highestTxSeq < nextTxSeq - 1)
       {
         highestTxSeq = nextTxSeq - 1;
+        wasRetransmit = false;
       }
+    else
+    {
+      wasRetransmit = true;
+    }
 
     return cell;
   }
+
+  bool WasRetransmit()
+  {
+    return wasRetransmit;
+  }
+
 
   void
   DiscardUpTo (uint32_t seq)

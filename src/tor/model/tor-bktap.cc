@@ -302,7 +302,6 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
       if (data = socket->RecvFrom (from))
         {
           data->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
-          m_readbucket.Decrement (data->GetSize ());
           read_bytes += data->GetSize ();
           Ptr<UdpChannel> ch = channels[from];
           NS_ASSERT (ch);
@@ -347,7 +346,10 @@ TorBktapApp::ReceivedRelayCell (Ptr<BktapCircuit> circ, CellDirection direction,
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
   UdpCellHeader header;
   cell->PeekHeader (header);
-  queue->Add (cell, header.seq);
+  bool newseq = queue->Add (cell, header.seq);
+  if (newseq) {
+    m_readbucket.Decrement(cell->GetSize());
+  }
   CellDirection oppdir = circ->GetOppositeDirection (direction);
   SendFeedbackCell (circ, oppdir, ACK, queue->tailSeq + 1);
 }
@@ -363,8 +365,7 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
       ++queue->dupackcnt;
       if (m_writebucket.GetSize () >= CELL_PAYLOAD_SIZE && queue->dupackcnt > 2)
         {
-          uint32_t bytes_written = FlushPendingCell (circ,direction,true);
-          m_writebucket.Decrement (bytes_written);
+          FlushPendingCell (circ,direction,true);
           queue->dupackcnt = 0;
         }
     }
@@ -529,7 +530,6 @@ TorBktapApp::WriteCallback ()
 
   if (bytes_written > 0)
     {
-      m_writebucket.Decrement (bytes_written);
       // try flushing more ...
       if (writeevent.IsExpired ())
         {
@@ -597,6 +597,10 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
           circ->IncrementStats (direction,0,bytes_written);
           SendFeedbackCell (circ, oppdir, FWD, queue->highestTxSeq + 1);
         }
+
+      if (!queue->WasRetransmit()) {
+        m_writebucket.Decrement(bytes_written);
+      }
 
       return bytes_written;
     }
@@ -687,8 +691,7 @@ TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection direction)
 {
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
   queue->nextTxSeq = queue->headSeq;
-  uint32_t bytes_written = FlushPendingCell (circ,direction);
-  m_writebucket.Decrement (bytes_written);
+  FlushPendingCell (circ,direction);
 }
 
 Ptr<BktapCircuit>
