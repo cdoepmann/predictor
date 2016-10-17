@@ -5,6 +5,9 @@
 #include "cell-header.h"
 
 #include "ns3/point-to-point-net-device.h"
+#include "ns3/uinteger.h"
+#include "ns3/traced-value.h"
+#include "ns3/trace-source-accessor.h"
 
 #define ACK 1
 #define FWD 2
@@ -339,10 +342,10 @@ public:
 
 
 
-class SeqQueue : public SimpleRefCount<SeqQueue>
+class SeqQueue : public Object
 {
 public:
-  uint32_t cwnd;
+  TracedValue<uint32_t> cwnd;
   uint32_t ssthresh;
   uint32_t nextTxSeq;
   uint32_t highestTxSeq;
@@ -374,6 +377,20 @@ public:
     begRttSeq = 1;
     ssthresh = pow (2,10);
     dupackcnt = 0;
+  }
+  
+  static TypeId
+  GetTypeId (void)
+  {
+    static TypeId tid = TypeId ("SeqQueue")
+      .SetParent (Object::GetTypeId())
+      .AddConstructor<SeqQueue> ()
+      .AddTraceSource ("CongestionWindow",
+                       "The BackTap congestion window (cwnd).",
+                       MakeTraceSourceAccessor(&SeqQueue::cwnd),
+                       "ns3::TracedValueCallback::Uint32")
+      ;
+    return tid;
   }
 
   // IMPORTANT: return value is now true if the cell is new, else false

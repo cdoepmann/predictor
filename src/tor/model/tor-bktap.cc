@@ -8,7 +8,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("TorBktapApp");
 NS_OBJECT_ENSURE_REGISTERED (TorBktapApp);
-
+NS_OBJECT_ENSURE_REGISTERED (SeqQueue);
 
 
 UdpChannel::UdpChannel ()
@@ -78,8 +78,8 @@ UdpChannel::ScheduleFlush ()
 
 BktapCircuit::BktapCircuit (uint16_t id) : BaseCircuit (id)
 {
-  inboundQueue = Create<SeqQueue> ();
-  outboundQueue = Create<SeqQueue> ();
+  inboundQueue = CreateObject<SeqQueue> ();
+  outboundQueue = CreateObject<SeqQueue> ();
 }
 
 CellDirection
@@ -404,13 +404,13 @@ TorBktapApp::CongestionAvoidance (Ptr<SeqQueue> queue, Time baseRtt)
           --queue->cwnd;
         }
 
-      if (queue->cwnd < 1)
+      if ((uint32_t) queue->cwnd < 1)
         {
           queue->cwnd = 1;
         }
 
       double maxexp = m_burst.GetBitRate () / 8 / CELL_PAYLOAD_SIZE * baseRtt.GetSeconds ();
-      queue->cwnd = min (queue->cwnd, (uint32_t) maxexp);
+      queue->cwnd = min ((uint32_t) queue->cwnd, (uint32_t) maxexp);
 
       queue->virtRtt.ResetCurrRtt ();
 
@@ -440,8 +440,8 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
     {
       queue->begRttSeq = queue->nextTxSeq;
       CongestionAvoidance (queue,ch->rttEstimator.baseRtt);
-      queue->ssthresh = min (queue->cwnd,queue->ssthresh);
-      queue->ssthresh = max (queue->ssthresh,queue->cwnd / 2);
+      queue->ssthresh = min ((uint32_t) queue->cwnd, (uint32_t) queue->ssthresh);
+      queue->ssthresh = max ((uint32_t) queue->ssthresh, (uint32_t) queue->cwnd / 2);
     }
   else if (queue->cwnd <= queue->ssthresh)
     {
@@ -469,7 +469,7 @@ TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
   CellDirection oppdir = circ->GetOppositeDirection (direction);
   Ptr<SeqQueue> queue = circ->GetQueue (oppdir);
 
-  uint32_t max_read = (queue->cwnd - queue->VirtSize () <= 0) ? 0 : queue->cwnd - queue->VirtSize ();
+  uint32_t max_read = ((uint32_t) queue->cwnd - queue->VirtSize () <= 0) ? 0 : (uint32_t) queue->cwnd - queue->VirtSize ();
   max_read *= CELL_PAYLOAD_SIZE;
 
   uint32_t read_bytes = 0;
