@@ -579,6 +579,12 @@ public:
     return inf < 0 ? 0 : (uint32_t) inf;
   }
 
+  bool
+  PackageInflight ()
+  {
+    return headSeq != highestTxSeq;
+  }
+
 };
 
 
@@ -593,7 +599,7 @@ public:
   uint8_t GetType ();
   bool SpeaksCells ();
 
-  void ScheduleFlush ();
+  void ScheduleFlush (bool=false);
   void Flush ();
   EventId m_flushEvent;
   queue<Ptr<Packet> > m_flushQueue;
@@ -685,6 +691,9 @@ public:
   void PushFeedbackCell (Ptr<BktapCircuit>, CellDirection);
   void ScheduleRto (Ptr<BktapCircuit>, CellDirection, bool = false);
   void Rto (Ptr<BktapCircuit>, CellDirection);
+
+  static void SetNagle(bool);
+  static bool s_nagle;
 
   EventId writeevent;
   EventId readevent;
