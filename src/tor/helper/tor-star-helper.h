@@ -23,6 +23,8 @@ public:
   void AddCircuit (int, string, string, string, Ptr<PseudoClientSocket> clientSocket = 0);
   void SetRelayAttribute (string, string, const AttributeValue &value);
   void SetStartTimeStream (Ptr<RandomVariableStream>);
+  void RegisterTtfbCallback (void (*)(int, double, string), string);
+  void RegisterTtlbCallback (void (*)(int, double, string), string);
   void SetRtt (Time);
   void DisableProxies (bool);
   void EnablePcap (bool);

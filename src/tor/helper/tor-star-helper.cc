@@ -114,6 +114,31 @@ TorStarHelper::DisableProxies (bool disableProxies)
 }
 
 void
+TorStarHelper::RegisterTtfbCallback (void (*ttfb)(int, double, string), string hint)
+{
+  NS_ASSERT (m_circuits.size () > 0 );
+  map<int,CircuitDescriptor>::iterator i;
+  for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
+    {
+      CircuitDescriptor desc = i->second;
+      desc.m_clientSocket->SetTtfbCallback (ttfb, desc.id, hint);
+    }
+}
+
+void
+TorStarHelper::RegisterTtlbCallback (void (*ttlb)(int, double, string), string hint)
+{
+  NS_ASSERT (m_circuits.size () > 0);
+  map<int,CircuitDescriptor>::iterator i;
+  for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
+    {
+      CircuitDescriptor desc = i->second;
+      desc.m_clientSocket->SetTtlbCallback (ttlb, desc.id, hint);
+    }
+}
+
+
+void
 TorStarHelper::ParseFile (string filename, uint32_t m)
 {
   ifstream f;
