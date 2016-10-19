@@ -27,7 +27,11 @@ TorBaseApp::GetTypeId (void)
                    MakeDataRateAccessor (&TorBaseApp::m_burst), MakeDataRateChecker ())
     .AddAttribute ("Refilltime", "Refill interval of the token bucket.",
                    TimeValue (Time ("100ms")),
-                   MakeTimeAccessor (&TorBaseApp::m_refilltime), MakeTimeChecker ());
+                   MakeTimeAccessor (&TorBaseApp::m_refilltime), MakeTimeChecker ())
+    .AddTraceSource ("AppStarted",
+                     "Trace indicating that this app was started.",
+                     MakeTraceSourceAccessor (&TorBaseApp::m_triggerAppStart),
+                     "ns3::TorBaseApp::TorAppStartedCallback");
   return tid;
 }
 

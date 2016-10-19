@@ -58,6 +58,10 @@ public:
   TokenBucket m_readbucket;
   map<uint16_t,Ptr<BaseCircuit> > baseCircuits;
 
+  // Callback to trigger after the app has started
+  TracedCallback<Ptr<TorBaseApp> // this app that was just started
+                 > m_triggerAppStart;
+  typedef void (* TorAppStartedCallback) (Ptr<TorBaseApp>);
 };
 
 class BaseCircuit : public SimpleRefCount<BaseCircuit>

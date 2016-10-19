@@ -25,7 +25,11 @@ TorApp::GetTypeId (void)
     .AddAttribute ("WindowIncrement", "End-to-end sliding window increment (in cells).",
                    IntegerValue (100),
                    MakeIntegerAccessor (&TorApp::m_windowIncrement),
-                   MakeIntegerChecker<int> ());
+                   MakeIntegerChecker<int> ())
+    .AddTraceSource ("NewSocket",
+                     "Trace indicating that a new socket has been installed.",
+                     MakeTraceSourceAccessor (&TorApp::m_triggerNewSocket),
+                     "ns3::TorApp::TorNewSocketCallback");
   return tid;
 }
 
@@ -72,6 +76,7 @@ TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, 
   Ptr<Connection> p_conn = AddConnection (p_ip, p_conntype);
   Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
   p_conn->SetSocket (clientSocket);
+  m_triggerNewSocket(this, INBOUND, clientSocket);
 
   Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
 
@@ -166,6 +171,7 @@ TorApp::StartApplication (void)
           socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
           socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
           conn->SetSocket (socket);
+          m_triggerNewSocket(this, OUTBOUND, socket);
         }
 
       if (ipmask.IsMatch (conn->GetRemote (), Ipv4Address ("127.0.0.1")) )
@@ -177,6 +183,7 @@ TorApp::StartApplication (void)
               // socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
+              m_triggerNewSocket(this, OUTBOUND, socket);
             }
 
           if (conn->GetType () == PROXYEDGE)
@@ -185,6 +192,7 @@ TorApp::StartApplication (void)
               if (!socket)
                 {
                   socket = CreateObject<PseudoClientSocket> ();
+                  m_triggerNewSocket(this, INBOUND, socket);
                 }
 
               socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
@@ -195,6 +203,7 @@ TorApp::StartApplication (void)
         }
     }
 
+  m_triggerAppStart (Ptr<TorBaseApp>(this));
   NS_LOG_INFO ("StartApplication " << m_name << " ip=" << m_ip);
 }
 
@@ -427,6 +436,7 @@ TorApp::HandleAccept (Ptr<Socket> s, const Address& from)
 
   NS_ASSERT (conn);
   conn->SetSocket (s);
+  m_triggerNewSocket(this, INBOUND, s);
 
   s->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
   // s->SetSendCallback (MakeCallback(&TorApp::ConnWriteCallback, this));

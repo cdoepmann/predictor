@@ -170,6 +170,13 @@ public:
   Ptr<Connection> m_scheduleReadHead;
   Ptr<Connection> m_scheduleWriteHead;
 
+  // Callback to trigger after a new socket is established
+  TracedCallback<Ptr<TorBaseApp>, // this app
+                 CellDirection,   // the direction of the new socket
+                 Ptr<Socket>      // the new socket itself
+                 > m_triggerNewSocket;
+  typedef void (* TorNewSocketCallback) (Ptr<TorBaseApp>, CellDirection, Ptr<Socket>);
+
 protected:
   virtual void DoDispose (void);
 
