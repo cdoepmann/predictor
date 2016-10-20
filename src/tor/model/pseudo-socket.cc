@@ -7,12 +7,13 @@ namespace ns3 {
 
 NS_OBJECT_ENSURE_REGISTERED (PseudoSocket);
 
-// static TypeId PseudoSocket::GetTypeId (void) {
-//   static TypeId tid = TypeId ("ns3::PseudoSocket")
-//     .SetParent<Socket> ()
-//   ;
-//   return tid;
-// }
+TypeId
+PseudoSocket::GetTypeId (void) {
+  static TypeId tid = TypeId ("ns3::PseudoSocket")
+    .SetParent<Socket> ()
+  ;
+  return tid;
+}
 
 PseudoSocket::PseudoSocket ()
 {
@@ -208,6 +209,17 @@ PseudoBulkSocket::Recv (uint32_t maxSize, uint32_t flags)
 
 
 
+TypeId
+PseudoServerSocket::GetTypeId (void) {
+  static TypeId tid = TypeId ("ns3::PseudoServerSocket")
+    .SetParent<PseudoSocket> ()
+    .AddTraceSource ("StartResponse",
+                     "Trace indicating that the transmission of a response has started.",
+                     MakeTraceSourceAccessor (&PseudoServerSocket::m_triggerStartResponse),
+                     "ns3::PseudoServerSocket::TorStartResponse");
+  ;
+  return tid;
+}
 
 PseudoServerSocket::PseudoServerSocket ()
 {
@@ -307,6 +319,7 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
       Time waitTime = MilliSeconds (m_rng->GetInteger ());
       m_notBefore = Simulator::Now() + waitTime;
       Simulator::Schedule (waitTime, &PseudoServerSocket::NotifyDataRecv, this);
+      Simulator::Schedule (waitTime, &PseudoServerSocket::m_triggerStartResponse, this);
     }
   else
     {

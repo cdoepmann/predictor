@@ -39,7 +39,7 @@ class PseudoSocket : public Socket
 public:
   PseudoSocket ();
   // ~PseudoSocket();
-  // static TypeId GetTypeId (void);
+  static TypeId GetTypeId (void);
 
   enum SocketErrno GetErrno (void) const;
   enum SocketType GetSocketType (void) const;
@@ -95,11 +95,17 @@ class PseudoServerSocket : public PseudoSocket
 {
 public:
   PseudoServerSocket ();
+  static TypeId GetTypeId (void);
 
   uint32_t GetTxAvailable () const;
   uint32_t GetRxAvailable () const;
   int Send (Ptr<Packet> p, uint32_t flags);
   Ptr<Packet> Recv (uint32_t maxSize, uint32_t flags);
+
+  // Callback to trigger when a new response has been started
+  TracedCallback<> m_triggerStartResponse;
+  typedef void (* TorStartResponse) ();
+
 private:
   uint32_t m_leftToSend;
   uint32_t m_leftToRead;

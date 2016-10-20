@@ -137,7 +137,11 @@ TorBktapApp::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::TorBktapApp")
     .SetParent<TorBaseApp> ()
-    .AddConstructor<TorBktapApp> ();
+    .AddConstructor<TorBktapApp> ()
+    .AddTraceSource ("NewServerSocket",
+                     "Trace indicating that a new pseudo server socket has been installed.",
+                     MakeTraceSourceAccessor (&TorBktapApp::m_triggerNewPseudoServerSocket),
+                     "ns3::TorApp::TorNewPseudoServerSocketCallback");
   return tid;
 }
 
@@ -225,6 +229,7 @@ TorBktapApp::StartApplication (void)
               Ptr<Socket> socket = CreateObject<PseudoServerSocket> ();
               socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
               ch->SetSocket (socket);
+              m_triggerNewPseudoServerSocket(this, DynamicCast<PseudoServerSocket>(socket));
             }
 
           if (ch->GetType () == PROXYEDGE)

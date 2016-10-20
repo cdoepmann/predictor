@@ -600,6 +600,12 @@ public:
   EventId readevent;
   Ptr<Queue> m_devQ;
   uint32_t m_devQlimit;
+
+  // Callback to trigger after a new pseudo server socket is added
+  TracedCallback<Ptr<TorBktapApp>, // this app
+                 Ptr<PseudoServerSocket>      // the new pseudo socket itself
+                 > m_triggerNewPseudoServerSocket;
+  typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBktapApp>, Ptr<PseudoServerSocket>);
 };
 
 
