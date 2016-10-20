@@ -105,6 +105,11 @@ private:
   uint32_t m_leftToRead;
   Ptr<Packet> m_request;
   Ptr<ExponentialRandomVariable> m_rng;
+
+  // Do not send out data via Recv(...) before this time. This is necessary
+  // in order to enforce the think time as clients may try to Recv(...) before
+  // they are notified (e.g. due to token bucket refilling).
+  Time m_notBefore;
 };
 
 

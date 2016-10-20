@@ -223,6 +223,9 @@ PseudoServerSocket::PseudoServerSocket ()
 uint32_t
 PseudoServerSocket::GetRxAvailable () const
 {
+  if(Simulator::Now() < m_notBefore)
+    return 0;
+
   return m_leftToSend;
 }
 
@@ -240,7 +243,7 @@ PseudoServerSocket::GetTxAvailable () const
 Ptr<Packet>
 PseudoServerSocket::Recv (uint32_t maxSize, uint32_t flags)
 {
-  if (m_leftToSend <= 0)
+  if (m_leftToSend <= 0 || Simulator::Now() < m_notBefore)
     {
       return 0;
     }
@@ -300,7 +303,10 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
       RequestHeader h;
       m_request->PeekHeader (h);
       m_leftToSend = h.GetRequestSize ();
-      Simulator::Schedule (MilliSeconds (m_rng->GetInteger ()), &PseudoServerSocket::NotifyDataRecv, this);
+
+      Time waitTime = MilliSeconds (m_rng->GetInteger ());
+      m_notBefore = Simulator::Now() + waitTime;
+      Simulator::Schedule (waitTime, &PseudoServerSocket::NotifyDataRecv, this);
     }
   else
     {
