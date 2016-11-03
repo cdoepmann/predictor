@@ -31,7 +31,7 @@ TorFairApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_
   Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
   p_conn->SetSocket (clientSocket);
 
-  Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
+  Ptr<Circuit> circ = CreateObject<Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
 
   // add to circuit list maintained by every connection
   AddActiveCircuit (p_conn, circ);

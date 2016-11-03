@@ -9,6 +9,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("TorBaseApp");
 NS_OBJECT_ENSURE_REGISTERED (TorBaseApp);
+NS_OBJECT_ENSURE_REGISTERED (BaseCircuit);
 
 TypeId
 TorBaseApp::GetTypeId (void)

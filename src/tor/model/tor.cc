@@ -11,6 +11,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("TorApp");
 NS_OBJECT_ENSURE_REGISTERED (TorApp);
+NS_OBJECT_ENSURE_REGISTERED (Circuit);
 
 TypeId
 TorApp::GetTypeId (void)
@@ -78,7 +79,7 @@ TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, 
   p_conn->SetSocket (clientSocket);
   m_triggerNewSocket(this, INBOUND, clientSocket);
 
-  Ptr<Circuit> circ = Create<Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
+  Ptr<Circuit> circ = CreateObject<Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
 
   // add to circuit list maintained by every connection
   AddActiveCircuit (p_conn, circ);

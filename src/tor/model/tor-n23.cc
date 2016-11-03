@@ -5,6 +5,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("TorN23App");
 NS_OBJECT_ENSURE_REGISTERED (TorN23App);
+NS_OBJECT_ENSURE_REGISTERED (N23Circuit);
 
 
 TorN23App::TorN23App ()
@@ -40,7 +41,7 @@ TorN23App::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_i
   Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
   p_conn->SetSocket (clientSocket);
 
-  Ptr<N23Circuit> circ = Create<N23Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
+  Ptr<N23Circuit> circ = CreateObject<N23Circuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
 
   // add to circuit list maintained by every connection
   AddActiveCircuit (p_conn, circ);

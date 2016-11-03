@@ -548,6 +548,14 @@ public:
   CellDirection GetDirection (Ptr<UdpChannel>);
   Ptr<SeqQueue> GetQueue (CellDirection);
   Ptr<UdpChannel> GetChannel (CellDirection direction);
+  
+  static TypeId
+  GetTypeId (void)
+  {
+    static TypeId tid = TypeId ("BktapCircuit")
+      .SetParent (BaseCircuit::GetTypeId());
+    return tid;
+  }
 };
 
 

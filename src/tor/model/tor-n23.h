@@ -25,6 +25,14 @@ public:
   int n_creditBalance;
   uint32_t p_cellsforwarded;
   uint32_t n_cellsforwarded;
+  
+  static TypeId
+  GetTypeId (void)
+  {
+    static TypeId tid = TypeId ("N23Circuit")
+      .SetParent (BaseCircuit::GetTypeId());
+    return tid;
+  }
 
 };
 

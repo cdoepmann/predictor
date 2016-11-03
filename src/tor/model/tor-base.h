@@ -64,7 +64,7 @@ public:
   typedef void (* TorAppStartedCallback) (Ptr<TorBaseApp>);
 };
 
-class BaseCircuit : public SimpleRefCount<BaseCircuit>
+class BaseCircuit : public Object
 {
 public:
   BaseCircuit ();
@@ -78,6 +78,14 @@ public:
   uint32_t GetBytesWritten (CellDirection);
   void IncrementStats (CellDirection,uint32_t,uint32_t);
   void ResetStats ();
+  
+  static TypeId
+  GetTypeId (void)
+  {
+    static TypeId tid = TypeId ("BaseCircuit")
+      .SetParent (Object::GetTypeId());
+    return tid;
+  }
 
 protected:
   uint16_t m_id;

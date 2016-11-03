@@ -9,6 +9,7 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("TorBktapApp");
 NS_OBJECT_ENSURE_REGISTERED (TorBktapApp);
 NS_OBJECT_ENSURE_REGISTERED (SeqQueue);
+NS_OBJECT_ENSURE_REGISTERED (BktapCircuit);
 
 
 UdpChannel::UdpChannel ()
@@ -154,7 +155,7 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
   // ensure unique circ_id
   NS_ASSERT (circuits[id] == 0);
 
-  Ptr<BktapCircuit> circ = Create<BktapCircuit> (id);
+  Ptr<BktapCircuit> circ = CreateObject<BktapCircuit> (id);
   circuits[id] = circ;
   baseCircuits[id] = circ;
 

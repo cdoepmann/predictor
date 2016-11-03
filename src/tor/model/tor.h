@@ -4,6 +4,10 @@
 #include "tor-base.h"
 #include "cell-header.h"
 
+#include "ns3/uinteger.h"
+#include "ns3/traced-value.h"
+#include "ns3/trace-source-accessor.h"
+
 namespace ns3 {
 
 #define CIRCWINDOW_START 1000
@@ -51,6 +55,23 @@ public:
   void IncPackageWindow ();
   uint32_t GetDeliverWindow ();
   void IncDeliverWindow ();
+   
+  static TypeId
+  GetTypeId (void)
+  {
+    static TypeId tid = TypeId ("Circuit")
+      .SetParent (BaseCircuit::GetTypeId())
+      .AddTraceSource ("PackageWindow",
+                       "The vanilla Tor package window.",
+                       MakeTraceSourceAccessor(&Circuit::package_window),
+                       "ns3::TracedValueCallback::int32")
+      .AddTraceSource ("DeliverWindow",
+                       "The vanilla Tor deliver window.",
+                       MakeTraceSourceAccessor(&Circuit::deliver_window),
+                       "ns3::TracedValueCallback::int32")
+      ;
+    return tid;
+  }
 
 protected:
   Ptr<Packet> PopQueue (queue<Ptr<Packet> >*);
@@ -70,12 +91,12 @@ protected:
   /** How many relay data cells can we package (read from edge streams)
    * on this circuit before we receive a circuit-level sendme cell asking
    * for more? */
-  int package_window;
+  TracedValue<int32_t> package_window;
   /** How many relay data cells will we deliver (write to edge streams)
    * on this circuit? When deliver_window gets low, we send some
    * circuit-level sendme cells to indicate that we're willing to accept
    * more. */
-  int deliver_window;
+  TracedValue<int32_t> deliver_window;
 
   int m_windowStart;
   int m_windowIncrement;
