@@ -79,6 +79,12 @@ public:
    */
   void SetCwMax (uint32_t maxCw);
   /**
+   * Set the TXOP limit.
+   *
+   * \param txopLimit the TXOP limit
+   */
+  void SetTxopLimit (Time txopLimit);
+  /**
    * Return the number of slots that make up an AIFS.
    *
    * \return the number of slots that make up an AIFS
@@ -96,6 +102,13 @@ public:
    * \return the maximum congestion window size
    */
   uint32_t GetCwMax (void) const;
+  /**
+   * Return the TXOP limit.
+   *
+   * \return the TXOP limit
+   */
+  Time GetTxopLimit (void) const;
+
   /**
    * Update the value of the CW variable to take into account
    * a transmission success or a transmission abort (stop transmission
@@ -202,6 +215,9 @@ private:
    * that a normal collision occured, that is, that
    * the medium was busy when access was requested.
    *
+   * This may also be called if the request for access occurred within
+   * the DIFS or AIFS between two frames.
+   *
    * The subclass is expected to start a new backoff by
    * calling DcfState::StartBackoffNow and DcfManager::RequestAccess
    * is access is still needed.
@@ -240,6 +256,7 @@ private:
   uint32_t m_cwMin;
   uint32_t m_cwMax;
   uint32_t m_cw;
+  Time m_txopLimit;
   bool m_accessRequested;
 };
 
@@ -515,12 +532,20 @@ private:
   void DoGrantAccess (void);
   /**
    * Check if the device is busy sending or receiving,
-   * or NAV busy.
+   * or NAV or CCA busy.
    *
    * \return true if the device is busy,
    *         false otherwise
    */
   bool IsBusy (void) const;
+  /**
+   * Check if the device is between frames (in DIFS or AIFS interval)
+   *
+   * \param state the state to check
+   * \return true if the device is within AIFS,
+   *         false otherwise
+   */
+  bool IsWithinAifs (DcfState* state) const;
 
   /**
    * typedef for a vector of DcfStates

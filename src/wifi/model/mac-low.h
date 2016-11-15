@@ -126,7 +126,13 @@ public:
    * Invoked when ns3::MacLow wants to start a new transmission
    * as configured by MacLowTransmissionParameters::EnableNextData.
    * The listener is expected to call again MacLow::StartTransmission
-   * with the "next" data to send.
+   * with the "next" fragment to send.
+   */
+  virtual void StartNextFragment (void) = 0;
+  /**
+   * Invoked when ns3::MacLow wants to continue the TXOP.
+   * The listener is expected to call again MacLow::StartTransmission
+   * with the "next" packet to send.
    */
   virtual void StartNext (void) = 0;
   /**
@@ -359,7 +365,7 @@ public:
    *
    * Add the transmission duration of the next data to the
    * durationId of the outgoing packet and call
-   * MacLowTransmissionListener::StartNext at the end of
+   * MacLowTransmissionListener::StartNextFragment at the end of
    * the current transmission + SIFS.
    */
   void EnableNextData (uint32_t size);
@@ -703,6 +709,10 @@ public:
                                   const WifiMacHeader* hdr,
                                   const MacLowTransmissionParameters& parameters) const;
 
+  Time CalculateOverallTxTime (Ptr<const Packet> packet,
+                               const WifiMacHeader* hdr,
+                               const MacLowTransmissionParameters &params) const;
+
   /**
    * \param packet packet to send
    * \param hdr 802.11 header for packet to send
@@ -736,7 +746,7 @@ public:
    * This method is typically invoked by the lower PHY layer to notify
    * the MAC layer that a packet was unsuccessfully received.
    */
-  void ReceiveError (Ptr<Packet> packet, double rxSnr, bool isEndOfFrame);
+  void ReceiveError (Ptr<Packet> packet, double rxSnr);
   /**
    * \param duration switching delay duration.
    *
@@ -823,7 +833,6 @@ public:
    */
   void FlushAggregateQueue (void);
 
-protected:
   /**
    * Return a TXVECTOR for the DATA frame given the destination.
    * The function consults WifiRemoteStationManager, which controls the rate
@@ -834,6 +843,7 @@ protected:
    * \return TXVECTOR for the given packet
    */
   virtual WifiTxVector GetDataTxVector (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
+
 private:
   /**
    * Cancel all scheduled events. Called before beginning a transmission
@@ -1026,9 +1036,6 @@ private:
    */
   bool NeedCtsToSelf (void);
 
-  Time CalculateOverallTxTime (Ptr<const Packet> packet,
-                               const WifiMacHeader* hdr,
-                               const MacLowTransmissionParameters &params) const;
   void NotifyNav (Ptr<const Packet> packet,const WifiMacHeader &hdr, WifiPreamble preamble);
   /**
    * Reset NAV with the given duration.
@@ -1137,11 +1144,14 @@ private:
    * \param duration
    */
   void SendDataAfterCts (Mac48Address source, Time duration);
+
   /**
    * Event handler that is usually scheduled to fired at the appropriate time
    * after completing transmissions.
    */
+  void WaitSifsAfterEndTxFragment (void);
   void WaitSifsAfterEndTx (void);
+
   /**
    * A transmission that does not require an ACK has completed.
    */
@@ -1378,7 +1388,6 @@ private:
   uint8_t m_sentMpdus;                //!< Number of transmitted MPDUs in an A-MPDU that have not been acknowledged yet
   Ptr<WifiMacQueue> m_aggregateQueue; //!< Queue used for MPDU aggregation
   WifiTxVector m_currentTxVector;     //!< TXVECTOR used for the current packet transmission
-  bool m_receivedAtLeastOneMpdu;      //!< Flag whether an MPDU has already been successfully received while receiving an A-MPDU
   std::vector<Item> m_txPackets;      //!< Contain temporary items to be sent with the next A-MPDU transmission, once RTS/CTS exchange has succeeded. It is not used in other cases.
   uint32_t m_nTxMpdus;                //!<Holds the number of transmitted MPDUs in the last A-MPDU transmission
 };

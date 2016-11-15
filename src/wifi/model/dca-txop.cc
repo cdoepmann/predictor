@@ -119,9 +119,12 @@ public:
   {
     m_txop->MissedAck ();
   }
+  virtual void StartNextFragment (void)
+  {
+    m_txop->StartNextFragment ();
+  }
   virtual void StartNext (void)
   {
-    m_txop->StartNext ();
   }
   virtual void Cancel (void)
   {
@@ -254,6 +257,13 @@ DcaTxop::SetAifsn (uint32_t aifsn)
   m_dcf->SetAifsn (aifsn);
 }
 
+void
+DcaTxop::SetTxopLimit (Time txopLimit)
+{
+  NS_LOG_FUNCTION (this << txopLimit);
+  m_dcf->SetTxopLimit (txopLimit);
+}
+
 uint32_t
 DcaTxop::GetMinCw (void) const
 {
@@ -273,6 +283,13 @@ DcaTxop::GetAifsn (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_dcf->GetAifsn ();
+}
+
+Time
+DcaTxop::GetTxopLimit (void) const
+{
+  NS_LOG_FUNCTION (this);
+  return m_dcf->GetTxopLimit ();
 }
 
 void
@@ -501,7 +518,6 @@ void
 DcaTxop::NotifyCollision (void)
 {
   NS_LOG_FUNCTION (this);
-  NS_LOG_DEBUG ("collision");
   m_dcf->StartBackoffNow (m_rng->GetNext (0, m_dcf->GetCw ()));
   RestartAccessIfNeeded ();
 }
@@ -619,7 +635,7 @@ DcaTxop::MissedAck (void)
 }
 
 void
-DcaTxop::StartNext (void)
+DcaTxop::StartNextFragment (void)
 {
   NS_LOG_FUNCTION (this);
   NS_LOG_DEBUG ("start next packet fragment");
