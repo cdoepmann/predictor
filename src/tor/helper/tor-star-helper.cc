@@ -207,15 +207,19 @@ TorStarHelper::BuildTopology ()
     {
       string nscStack = "liblinux2.6.26.so";
       m_stackHelper.SetTcp ("ns3::NscTcpL4Protocol","Library",StringValue (nscStack));
-      if (m_nscTcpCong != "cubic")
-        {
-          Config::Set ("/NodeList/*/$ns3::Ns3NscStack<linux2.6.26>/net.ipv4.tcp_congestion_control", StringValue (m_nscTcpCong));
-        }
     }
 
   for (int i = 0; i < m_nSpokes; ++i)
     {
       m_stackHelper.Install (m_starHelper->GetSpokeNode (i));
+    }
+
+  if (m_nscTcpCong.size () > 0)
+    {
+      if (m_nscTcpCong != "cubic")
+        {
+          Config::Set ("/NodeList/*/$ns3::Ns3NscStack<linux2.6.26>/net.ipv4.tcp_congestion_control", StringValue (m_nscTcpCong));
+        }
     }
 
   //assign ipv4
