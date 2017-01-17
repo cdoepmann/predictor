@@ -2,8 +2,10 @@
 
 TorStarHelper::TorStarHelper ()
 {
-  m_p2pHelper.SetDeviceAttribute ("DataRate", StringValue ("10Gb/s"));
-  m_p2pHelper.SetChannelAttribute ("Delay", StringValue ("20ms"));
+  m_underlayLinkDelay = Time("20ms");
+  m_underlayRate = DataRate("10Gb/s");
+  m_p2pHelper.SetDeviceAttribute ("DataRate", DataRateValue(m_underlayRate));
+  m_p2pHelper.SetChannelAttribute ("Delay", TimeValue(m_underlayLinkDelay));
   m_rng = CreateObject<UniformRandomVariable> ();
   m_startTimeStream = 0;
   m_starHelper = 0;
@@ -73,7 +75,15 @@ TorStarHelper::SetRelayAttribute (string relayName, string attrName, const Attri
 void
 TorStarHelper::SetRtt (Time rtt)
 {
-  m_p2pHelper.SetChannelAttribute ("Delay", TimeValue (rtt / 4.0));
+  m_underlayLinkDelay = rtt/4.0;
+  m_p2pHelper.SetChannelAttribute ("Delay", TimeValue (m_underlayLinkDelay));
+}
+
+void
+TorStarHelper::SetUnderlayRate (DataRate rate)
+{
+  m_underlayRate = rate;
+  m_p2pHelper.SetDeviceAttribute ("DataRate", DataRateValue(m_underlayRate));
 }
 
 void
@@ -390,6 +400,33 @@ TorStarHelper::GetProxyName (int id)
   return ss.str ();
 }
 
+uint32_t TorStarHelper::GetBdp()
+{
+  // get bottleneck data rate
+  DataRate bottleneck = m_underlayRate;
+
+  map<string,RelayDescriptor>::iterator i;
+  for (i = m_relays.begin (); i != m_relays.end (); ++i)
+  {
+    DataRateValue rate_value;
+    i->second.tapp->GetAttribute("BandwidthRate", rate_value);
+    DataRate rate = rate_value.Get();
+
+    DataRateValue burst_value;
+    i->second.tapp->GetAttribute("BandwidthBurst", burst_value);
+    DataRate burst = burst_value.Get();
+
+    NS_ASSERT(rate == burst);
+
+    if(rate < bottleneck)
+      bottleneck = rate;
+  }
+
+  // get delay
+  Time delay = m_disableProxies ? m_underlayLinkDelay*8 : m_underlayLinkDelay*12;
+
+  return static_cast<uint32_t>(delay.GetSeconds()/8.0 * bottleneck.GetBitRate());
+}
 void
 TorStarHelper::PrintCircuits ()
 {

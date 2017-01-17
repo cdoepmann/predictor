@@ -45,7 +45,17 @@ public:
 
   string GetProxyName (int);
 
+  // Return the BDP of the current setup in bytes.
+  uint32_t GetBdp();
+
+  // Set the default underlay link data rate
+  void SetUnderlayRate (DataRate);
+
   vector<int> circuitIds;
+
+protected:
+  DataRate m_underlayRate;
+  Time m_underlayLinkDelay;
 
 private:
   class CircuitDescriptor
