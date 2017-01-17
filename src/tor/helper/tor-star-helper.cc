@@ -1,4 +1,5 @@
 #include "tor-star-helper.h"
+#include "ns3/traffic-control-helper.h"
 
 TorStarHelper::TorStarHelper ()
 {
@@ -199,6 +200,9 @@ TorStarHelper::BuildTopology ()
 {
   m_starHelper = new PointToPointStarHelper (m_nSpokes,m_p2pHelper);
 
+  // Disable high-level traffic control
+  TrafficControlHelper tch;
+
   //install stack
   m_stackHelper.Install (m_starHelper->GetHub ());
 
@@ -242,6 +246,13 @@ TorStarHelper::BuildTopology ()
   // }
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+  for (int i = 0; i < m_nSpokes; ++i)
+    {
+      tch.Uninstall (m_starHelper->GetHub()->GetDevice(i));
+      tch.Uninstall (m_starHelper->GetSpokeNode (i)->GetDevice(0));
+    }
+
   InstallCircuits ();
 }
 
