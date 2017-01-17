@@ -431,6 +431,26 @@ uint32_t TorStarHelper::GetBdp()
 
   return static_cast<uint32_t>(delay.GetSeconds()/8.0 * bottleneck.GetBitRate());
 }
+
+map<string, Ptr<PointToPointNetDevice> >
+TorStarHelper::GetRouterDevices ()
+{
+  map<string, Ptr<PointToPointNetDevice> > result;
+
+  map<string, RelayDescriptor>::const_iterator it;
+  for(it = m_relays.begin(); it != m_relays.end(); ++it)
+  {
+    string torname = it->first;
+    RelayDescriptor relay = it->second;
+
+    result[torname] = DynamicCast<PointToPointNetDevice> (
+        m_starHelper->GetHub()->GetDevice(relay.spokeId)
+    );
+  }
+
+  return result;
+}
+
 void
 TorStarHelper::PrintCircuits ()
 {

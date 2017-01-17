@@ -48,6 +48,10 @@ public:
   // Return the BDP of the current setup in bytes.
   uint32_t GetBdp();
 
+  // Get the hub net devices. Returns a map that assigns each tor node name the
+  // respective net device used to connect to it from the router (hub)
+  map<string, Ptr<PointToPointNetDevice> > GetRouterDevices ();
+
   // Set the default underlay link data rate
   void SetUnderlayRate (DataRate);
 
