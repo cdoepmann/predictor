@@ -443,11 +443,6 @@ NscTcpSocketImpl::Recv (uint32_t maxSize, uint32_t flags)
     }
 
   Ptr<Packet> p = Create<Packet> (0);
-  SocketAddressTag tag;
-  if (m_deliveryQueue.front ()->PeekPacketTag (tag))
-    {
-      p->AddPacketTag (tag);
-    }
 
   while (p->GetSize () < maxSize && m_deliveryQueue.size() > 0)
     {
