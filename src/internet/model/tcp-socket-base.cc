@@ -2747,7 +2747,8 @@ uint16_t
 TcpSocketBase::AdvertisedWindowSize (bool scale) const
 {
   NS_LOG_FUNCTION (this << scale);
-  uint32_t w = m_rxBuffer->MaxBufferSize ();
+  uint32_t w = (m_rxBuffer->MaxRxSequence () > m_rxBuffer->NextRxSequence ()) ?
+                m_rxBuffer->MaxRxSequence () - m_rxBuffer->NextRxSequence () : 0;
 
   if (scale)
     {

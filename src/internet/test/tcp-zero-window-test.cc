@@ -53,6 +53,7 @@ protected:
   bool m_windowUpdated;
   bool m_senderFinished;
   bool m_receiverFinished;
+  bool m_sentUpdate;
 };
 
 TcpZeroWindowTest::TcpZeroWindowTest (const std::string &desc)
@@ -60,7 +61,8 @@ TcpZeroWindowTest::TcpZeroWindowTest (const std::string &desc)
     m_zeroWindowProbe (false),
     m_windowUpdated (false),
     m_senderFinished (false),
-    m_receiverFinished (false)
+    m_receiverFinished (false),
+    m_sentUpdate (false)
 {
 }
 
@@ -154,10 +156,11 @@ TcpZeroWindowTest::Tx (const Ptr<const Packet> p, const TcpHeader &h, SocketWho 
         {
           NS_FATAL_ERROR ("No packets should be sent before the window update");
         }
-      else if (Simulator::Now ().GetSeconds () >= 10.0)
+      else if (Simulator::Now ().GetSeconds () >= 10.0 && !m_sentUpdate)
         {
           NS_TEST_ASSERT_MSG_EQ (h.GetWindowSize (), 2500,
                                  "Receiver window not updated");
+          m_sentUpdate = true;
         }
     }
 
@@ -180,7 +183,7 @@ TcpZeroWindowTest::Rx (const Ptr<const Packet> p, const TcpHeader &h, SocketWho 
                                  "RECEIVER window size is not 0 in the SYN-ACK");
         }
 
-      if (Simulator::Now ().GetSeconds () >= 10.0)
+      if (Simulator::Now ().GetSeconds () >= 10.0 && !m_windowUpdated)
         {
           NS_TEST_ASSERT_MSG_EQ (h.GetWindowSize (), 2500,
                                  "Receiver window not updated");
