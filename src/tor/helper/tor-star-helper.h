@@ -25,6 +25,7 @@ public:
   void SetStartTimeStream (Ptr<RandomVariableStream>);
   void RegisterTtfbCallback (void (*)(int, double, string), string);
   void RegisterTtlbCallback (void (*)(int, double, string), string);
+  void RegisterRecvCallback (void (*)(int, uint32_t, string), string);
   void SetRtt (Time);
   void DisableProxies (bool);
   void EnablePcap (bool);

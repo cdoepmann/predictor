@@ -137,6 +137,10 @@ public:
   void SetTtfbCallback (void (*)(int, double, string), int, string);
   void SetTtlbCallback (void (*)(int, double, string), int, string);
 
+  // Set a callback that will be invoked every time the client receives some
+  // usable "end-user" data.
+  void SetClientRecvCallback (void (*)(int, uint32_t, string), int, string);
+
 private:
   void RequestPage ();
   uint32_t RoundUp (uint32_t,uint32_t);
@@ -147,10 +151,13 @@ private:
   Time m_requestSent;
   void (*ttfbCallback)(int, double, string);
   void (*ttlbCallback)(int, double, string);
+  void (*recvCallback)(int, uint32_t, string);
   int m_ttfbId;
   int m_ttlbId;
+  int m_recvId;
   string m_ttfbDesc;
   string m_ttlbDesc;
+  string m_recvDesc;
   EventId m_startEvent;
 
   Ptr<RandomVariableStream> m_thinkTimeStream;

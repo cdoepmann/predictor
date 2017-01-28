@@ -348,8 +348,10 @@ PseudoClientSocket::PseudoClientSocket (Time startTime)
   m_leftToRead = 0;
   ttlbCallback = 0;
   ttfbCallback = 0;
+  recvCallback = 0;
   m_ttlbId = 0;
   m_ttfbId = 0;
+  m_recvId = 0;
 
   m_startEvent = Simulator::Schedule (startTime, &PseudoClientSocket::RequestPage, this);
 }
@@ -360,6 +362,7 @@ PseudoClientSocket::PseudoClientSocket (Ptr<RandomVariableStream> requestStream,
   m_leftToRead = 0;
   ttlbCallback = 0;
   ttfbCallback = 0;
+  recvCallback = 0;
   m_requestSizeStream = requestStream;
   m_thinkTimeStream = thinkStream;
   m_leftToSend = 0;
@@ -465,6 +468,8 @@ PseudoClientSocket::Send (Ptr<Packet> p, uint32_t flags)
   uint32_t size = p->GetSize ();
   m_leftToRead -= size;
 
+  recvCallback (m_recvId, size, m_recvDesc);
+
   if (m_leftToRead <= 0)
     {
       m_leftToRead = 0;
@@ -521,6 +526,14 @@ PseudoClientSocket::SetTtlbCallback (void (*ttlb)(int, double, string), int id, 
   m_ttlbId = id;
   m_ttlbDesc = desc;
   ttlbCallback = ttlb;
+}
+
+void
+PseudoClientSocket::SetClientRecvCallback (void (*cb)(int, uint32_t, string), int id, string desc)
+{
+  m_recvId = id;
+  m_recvDesc = desc;
+  recvCallback = cb;
 }
 
 

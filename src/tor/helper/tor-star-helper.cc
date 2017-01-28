@@ -148,6 +148,18 @@ TorStarHelper::RegisterTtlbCallback (void (*ttlb)(int, double, string), string h
     }
 }
 
+void
+TorStarHelper::RegisterRecvCallback (void (*cb)(int, uint32_t, string), string hint)
+{
+  NS_ASSERT (m_circuits.size () > 0);
+  map<int,CircuitDescriptor>::iterator i;
+  for (i = m_circuits.begin (); i != m_circuits.end (); ++i)
+    {
+      CircuitDescriptor desc = i->second;
+      desc.m_clientSocket->SetClientRecvCallback (cb, desc.id, hint);
+    }
+}
+
 
 void
 TorStarHelper::ParseFile (string filename, uint32_t m)
