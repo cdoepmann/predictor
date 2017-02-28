@@ -2,6 +2,8 @@
 #include "ns3/log.h"
 #include "tor-bktap.h"
 
+#include <sstream>
+
 using namespace std;
 
 namespace ns3 {
@@ -23,6 +25,41 @@ UdpChannel::UdpChannel (Address remote, int conntype)
   m_remote = remote;
   m_conntype = conntype;
   this->m_socket = 0;
+}
+
+string
+format_packet (Ptr<Packet> packet, bool raw=false)
+{
+  Ptr<Packet> p = packet->Copy();
+  stringstream output;
+
+  BaseCellHeader header;
+  if(!raw)
+    p->PeekHeader (header);
+
+  if (header.cellType == FDBK && !raw)
+    {
+      output << "FDBK [";
+      FdbkCellHeader h;
+      p->RemoveHeader (h);
+
+      if (h.flags & ACK)
+          output << "ACK=" << h.ack;
+
+      if (h.flags & ACK && h.flags & FWD)
+          output << "|";
+
+      if (h.flags & FWD)
+          output << "FWD=" << h.fwd;
+
+      output << "] ";
+      output << h.GetSerializedSize() << " bytes";
+    }
+  else
+    {
+      output << "DATA " << p->GetSize() << " bytes";
+    }
+  return output.str();
 }
 
 void
@@ -58,6 +95,34 @@ UdpChannel::Flush ()
           data->AddAtEnd (m_flushQueue.front ());
           m_flushQueue.pop ();
         }
+      cout << Simulator::Now().GetSeconds() << " " << app->GetNodeName() << " sending ";
+
+      Ptr<PseudoClientSocket> client = DynamicCast<PseudoClientSocket>(m_socket);
+      Ptr<PseudoServerSocket> server = DynamicCast<PseudoServerSocket>(m_socket);
+
+      if(client) {
+        cout << "<- ";
+        cout << format_packet(data, true) << endl;
+      }
+      else if(server) {
+        cout << "-> ";
+        cout << format_packet(data, true) << endl;
+      }
+      else {
+        BaseCellHeader header;
+        data->PeekHeader (header);
+        cout << "circid " << header.circId << " ";
+        BktapCircuit * circ = PeekPointer(app->circuits[header.circId]);
+        CellDirection direction = circ->GetDirection (this);
+        if (direction == INBOUND)
+          cout << "<- ";
+        else
+          cout << "-> ";
+        cout << format_packet(data) << endl;
+      }
+//      else
+//        cout << "?? ";
+//      
       m_socket->SendTo (data,0,m_remote);
     }
 }
@@ -125,6 +190,7 @@ BktapCircuit::GetQueue (CellDirection direction)
 
 TorBktapApp::TorBktapApp ()
 {
+  m_startupScheme = "slow-start";
   NS_LOG_FUNCTION (this);
 }
 
@@ -162,9 +228,11 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
   circ->inbound = AddChannel (InetSocketAddress (p_ip,9001),p_conntype);
   circ->inbound->circuits.push_back (circ);
   circ->inbound->SetSocket (clientSocket);
+  circ->inbound->app = this;
 
   circ->outbound = AddChannel (InetSocketAddress (n_ip,9001),n_conntype);
   circ->outbound->circuits.push_back (circ);
+  circ->outbound->app = this;
 
 }
 
@@ -173,11 +241,15 @@ TorBktapApp::AddChannel (Address remote, int conntype)
 {
   // find existing or create new channel-object
   Ptr<UdpChannel> ch = channels[remote];
+  cout << GetNodeName() << " AddChannel " << InetSocketAddress::ConvertFrom (remote).GetIpv4 ();
   if (!ch)
     {
+      cout << " does not exist... ";
       ch = Create<UdpChannel> (remote, conntype);
+      NS_ASSERT(ch);
       channels[remote] = ch;
     }
+  cout << endl;
   return ch;
 }
 
@@ -201,6 +273,7 @@ TorBktapApp::StartApplication (void)
     {
       m_socket = Socket::CreateSocket (GetNode (), UdpSocketFactory::GetTypeId ());
       m_socket->Bind (m_local);
+      cout << GetNodeName() << " has local: " << InetSocketAddress::ConvertFrom (m_local).GetIpv4 () << endl;
     }
 
   m_socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
@@ -307,9 +380,22 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
       Address from;
       if (data = socket->RecvFrom (from))
         {
+          cout << Simulator::Now() << " " << GetNodeName() << " got " << format_packet(data) << endl;
           data->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
           read_bytes += data->GetSize ();
           Ptr<UdpChannel> ch = channels[from];
+
+          cout << GetNodeName()  << " from Address: " << InetSocketAddress::ConvertFrom (from).GetIpv4 () << endl;
+          map<Address,Ptr<UdpChannel> >::iterator it;
+          for ( it = channels.begin (); it != channels.end (); it++ )
+            {
+              cout << InetSocketAddress::ConvertFrom (it->first).GetIpv4 ();
+              if(!it->second)
+                cout << " (no UdpChannel)";
+              cout << endl;
+              //cout << it->first << endl;
+            }
+
           NS_ASSERT (ch);
           while (data->GetSize () > 0)
             {
@@ -371,6 +457,15 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
       ++queue->dupackcnt;
       if (m_writebucket.GetSize () >= CELL_PAYLOAD_SIZE && queue->dupackcnt > 2)
         {
+          if (queue->doingSlowStart && m_startupScheme == "slow-start")
+            {
+              // exit Slow Start phase since we are already experiencing DUPACKs
+              cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " exit slow start due to TDACKs" << endl;
+              queue->doingSlowStart = false;
+              queue->virtRtt.ResetCurrRtt ();
+            }
+
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " TDACK, retransmit " << endl;
           FlushPendingCell (circ,direction,true);
           queue->dupackcnt = 0;
         }
@@ -382,8 +477,8 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
       queue->DiscardUpTo (header.ack);
       Time rtt = queue->actRtt.EstimateRtt (header.ack);
       ScheduleRto (circ,direction,true);
-    }
-  else
+  }
+else
     {
       cerr << GetNodeName () << " Ignore Ack" << endl;
     }
@@ -393,21 +488,26 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
 void
 TorBktapApp::CongestionAvoidance (Ptr<SeqQueue> queue, Time baseRtt)
 {
+  cout << Simulator::Now().GetSeconds() << " "  << GetNodeName() << " CongestionAvoidance" << endl;
   //Do the Vegas-thing every RTT
   if (queue->virtRtt.cntRtt > 2)
     {
       Time rtt = queue->virtRtt.currentRtt;
-      double diff = queue->cwnd * (rtt.GetSeconds () - baseRtt.GetSeconds ()) / baseRtt.GetSeconds ();
+      double diff = (double)queue->cwnd * (rtt.GetSeconds () - baseRtt.GetSeconds ()) / baseRtt.GetSeconds ();
       // uint32_t target = queue->cwnd * baseRtt.GetMilliSeconds() / rtt.GetMilliSeconds();
+      cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " rtt " << rtt.GetSeconds()*1000 << " vs " << baseRtt.GetSeconds()*1000 << " => diff " << diff << endl;
+
 
       if (diff < VEGASALPHA)
         {
           ++queue->cwnd;
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "increase cwnd to " << queue->cwnd << endl;
         }
 
       if (diff > VEGASBETA)
         {
           --queue->cwnd;
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "decrease cwnd to " << queue->cwnd << endl;
         }
 
       if ((uint32_t) queue->cwnd < 1)
@@ -423,8 +523,59 @@ TorBktapApp::CongestionAvoidance (Ptr<SeqQueue> queue, Time baseRtt)
     }
   else
     {
+      cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " CongestionAvoidance: not enough samples" << endl;
       // Vegas falls back to Reno CA, i.e. increase per RTT
       // However, This messes up with our backlog and makes the approach too aggressive.
+    }
+}
+
+void
+TorBktapApp::SlowStart (Ptr<SeqQueue> queue, Time baseRtt, FdbkCellHeader header)
+{
+  cout << GetNodeName() << " SlowStart" << endl;
+  //Do the Vegas-thing every RTT
+  if (queue->virtRtt.cntRtt > 2)
+    {
+      // Here, we us the calculated estimatedRtt, which is an exponential
+      // moving average. This is different from currentRtt in that it does
+      // not use only the min value over the last RTT, but the sliding average
+      // over the complete history.
+      //
+      // TODO: This currently won't reset over simulation time, so we need a
+      //       way to reset this
+      Time rtt = queue->virtRtt.estimatedRtt;
+
+      double diff = (double)queue->cwnd * (rtt.GetSeconds () - baseRtt.GetSeconds ()) / baseRtt.GetSeconds ();
+      cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " rtt " << rtt.GetSeconds()*1000 << " vs " << baseRtt.GetSeconds()*1000 << " => diff " << diff << endl;
+
+      if (diff > VEGASGAMMA)
+        {
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "finish slow start based on virtRTT "<< endl;
+          queue->doingSlowStart = false;
+        }
+      else
+        {
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "double cwnd"<< endl;
+          queue->cwnd *= 2;
+          queue->cwndIncRttSeq = header.fwd;
+        }
+
+      double maxexp = m_burst.GetBitRate () / 8 / CELL_PAYLOAD_SIZE * baseRtt.GetSeconds ();
+      queue->cwnd = min ((uint32_t) queue->cwnd, (uint32_t) maxexp);
+
+      // also stop slow start if we reached the maximum as per the app-layer
+      // restrictions
+      if (queue->cwnd == maxexp)
+        {
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "finish slow start because the app-layer limit is reached"<< endl;
+          queue->doingSlowStart = false;
+        }
+
+      queue->virtRtt.ResetCurrRtt ();
+    }
+  else
+    {
+      cout << GetNodeName() << " SlowStart: else" << endl;
     }
 }
 
@@ -435,6 +586,23 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
   Ptr<UdpChannel> ch = circ->GetChannel (direction);
   Time rtt = queue->virtRtt.EstimateRtt (header.fwd);
+
+  string strdir;
+  if (direction == INBOUND)
+    strdir = "INBOUND";
+  else
+    strdir = "OUTBOUND";
+
+  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << strdir << " " << (void*)queue << " ReceivedFwd: rtt="
+    << rtt.GetSeconds () << " diff="
+    << (double)queue->cwnd * (rtt.GetSeconds () - ch->rttEstimator.baseRtt.GetSeconds ()) / ch->rttEstimator.baseRtt.GetSeconds ()
+    << " fwd=" << header.fwd<< endl;
+
+  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << strdir << " ReceivedFwd: estimatedRtt="
+    << queue->virtRtt.estimatedRtt.GetSeconds () << " diff=["
+    << queue->virtRtt.cntRtt << " " << queue->virtRtt.currentRtt << " " << queue->virtRtt.devRtt << " "
+    << (double)queue->cwnd * (queue->virtRtt.estimatedRtt.GetSeconds () - ch->rttEstimator.baseRtt.GetSeconds ()) / ch->rttEstimator.baseRtt.GetSeconds () << "]" << endl;
+
   ch->rttEstimator.AddSample (rtt);
 
   if (queue->virtHeadSeq <= header.fwd)
@@ -442,15 +610,59 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
       queue->virtHeadSeq = header.fwd;
     }
 
+  if (queue->doingSlowStart && m_startupScheme == "slow-start")
+    {
+      // called every time 
+      if (queue->virtRtt.cntRtt > 2)
+        {
+          Time rtt = queue->virtRtt.estimatedRtt;
+
+          double diff = (double)queue->cwnd * (rtt.GetSeconds () - ch->rttEstimator.baseRtt.GetSeconds ()) / ch->rttEstimator.baseRtt.GetSeconds ();
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " rtt " << rtt.GetSeconds()*1000 << " vs " << ch->rttEstimator.baseRtt.GetSeconds()*1000 << " => diff " << diff << endl;
+
+          if (diff > VEGASGAMMA)
+          {
+            cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "finish slow start early based on virtRTT "<< endl;
+            queue->doingSlowStart = false;
+            queue->begRttSeq = queue->nextTxSeq;
+            queue->virtRtt.ResetCurrRtt ();
+
+            // Adjust cwnd back to a lower value to compensate for too much
+            // overshooting.
+            
+            cout << "queue->cwndIncRttSeq " << queue->cwndIncRttSeq << endl;
+            cout << "header.fwd " << header.fwd << endl;
+            cout << "queue->cwnd " << queue->cwnd << endl;
+
+            if (queue->cwndIncRttSeq > 0)
+              {
+                queue->cwnd = header.fwd - queue->cwndIncRttSeq;
+              }
+            cout << "queue->cwnd " << queue->cwnd << endl;
+          }
+        }
+    }
+
   if (header.fwd > queue->begRttSeq)
     {
+      // RTT is complete
       queue->begRttSeq = queue->nextTxSeq;
-      CongestionAvoidance (queue,ch->rttEstimator.baseRtt);
-      queue->ssthresh = min ((uint32_t) queue->cwnd, (uint32_t) queue->ssthresh);
-      queue->ssthresh = max ((uint32_t) queue->ssthresh, (uint32_t) queue->cwnd / 2);
+      cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " ReceivedFwd: RTT is full" << endl;
+
+    if (queue->doingSlowStart && m_startupScheme == "slow-start")
+      {
+        SlowStart (queue,ch->rttEstimator.baseRtt, header);
+      }
+      else
+        {
+          CongestionAvoidance (queue,ch->rttEstimator.baseRtt);
+          queue->ssthresh = min ((uint32_t) queue->cwnd, (uint32_t) queue->ssthresh);
+          queue->ssthresh = max ((uint32_t) queue->ssthresh, (uint32_t) queue->cwnd / 2);
+        }
     }
   else if (queue->cwnd <= queue->ssthresh)
     {
+      cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " not a sample from this RTT" << endl;
       //TODO test different slow start schemes
     }
 
@@ -467,6 +679,7 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
 uint32_t
 TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
 {
+  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " reading from edge... ";
   Ptr<UdpChannel> ch = LookupChannel (socket);
   NS_ASSERT (ch);
   Ptr<BktapCircuit> circ = ch->circuits.front ();
@@ -475,13 +688,14 @@ TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
   CellDirection oppdir = circ->GetOppositeDirection (direction);
   Ptr<SeqQueue> queue = circ->GetQueue (oppdir);
 
-  uint32_t max_read = ((uint32_t) queue->cwnd - queue->VirtSize () <= 0) ? 0 : (uint32_t) queue->cwnd - queue->VirtSize ();
+  uint32_t max_read = ((int) queue->cwnd - (int) queue->VirtSize () <= 0) ? 0 : (uint32_t) queue->cwnd - queue->VirtSize ();
   max_read *= CELL_PAYLOAD_SIZE;
 
   uint32_t read_bytes = 0;
 
   while (max_read - read_bytes >= CELL_PAYLOAD_SIZE && socket->GetRxAvailable () >= CELL_PAYLOAD_SIZE)
     {
+      cout << "[p] ";
       Ptr<Packet> data = socket->Recv (CELL_PAYLOAD_SIZE, 0);
       data->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
       read_bytes += data->GetSize ();
@@ -489,6 +703,8 @@ TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
       circ->IncrementStats (oppdir,data->GetSize (),0);
       PackageRelayCell (circ, oppdir, data);
     }
+
+  cout << read_bytes << " bytes" << endl;
 
   return read_bytes;
 }
@@ -519,6 +735,7 @@ TorBktapApp::SocketWriteCallback (Ptr<Socket> s, uint32_t i)
 void
 TorBktapApp::WriteCallback ()
 {
+  cout << Simulator::Now() << " " << GetNodeName() << " WriteCallback";
   uint32_t bytes_written = 0;
 
   if (m_writebucket.GetSize () >= CELL_PAYLOAD_SIZE)
@@ -530,9 +747,12 @@ TorBktapApp::WriteCallback ()
         {
           circ = GetNextCircuit ();
           bytes_written += FlushPendingCell (circ,INBOUND);
+          cout << " in:" << bytes_written << " ";
           bytes_written += FlushPendingCell (circ,OUTBOUND);
+          cout << "in+out:" << bytes_written;
         }
     }
+  cout << endl;
 
   if (bytes_written > 0)
     {
@@ -584,6 +804,7 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
           queue->actRtt.SentSeq (header.seq);
         }
 
+      cout << Simulator::Now() << " " << GetNodeName() << " pushing pending " << format_packet(cell) << endl;
       ch->m_flushQueue.push (cell);
       int bytes_written = cell->GetSize ();
       ch->ScheduleFlush ();
@@ -600,6 +821,7 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
 
       if (queue->highestTxSeq == header.seq)
         {
+          cout << Simulator::Now() << " " << GetNodeName() << " writing " << format_packet(cell) << endl;
           circ->IncrementStats (direction,0,bytes_written);
           SendFeedbackCell (circ, oppdir, FWD, queue->highestTxSeq + 1);
         }
@@ -669,6 +891,7 @@ TorBktapApp::PushFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction)
           queue->fwdq.pop ();
         }
       cell->AddHeader (header);
+      cout << Simulator::Now() << " " << GetNodeName() << " pushing feedback " << format_packet(cell) << endl;
       ch->m_flushQueue.push (cell);
       ch->ScheduleFlush ();
     }
@@ -696,6 +919,24 @@ void
 TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection direction)
 {
   Ptr<SeqQueue> queue = circ->GetQueue (direction);
+
+  if (m_startupScheme == "slow-start")
+    {
+      if (queue->doingSlowStart)
+        {
+          // exit Slow Start phase since we are experiencing losses
+          cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " exit slow start due to timeouts" << endl;
+          queue->doingSlowStart = false;
+          queue->virtRtt.ResetCurrRtt ();
+        }
+      else
+        {
+          // TODO: handle timeout, start slow start e.g.
+        }
+    }
+
+
+  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " timeout, retransmit " << endl;
   queue->nextTxSeq = queue->headSeq;
   FlushPendingCell (circ,direction);
 }
@@ -730,6 +971,27 @@ TorBktapApp::LookupChannel (Ptr<Socket> socket)
         }
     }
   return NULL;
+}
+
+void
+TorBktapApp::SetStartupScheme (string scheme)
+{
+  if (scheme.size () == 0)
+    scheme = "none";
+
+  if (scheme == "none" || scheme == "slow-start")
+    {
+      m_startupScheme = scheme;
+      return;
+    }
+
+  NS_ABORT_MSG ("Unknown BackTap startup scheme");
+}
+
+string
+TorBktapApp::GetStartupScheme ()
+{
+  return m_startupScheme;
 }
 
 void

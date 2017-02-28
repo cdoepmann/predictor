@@ -9,12 +9,15 @@
 #include "ns3/traced-value.h"
 #include "ns3/trace-source-accessor.h"
 
+#include <iostream>
+
 #define ACK 1
 #define FWD 2
 #define FDBK 12
 #define NS3_SOCK_STREAM 0
 #define VEGASALPHA 3
 #define VEGASBETA 6
+#define VEGASGAMMA 2
 #define UDP_CELL_HEADER_SIZE (4 + 4 + 2 + 6 + 2 + 1)
 
 
@@ -22,6 +25,7 @@ namespace ns3 {
 
 class BktapCircuit;
 class UdpChannel;
+class TorBktapApp;
 
 
 class BaseCellHeader : public Header
@@ -299,17 +303,33 @@ public:
   void
   AddSample (Time rtt)
   {
+    std::cout << "AddSample rtt=" << rtt
+      << " estimatedRtt(old)=" << estimatedRtt
+      << " devRtt=" << devRtt
+      << " estimatedRtt(old)=" << estimatedRtt
+      << std::endl;
     if (rtt > 0)
       {
         double alpha = 0.125;
         double beta = 0.25;
         if (estimatedRtt > 0)
           {
-            estimatedRtt = (1 - alpha) * estimatedRtt + alpha * rtt;
-            devRtt = (1 - beta) * devRtt + beta* Abs (rtt - estimatedRtt);
+            std::cout << " >0";
+            std::cout
+              << " " << (1.0 - alpha)
+              << " " << estimatedRtt
+              << " " << Seconds((1.0 - alpha) * estimatedRtt.GetSeconds ())
+              << " " << alpha
+              << " " << rtt
+              << " " << Seconds(alpha * rtt.GetSeconds ())
+            ;
+            estimatedRtt = Seconds((1.0 - alpha) * estimatedRtt.GetSeconds ()) + Seconds(alpha * rtt.GetSeconds ());
+            //estimatedRtt = (1.0 - alpha) * estimatedRtt + alpha * rtt;
+            devRtt = (1.0 - beta) * devRtt + beta* Abs (rtt - estimatedRtt);
           }
         else
           {
+            std::cout << " <=0";
             estimatedRtt = rtt;
           }
 
@@ -317,6 +337,7 @@ public:
         currentRtt = min (rtt,currentRtt);
         ++cntRtt;
       }
+    std::cout << " estimatedRtt(new)=" << estimatedRtt << std::endl;
   }
 
   void
@@ -324,6 +345,14 @@ public:
   {
     currentRtt = Time (Seconds (10000));
     cntRtt = 0;
+  }
+
+  // call this when (re-)entering slow start
+  void
+  ResetEstimatedRtt ()
+  {
+    estimatedRtt = Time (0);
+    devRtt = Time (0);
   }
 
   Time
@@ -353,10 +382,12 @@ public:
   uint32_t headSeq;
   uint32_t virtHeadSeq;
   uint32_t begRttSeq;
+  uint32_t cwndIncRttSeq;
   uint32_t dupackcnt;
   map< uint32_t, Ptr<Packet> > cellMap;
 
   bool wasRetransmit;
+  bool doingSlowStart;
 
   queue<uint32_t> ackq;
   queue<uint32_t> fwdq;
@@ -375,8 +406,9 @@ public:
     headSeq = 0;
     virtHeadSeq = 0;
     begRttSeq = 1;
-    ssthresh = pow (2,10);
+    ssthresh = 0xffffffff;
     dupackcnt = 0;
+    doingSlowStart = true;
   }
   
   static TypeId
@@ -490,13 +522,15 @@ public:
   uint32_t
   Window ()
   {
-    return cwnd - Inflight ();
+    int win = (int)cwnd - (int)Inflight ();
+    return win < 0 ? 0 : (uint32_t) win;
   }
 
   uint32_t
   Inflight ()
   {
-    return nextTxSeq - virtHeadSeq - 1;
+    int inf = (int)nextTxSeq - (int)virtHeadSeq - 1;
+    return inf < 0 ? 0 : (uint32_t) inf;
   }
 
 };
@@ -521,6 +555,7 @@ public:
   uint32_t m_devQlimit;
 
   Ptr<Socket> m_socket;
+  Ptr<TorBktapApp> app;
   Address m_remote;
   uint8_t m_conntype;
   list<Ptr<BktapCircuit> > circuits;
@@ -594,6 +629,7 @@ public:
   void ReceivedAck (Ptr<BktapCircuit>, CellDirection, FdbkCellHeader);
   void ReceivedFwd (Ptr<BktapCircuit>, CellDirection, FdbkCellHeader);
   void CongestionAvoidance (Ptr<SeqQueue>, Time);
+  void SlowStart (Ptr<SeqQueue>, Time, FdbkCellHeader);
   Ptr<UdpChannel> LookupChannel (Ptr<Socket>);
 
   void SocketWriteCallback (Ptr<Socket>, uint32_t);
@@ -614,6 +650,11 @@ public:
                  Ptr<PseudoServerSocket>      // the new pseudo socket itself
                  > m_triggerNewPseudoServerSocket;
   typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBktapApp>, Ptr<PseudoServerSocket>);
+
+  string m_startupScheme; 
+
+  void SetStartupScheme (string scheme);
+  string GetStartupScheme ();
 };
 
 
