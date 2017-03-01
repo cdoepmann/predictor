@@ -403,8 +403,8 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
               data->PeekHeader (header);
               Ptr<BktapCircuit> circ = circuits[header.circId];
               NS_ASSERT (circ);
-              CellDirection direction = circ->GetDirection (ch);
-              CellDirection oppdir = circ->GetOppositeDirection (direction);
+              CellDirection from_direction = circ->GetDirection (ch);
+              CellDirection oppdir = circ->GetOppositeDirection (from_direction);
               if (header.cellType == FDBK)
                 {
                   FdbkCellHeader h;
@@ -412,11 +412,11 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
                   circ->IncrementStats (oppdir,h.GetSerializedSize (),0);
                   if (h.flags & ACK)
                     {
-                      ReceivedAck (circ,direction,h);
+                      ReceivedAck (circ,from_direction,h);
                     }
                   if (h.flags & FWD)
                     {
-                      ReceivedFwd (circ,direction,h);
+                      ReceivedFwd (circ,from_direction,h);
                     }
                 }
               else
@@ -433,24 +433,24 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
 }
 
 void
-TorBktapApp::ReceivedRelayCell (Ptr<BktapCircuit> circ, CellDirection direction, Ptr<Packet> cell)
+TorBktapApp::ReceivedRelayCell (Ptr<BktapCircuit> circ, CellDirection to_direction, Ptr<Packet> cell)
 {
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
   UdpCellHeader header;
   cell->PeekHeader (header);
   bool newseq = queue->Add (cell, header.seq);
   if (newseq) {
     m_readbucket.Decrement(cell->GetSize());
   }
-  CellDirection oppdir = circ->GetOppositeDirection (direction);
+  CellDirection oppdir = circ->GetOppositeDirection (to_direction);
   SendFeedbackCell (circ, oppdir, ACK, queue->tailSeq + 1);
 }
 
 
 void
-TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkCellHeader header)
+TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection from_direction, FdbkCellHeader header)
 {
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (from_direction);
   if (header.ack == queue->headSeq)
     {
       // DupACK. Do fast retransmit.
@@ -466,7 +466,7 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
             }
 
           cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " TDACK, retransmit " << endl;
-          FlushPendingCell (circ,direction,true);
+          FlushPendingCell (circ,from_direction,true);
           queue->dupackcnt = 0;
         }
     }
@@ -476,7 +476,7 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
       queue->dupackcnt = 0;
       queue->DiscardUpTo (header.ack);
       Time rtt = queue->actRtt.EstimateRtt (header.ack);
-      ScheduleRto (circ,direction,true);
+      ScheduleRto (circ,from_direction,true);
   }
 else
     {
@@ -580,15 +580,15 @@ TorBktapApp::SlowStart (Ptr<SeqQueue> queue, Time baseRtt, FdbkCellHeader header
 }
 
 void
-TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkCellHeader header)
+TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection from_direction, FdbkCellHeader header)
 {
   //Received flow control feeback (FWD)
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
-  Ptr<UdpChannel> ch = circ->GetChannel (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (from_direction);
+  Ptr<UdpChannel> ch = circ->GetChannel (from_direction);
   Time rtt = queue->virtRtt.EstimateRtt (header.fwd);
 
   string strdir;
-  if (direction == INBOUND)
+  if (from_direction == INBOUND)
     strdir = "INBOUND";
   else
     strdir = "OUTBOUND";
@@ -666,7 +666,7 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection direction, FdbkC
       //TODO test different slow start schemes
     }
 
-  CellDirection oppdir = circ->GetOppositeDirection (direction);
+  CellDirection oppdir = circ->GetOppositeDirection (from_direction);
   ch = circ->GetChannel (oppdir);
   Simulator::Schedule (Seconds (0), &TorBktapApp::ReadCallback, this, ch->m_socket);
 
@@ -684,8 +684,8 @@ TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
   NS_ASSERT (ch);
   Ptr<BktapCircuit> circ = ch->circuits.front ();
   NS_ASSERT (circ);
-  CellDirection direction = circ->GetDirection (ch);
-  CellDirection oppdir = circ->GetOppositeDirection (direction);
+  CellDirection from_direction = circ->GetDirection (ch);
+  CellDirection oppdir = circ->GetOppositeDirection (from_direction);
   Ptr<SeqQueue> queue = circ->GetQueue (oppdir);
 
   uint32_t max_read = ((int) queue->cwnd - (int) queue->VirtSize () <= 0) ? 0 : (uint32_t) queue->cwnd - queue->VirtSize ();
@@ -704,17 +704,17 @@ TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
       PackageRelayCell (circ, oppdir, data);
     }
 
-  cout << read_bytes << " bytes" << endl;
+  cout << "... " << read_bytes << " bytes" << endl;
 
   return read_bytes;
 }
 
 void
-TorBktapApp::PackageRelayCell (Ptr<BktapCircuit> circ, CellDirection direction, Ptr<Packet> cell)
+TorBktapApp::PackageRelayCell (Ptr<BktapCircuit> circ, CellDirection to_direction, Ptr<Packet> cell)
 {
   UdpCellHeader header;
   header.circId = circ->GetId ();
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
   NS_ASSERT (queue);
   header.seq = queue->tailSeq + 1;
   cell->AddHeader (header);
@@ -767,11 +767,11 @@ TorBktapApp::WriteCallback ()
 
 
 uint32_t
-TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, bool retx)
+TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection to_direction, bool retx)
 {
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
-  CellDirection oppdir = circ->GetOppositeDirection (direction);
-  Ptr<UdpChannel> ch = circ->GetChannel (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
+  CellDirection oppdir = circ->GetOppositeDirection (to_direction);
+  Ptr<UdpChannel> ch = circ->GetChannel (to_direction);
   Ptr<Packet> cell;
 
   if (queue->Window () <= 0 && !retx)
@@ -811,7 +811,7 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
 
       if (ch->SpeaksCells ())
         {
-          ScheduleRto (circ,direction);
+          ScheduleRto (circ,to_direction);
         }
       else
         {
@@ -822,7 +822,7 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
       if (queue->highestTxSeq == header.seq)
         {
           cout << Simulator::Now() << " " << GetNodeName() << " writing " << format_packet(cell) << endl;
-          circ->IncrementStats (direction,0,bytes_written);
+          circ->IncrementStats (to_direction,0,bytes_written);
           SendFeedbackCell (circ, oppdir, FWD, queue->highestTxSeq + 1);
         }
 
@@ -836,10 +836,10 @@ TorBktapApp::FlushPendingCell (Ptr<BktapCircuit> circ, CellDirection direction, 
 }
 
 void
-TorBktapApp::SendFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction, uint8_t flag, uint32_t ack)
+TorBktapApp::SendFeedbackCell (Ptr<BktapCircuit> circ, CellDirection to_direction, uint8_t flag, uint32_t ack)
 {
-  Ptr<UdpChannel> ch = circ->GetChannel (direction);
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<UdpChannel> ch = circ->GetChannel (to_direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
   NS_ASSERT (ch);
   if (ch->SpeaksCells ())
     {
@@ -854,20 +854,20 @@ TorBktapApp::SendFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction, 
       if (queue->ackq.size () > 0 && queue->fwdq.size () > 0)
         {
           queue->delFeedbackEvent.Cancel ();
-          PushFeedbackCell (circ, direction);
+          PushFeedbackCell (circ, to_direction);
         }
       else
         {
-          queue->delFeedbackEvent = Simulator::Schedule (MilliSeconds (1), &TorBktapApp::PushFeedbackCell, this, circ, direction);
+          queue->delFeedbackEvent = Simulator::Schedule (MilliSeconds (1), &TorBktapApp::PushFeedbackCell, this, circ, to_direction);
         }
     }
 }
 
 void
-TorBktapApp::PushFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction)
+TorBktapApp::PushFeedbackCell (Ptr<BktapCircuit> circ, CellDirection to_direction)
 {
-  Ptr<UdpChannel> ch = circ->GetChannel (direction);
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<UdpChannel> ch = circ->GetChannel (to_direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
   NS_ASSERT (ch);
 
   while (queue->ackq.size () > 0 || queue->fwdq.size () > 0)
@@ -898,9 +898,9 @@ TorBktapApp::PushFeedbackCell (Ptr<BktapCircuit> circ, CellDirection direction)
 }
 
 void
-TorBktapApp::ScheduleRto (Ptr<BktapCircuit> circ, CellDirection direction, bool force)
+TorBktapApp::ScheduleRto (Ptr<BktapCircuit> circ, CellDirection to_direction, bool force)
 {
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
   if (force)
     {
       queue->retxEvent.Cancel ();
@@ -911,14 +911,14 @@ TorBktapApp::ScheduleRto (Ptr<BktapCircuit> circ, CellDirection direction, bool 
     }
   if (queue->retxEvent.IsExpired ())
     {
-      queue->retxEvent = Simulator::Schedule (queue->actRtt.Rto (), &TorBktapApp::Rto, this, circ, direction);
+      queue->retxEvent = Simulator::Schedule (queue->actRtt.Rto (), &TorBktapApp::Rto, this, circ, to_direction);
     }
 }
 
 void
-TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection direction)
+TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection to_direction)
 {
-  Ptr<SeqQueue> queue = circ->GetQueue (direction);
+  Ptr<SeqQueue> queue = circ->GetQueue (to_direction);
 
   if (m_startupScheme == "slow-start")
     {
@@ -938,7 +938,7 @@ TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection direction)
 
   cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " timeout, retransmit " << endl;
   queue->nextTxSeq = queue->headSeq;
-  FlushPendingCell (circ,direction);
+  FlushPendingCell (circ,to_direction);
 }
 
 Ptr<BktapCircuit>
