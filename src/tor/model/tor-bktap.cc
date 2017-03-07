@@ -197,6 +197,9 @@ TorBktapApp::TorBktapApp ()
 TorBktapApp::~TorBktapApp ()
 {
   NS_LOG_FUNCTION (this);
+  
+  //tor proposal #183: smooth bursts & get queued data out earlier
+  m_refilltime = MilliSeconds (10);
 }
 
 TypeId
@@ -256,8 +259,6 @@ TorBktapApp::AddChannel (Address remote, int conntype)
 void
 TorBktapApp::StartApplication (void)
 {
-  //tor proposal #183: smooth bursts & get queued data out earlier
-  m_refilltime = MilliSeconds (10);
   TorBaseApp::StartApplication ();
   m_readbucket.SetRefilledCallback (MakeCallback (&TorBktapApp::RefillReadCallback, this));
   m_writebucket.SetRefilledCallback (MakeCallback (&TorBktapApp::RefillWriteCallback, this));
