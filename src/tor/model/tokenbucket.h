@@ -23,7 +23,7 @@ public:
 private:
   void Refill ();
 
-  int64_t m_bucket;
+  double m_bucket;
   DataRate m_rate;
   DataRate m_burst;
   Time m_refilltime;

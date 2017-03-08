@@ -35,7 +35,7 @@ TokenBucket::SetRefilledCallback (Callback<void,int64_t> cb)
 void
 TokenBucket::StartBucket (Time offset)
 {
-  m_bucket = m_burst.GetBitRate () / 8;
+  m_bucket = m_burst.GetBitRate () / 8.0;
   m_refillevent = Simulator::Schedule (offset,&TokenBucket::Refill, this);
 }
 
@@ -46,21 +46,21 @@ TokenBucket::GetSize ()
     {
       return 0;
     }
-  return m_bucket;
+  return static_cast<uint32_t> (m_bucket);
 }
 
 void
 TokenBucket::Decrement (uint32_t n)
 {
-  m_bucket -= n;
+  m_bucket -= static_cast<double> (n);
 }
 
 void
 TokenBucket::Refill ()
 {
-  int64_t prev_bucket = m_bucket;
-  int64_t rate = m_rate.GetBitRate () / 8;
-  int64_t burst = m_burst.GetBitRate () / 8;
+  int64_t prev_bucket = GetSize ();
+  double rate = m_rate.GetBitRate () / 8.0;
+  double burst = m_burst.GetBitRate () / 8.0;
   m_bucket += rate * m_refilltime.GetSeconds ();
   if (burst < m_bucket)
     {
