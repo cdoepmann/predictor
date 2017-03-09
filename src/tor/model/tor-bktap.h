@@ -407,6 +407,8 @@ public:
   uint32_t cwndIncRttSeq;
   uint32_t dupackcnt;
   map< uint32_t, Ptr<Packet> > cellMap;
+  TracedValue<uint32_t> queueLenPackets;
+  TracedValue<uint32_t> queueLenBytes;
 
   bool wasRetransmit;
   bool doingSlowStart;
@@ -431,6 +433,8 @@ public:
     ssthresh = 0xffffffff;
     dupackcnt = 0;
     doingSlowStart = true;
+    queueLenPackets = 0;
+    queueLenBytes = 0;
   }
   
   static TypeId
@@ -442,6 +446,14 @@ public:
       .AddTraceSource ("CongestionWindow",
                        "The BackTap congestion window (cwnd).",
                        MakeTraceSourceAccessor(&SeqQueue::cwnd),
+                       "ns3::TracedValueCallback::Uint32")
+      .AddTraceSource ("QueueLengthPackets",
+                       "The number of cells currently queued (not necessarily consecutively).",
+                       MakeTraceSourceAccessor(&SeqQueue::queueLenPackets),
+                       "ns3::TracedValueCallback::Uint32")
+      .AddTraceSource ("QueueLengthBytes",
+                       "The total size of cells currently queued.",
+                       MakeTraceSourceAccessor(&SeqQueue::queueLenBytes),
                        "ns3::TracedValueCallback::Uint32")
       ;
     return tid;
@@ -464,6 +476,12 @@ public:
           {
             headSeq = virtHeadSeq = cellMap.begin ()->first;
           }
+
+        queueLenPackets = cellMap.size ();
+        uint32_t queue_size = 0;
+        for (auto it = cellMap.cbegin (); it != cellMap.cend (); ++it)
+          queue_size += it->second->GetSize ();
+        queueLenBytes = queue_size;
 
         return true;
       }
@@ -525,6 +543,12 @@ public:
       {
         nextTxSeq = headSeq;
       }
+
+    queueLenPackets = cellMap.size ();
+    uint32_t queue_size = 0;
+    for (auto it = cellMap.cbegin (); it != cellMap.cend (); ++it)
+      queue_size += it->second->GetSize ();
+    queueLenBytes = queue_size;
   }
 
   uint32_t
