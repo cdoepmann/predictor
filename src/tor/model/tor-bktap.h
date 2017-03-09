@@ -277,7 +277,10 @@ private:
     Time rtt;
 
     NS_ABORT_MSG_IF (currentSamples.size () == 0, "cannot calculate current RTT from zero samples");
-    int pos = currentSamples.size () * 0.1;
+
+    int pos = currentSamples.size () * 0.1 + 1;
+    pos = std::min (pos, (int)currentSamples.size () - 1);
+
     auto it = currentSamples.crbegin ();
     std::advance (it, pos);
 
