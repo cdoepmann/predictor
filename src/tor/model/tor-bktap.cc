@@ -138,7 +138,7 @@ UdpChannel::ScheduleFlush ()
     }
   else
     {
-      m_flushEvent = Simulator::Schedule (MicroSeconds (1), &UdpChannel::Flush, this);
+      m_flushEvent = Simulator::Schedule (MilliSeconds (1), &UdpChannel::Flush, this);
     }
 }
 
@@ -859,7 +859,7 @@ TorBktapApp::SendFeedbackCell (Ptr<BktapCircuit> circ, CellDirection to_directio
         }
       else
         {
-          queue->delFeedbackEvent = Simulator::Schedule (MicroSeconds (1), &TorBktapApp::PushFeedbackCell, this, circ, to_direction);
+          queue->delFeedbackEvent = Simulator::Schedule (MilliSeconds (1), &TorBktapApp::PushFeedbackCell, this, circ, to_direction);
         }
     }
 }
