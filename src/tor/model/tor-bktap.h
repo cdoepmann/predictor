@@ -10,6 +10,8 @@
 #include "ns3/trace-source-accessor.h"
 
 #include <iostream>
+#include <iterator>
+#include <set>
 
 #define ACK 1
 #define FWD 2
@@ -254,6 +256,7 @@ public:
   Time estimatedRtt;
   Time devRtt;
   Time currentRtt;
+  std::multiset<Time> currentSamples;
   Time baseRtt;
   uint32_t cntRtt;
   uint32_t rttMultiplier;
@@ -267,6 +270,23 @@ public:
     ResetCurrRtt ();
   }
 
+private:
+  Time
+  CalculateCurrentRtt ()
+  {
+    Time rtt;
+
+    NS_ABORT_MSG_IF (currentSamples.size () == 0, "cannot calculate current RTT from zero samples");
+    int pos = currentSamples.size () * 0.1;
+    auto it = currentSamples.crbegin ();
+    std::advance (it, pos);
+
+    rtt = *it;
+
+    return rtt;
+  }
+
+public:
   void
   SentSeq (uint32_t seq)
   {
@@ -334,7 +354,8 @@ public:
           }
 
         baseRtt = min (baseRtt,rtt);
-        currentRtt = min (rtt,currentRtt);
+        currentSamples.insert (rtt);
+        currentRtt = CalculateCurrentRtt();
         ++cntRtt;
       }
     std::cout << " estimatedRtt(new)=" << estimatedRtt << std::endl;
@@ -344,6 +365,7 @@ public:
   ResetCurrRtt ()
   {
     currentRtt = Time (Seconds (10000));
+    currentSamples.clear ();
     cntRtt = 0;
   }
 
