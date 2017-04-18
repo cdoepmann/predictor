@@ -196,6 +196,20 @@ BktapCircuit::GetQueue (CellDirection direction)
     }
 }
 
+void
+BktapCircuit::EnableMinFilter (bool enabled)
+{
+  inbound->rttEstimator.EnableMinFilter (enabled);
+
+  outbound->rttEstimator.EnableMinFilter (enabled);
+
+  inboundQueue->virtRtt.EnableMinFilter (enabled);
+  inboundQueue->actRtt.EnableMinFilter (enabled);
+
+  outboundQueue->virtRtt.EnableMinFilter (enabled);
+  outboundQueue->actRtt.EnableMinFilter (enabled);
+}
+
 bool TorBktapApp::s_nagle = false;
 
 TorBktapApp::TorBktapApp ()
@@ -218,6 +232,10 @@ TorBktapApp::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::TorBktapApp")
     .SetParent<TorBaseApp> ()
     .AddConstructor<TorBktapApp> ()
+    .AddAttribute ("MinFiltering", "Do min-filtering on the RTT samples for getting the current RTT (instead of using the 90th percentile). Do not use this when Slow Start is active!",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&TorBktapApp::m_minFiltering),
+                   MakeBooleanChecker ())
     .AddTraceSource ("NewServerSocket",
                      "Trace indicating that a new pseudo server socket has been installed.",
                      MakeTraceSourceAccessor (&TorBktapApp::m_triggerNewPseudoServerSocket),
@@ -247,6 +265,7 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
   circ->outbound->circuits.push_back (circ);
   circ->outbound->app = this;
 
+  circ->EnableMinFilter (m_minFiltering);
 }
 
 Ptr<UdpChannel>

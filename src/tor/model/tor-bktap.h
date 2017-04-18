@@ -260,6 +260,7 @@ public:
   Time baseRtt;
   uint32_t cntRtt;
   uint32_t rttMultiplier;
+  bool doMinFiltering;
 
   SimpleRttEstimator ()
   {
@@ -267,7 +268,16 @@ public:
     estimatedRtt = Time (0);
     devRtt = Time (0);
     baseRtt = Time (Seconds (42));
+    doMinFiltering = false;
     ResetCurrRtt ();
+  }
+
+  // Enable min-filtering RTT sanmples over each complete RTT for obtaining
+  // the "current" RTT. If disabled (the default), a 90th-percentile will be
+  // used instead.
+  void EnableMinFilter (bool enabled)
+  {
+    doMinFiltering = enabled;
   }
 
 private:
@@ -358,7 +368,16 @@ public:
 
         baseRtt = min (baseRtt,rtt);
         currentSamples.insert (rtt);
-        currentRtt = CalculateCurrentRtt();
+
+        if (doMinFiltering)
+        {
+          currentRtt = min (rtt,currentRtt);
+        }
+        else
+        {
+          currentRtt = CalculateCurrentRtt();
+        }
+
         ++cntRtt;
       }
     std::cout << " estimatedRtt(new)=" << estimatedRtt << std::endl;
@@ -638,6 +657,8 @@ public:
   CellDirection GetDirection (Ptr<UdpChannel>);
   Ptr<SeqQueue> GetQueue (CellDirection);
   Ptr<UdpChannel> GetChannel (CellDirection direction);
+
+  void EnableMinFilter (bool enabled);
   
   static TypeId
   GetTypeId (void)
@@ -697,6 +718,8 @@ public:
 
   static void SetNagle(bool);
   static bool s_nagle;
+
+  bool m_minFiltering;
 
   EventId writeevent;
   EventId readevent;
