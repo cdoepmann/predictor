@@ -575,9 +575,15 @@ TorBktapApp::SlowStart (Ptr<SeqQueue> queue, Time baseRtt, FdbkCellHeader header
       // not use only the min value over the last RTT, but the sliding average
       // over the complete history.
       //
+      // CHANGED: Now uses virtRtt.currentRtt as this is no longer based on a
+      // min filter, but on the 90th percentile. Avoiding the moving average
+      // became necessary because Nagle started to introduce single huge delays
+      // that would at once raise the average too much, resulting in too early
+      // Slow Start exits.
+      //
       // TODO: This currently won't reset over simulation time, so we need a
       //       way to reset this
-      Time rtt = queue->virtRtt.estimatedRtt;
+      Time rtt = queue->virtRtt.currentRtt;
 
       double diff = (double)queue->cwnd * (rtt.GetSeconds () - baseRtt.GetSeconds ()) / baseRtt.GetSeconds ();
       cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " rtt " << rtt.GetSeconds()*1000 << " vs " << baseRtt.GetSeconds()*1000 << " => diff " << diff << endl;
@@ -649,7 +655,7 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection from_direction, 
       // called every time 
       if (queue->virtRtt.cntRtt > 2)
         {
-          Time rtt = queue->virtRtt.estimatedRtt;
+          Time rtt = queue->virtRtt.currentRtt;
 
           double diff = (double)queue->cwnd * (rtt.GetSeconds () - ch->rttEstimator.baseRtt.GetSeconds ()) / ch->rttEstimator.baseRtt.GetSeconds ();
           cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " rtt " << rtt.GetSeconds()*1000 << " vs " << ch->rttEstimator.baseRtt.GetSeconds()*1000 << " => diff " << diff << endl;
@@ -680,13 +686,24 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection from_direction, 
   if (header.fwd > queue->begRttSeq)
     {
       // RTT is complete
-      queue->begRttSeq = queue->nextTxSeq;
-      cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " ReceivedFwd: RTT is full" << endl;
 
-    if (queue->doingSlowStart && m_startupScheme == "slow-start")
+      if (queue->virtRtt.cntRtt > 2)
       {
-        SlowStart (queue,ch->rttEstimator.baseRtt, header);
+        // only start new RTT phase if enough samples
+        // TODO: Get this decision as return value from SlowStart() and
+        //       CongestionAvoidance()
+        queue->begRttSeq = queue->nextTxSeq;
+        cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " ReceivedFwd: RTT is full" << endl;
       }
+      else
+      {
+        cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " ReceivedFwd: RTT is full, but not enough samples" << endl;
+      }
+
+      if (queue->doingSlowStart && m_startupScheme == "slow-start")
+        {
+          SlowStart (queue,ch->rttEstimator.baseRtt, header);
+        }
       else
         {
           CongestionAvoidance (queue,ch->rttEstimator.baseRtt);
