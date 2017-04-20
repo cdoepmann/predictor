@@ -239,7 +239,11 @@ TorBktapApp::GetTypeId (void)
     .AddTraceSource ("NewServerSocket",
                      "Trace indicating that a new pseudo server socket has been installed.",
                      MakeTraceSourceAccessor (&TorBktapApp::m_triggerNewPseudoServerSocket),
-                     "ns3::TorApp::TorNewPseudoServerSocketCallback");
+                     "ns3::TorApp::TorNewPseudoServerSocketCallback")
+    .AddTraceSource ("State",
+                     "Trace of the BackTap state (slow start, etc.).",
+                     MakeTraceSourceAccessor (&TorBktapApp::m_triggerStateChange),
+                     "ns3::TorApp::TorBktapStateChangeCallback");
   return tid;
 }
 
@@ -333,7 +337,12 @@ TorBktapApp::StartApplication (void)
               Ptr<Socket> socket = CreateObject<PseudoServerSocket> ();
               socket->SetRecvCallback (MakeCallback (&TorBktapApp::ReadCallback, this));
               ch->SetSocket (socket);
-              m_triggerNewPseudoServerSocket(this, DynamicCast<PseudoServerSocket>(socket));
+
+              for (auto it2 = ch->circuits.begin(); it2 != ch->circuits.end(); it2++)
+              {
+                int circId = (*it2)->GetId ();
+                m_triggerNewPseudoServerSocket(this, circId, DynamicCast<PseudoServerSocket>(socket));
+              }
             }
 
           if (ch->GetType () == PROXYEDGE)
@@ -493,6 +502,7 @@ TorBktapApp::ReceivedAck (Ptr<BktapCircuit> circ, CellDirection from_direction, 
               cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " exit slow start due to TDACKs" << endl;
               queue->doingSlowStart = false;
               queue->virtRtt.ResetCurrRtt ();
+              m_triggerStateChange(this, header.circId, BktapState::SlowStart, BktapState::Normal);
             }
 
           cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " TDACK, retransmit " << endl;
@@ -592,6 +602,7 @@ TorBktapApp::SlowStart (Ptr<SeqQueue> queue, Time baseRtt, FdbkCellHeader header
         {
           cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "finish slow start based on virtRTT "<< endl;
           queue->doingSlowStart = false;
+          m_triggerStateChange(this, header.circId, BktapState::SlowStart, BktapState::Normal);
         }
       else
         {
@@ -609,6 +620,7 @@ TorBktapApp::SlowStart (Ptr<SeqQueue> queue, Time baseRtt, FdbkCellHeader header
         {
           cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << "finish slow start because the app-layer limit is reached"<< endl;
           queue->doingSlowStart = false;
+          m_triggerStateChange(this, header.circId, BktapState::SlowStart, BktapState::Normal);
         }
 
       queue->virtRtt.ResetCurrRtt ();
@@ -666,6 +678,7 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection from_direction, 
             queue->doingSlowStart = false;
             queue->begRttSeq = queue->nextTxSeq;
             queue->virtRtt.ResetCurrRtt ();
+            m_triggerStateChange(this, header.circId, BktapState::SlowStart, BktapState::Normal);
 
             // Adjust cwnd back to a lower value to compensate for too much
             // overshooting.
@@ -979,6 +992,7 @@ TorBktapApp::Rto (Ptr<BktapCircuit> circ, CellDirection to_direction)
           cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " exit slow start due to timeouts" << endl;
           queue->doingSlowStart = false;
           queue->virtRtt.ResetCurrRtt ();
+          m_triggerStateChange(this, circ->GetId(), BktapState::SlowStart, BktapState::Normal);
         }
       else
         {
@@ -1069,6 +1083,16 @@ void
 TorBktapApp::SetNagle (bool nagle)
 {
   s_nagle = nagle;
+}
+
+std::string FormatBktapState (BktapState state)
+{
+  if (state == BktapState::Normal)
+    return std::string("normal");
+  else if (state == BktapState::SlowStart)
+    return std::string("slow-start");
+
+  return std::string("unknown");
 }
 
 } //namespace ns3

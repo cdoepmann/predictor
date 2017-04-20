@@ -12,6 +12,7 @@
 #include <iostream>
 #include <iterator>
 #include <set>
+#include <string>
 
 #define ACK 1
 #define FWD 2
@@ -670,7 +671,9 @@ public:
 };
 
 
+enum class BktapState {SlowStart, Normal};
 
+std::string FormatBktapState (BktapState state);
 
 class TorBktapApp : public TorBaseApp
 {
@@ -728,9 +731,18 @@ public:
 
   // Callback to trigger after a new pseudo server socket is added
   TracedCallback<Ptr<TorBktapApp>, // this app
+                 int,              // circuit id
                  Ptr<PseudoServerSocket>      // the new pseudo socket itself
                  > m_triggerNewPseudoServerSocket;
-  typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBktapApp>, Ptr<PseudoServerSocket>);
+  typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBktapApp>, int, Ptr<PseudoServerSocket>);
+
+  // Callback to trigger after a BackTap state change
+  TracedCallback<Ptr<TorBktapApp>, // this app
+                 int,              // circuit id
+                 BktapState,       // previous state
+                 BktapState        // new state
+                 > m_triggerStateChange;
+  typedef void (* TorBktapStateChangeCallback) (Ptr<TorBktapApp>, int, BktapState, BktapState);
 
   string m_startupScheme; 
 
