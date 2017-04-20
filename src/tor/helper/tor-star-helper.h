@@ -11,6 +11,9 @@
 #include "ns3/global-route-manager.h"
 #include "ns3/tor-module.h"
 
+#include <map>
+#include <vector>
+
 namespace ns3 {
 
 class TorStarHelper
@@ -22,6 +25,7 @@ public:
   void ParseFile (string, uint32_t m = 0);
   void AddCircuit (int, string, string, string, Ptr<PseudoClientSocket> clientSocket = 0);
   void SetRelayAttribute (string, string, const AttributeValue &value);
+  void SetAllRelaysAttribute (string, const AttributeValue &value);
   void SetStartTimeStream (Ptr<RandomVariableStream>);
   void RegisterTtfbCallback (void (*)(int, double, string), string);
   void RegisterTtlbCallback (void (*)(int, double, string), string);
@@ -33,6 +37,13 @@ public:
   void SetTorAppType (string);
   void BuildTopology ();
   void PrintCircuits ();
+
+  // Set the delay between a single nod and the router, overriding the default
+  // RTT. Note that this is only for this specific node, so the given time is
+  // twice the underlay link delay, not four times, as is the case for the
+  // default RTT which does not count from node to router, but from node to the
+  // next node.
+  void SetNodeRtt (string, Time);
 
   ApplicationContainer GetTorAppsContainer ();
 
@@ -46,8 +57,8 @@ public:
 
   string GetProxyName (int);
 
-  // Return the BDP of the current setup in bytes.
-  uint32_t GetBdp();
+  // Return the BDP of the current setup for one circuit in bytes.
+  uint32_t GetBdp(int);
 
   // Get the hub net devices. Returns a map that assigns each tor node name the
   // respective net device used to connect to it from the router (hub)
@@ -56,11 +67,36 @@ public:
   // Set the default underlay link data rate
   void SetUnderlayRate (DataRate);
 
+  // Get the relay names that form a given circuit
+  vector<string> GetCircuitRelays (int circuit);
+
+  // Get theoretical maximum data rate for a circuit
+  DataRate GetCircuitDataRate (int circuit, vector<string> relays = vector<string>());
+
+  // Get theoretical end-to-end RTT for a circuit
+  Time GetCircuitRtt (int circuit, vector<string> relays = vector<string>(), bool one_way = false);
+
+  // Get the underlay link delay with which a relay is connected to the router
+  Time GetRelayDelay (string relay);
+
+  // Get theoretically optimal cwnd for a BackTap circuit
+  uint32_t GetOptimalBktapCircuitCwnd (int circuit);
+
+  // Get theoretically optimal cwnd for a BackTap circuit
+  uint32_t GetOptimalBktapBacklog (int circuit);
+
+  // Get the resulting circuits
+  std::map <int, std::vector<std::string> > GetCircuitRelays ();
+
   vector<int> circuitIds;
 
 protected:
   DataRate m_underlayRate;
   Time m_underlayLinkDelay;
+  map<string, Time> m_specificLinkDelays;
+
+  // Set a link property after the topology was built
+  void SetLinkProperty (string node, string property, const AttributeValue& value);
 
 private:
   class CircuitDescriptor

@@ -74,10 +74,28 @@ TorStarHelper::SetRelayAttribute (string relayName, string attrName, const Attri
 }
 
 void
+TorStarHelper::SetAllRelaysAttribute (string attrName, const AttributeValue &value)
+{
+  for(auto it = m_relays.begin(); it != m_relays.end(); ++it)
+  {
+    SetRelayAttribute(it->first, attrName, value);
+  }
+}
+
+void
 TorStarHelper::SetRtt (Time rtt)
 {
   m_underlayLinkDelay = rtt/4.0;
   m_p2pHelper.SetChannelAttribute ("Delay", TimeValue (m_underlayLinkDelay));
+}
+
+void
+TorStarHelper::SetNodeRtt (string name, Time rtt)
+{
+  auto node = m_relays.find (name);
+  NS_ABORT_MSG_IF (node == m_relays.end(), "node not found");
+
+  m_specificLinkDelays[name] = rtt/2;
 }
 
 void
@@ -211,6 +229,12 @@ void
 TorStarHelper::BuildTopology ()
 {
   m_starHelper = new PointToPointStarHelper (m_nSpokes,m_p2pHelper);
+
+  // Configure specific link delays
+  for (auto it = m_specificLinkDelays.cbegin(); it != m_specificLinkDelays.cend(); ++it)
+  {
+    SetLinkProperty (it->first, "Delay", TimeValue (it->second));
+  }
 
   // Disable high-level traffic control
   TrafficControlHelper tch;
@@ -427,32 +451,157 @@ TorStarHelper::GetProxyName (int id)
   return ss.str ();
 }
 
-uint32_t TorStarHelper::GetBdp()
+uint32_t
+TorStarHelper::GetBdp(int circuit)
 {
-  // get bottleneck data rate
-  DataRate bottleneck = m_underlayRate;
+  // Figure out which relays are involved into this circuit
+  vector<string> relays = GetCircuitRelays (circuit);
 
-  map<string,RelayDescriptor>::iterator i;
-  for (i = m_relays.begin (); i != m_relays.end (); ++i)
+  // Find out the minimum rate
+  DataRate bottleneck = GetCircuitDataRate (circuit, relays);
+
+  // Find out the end-to-end delay
+  Time delay = GetCircuitRtt (circuit, relays);
+
+  return static_cast<uint32_t>(delay.GetSeconds()/8.0 * bottleneck.GetBitRate());
+}
+
+uint32_t
+TorStarHelper::GetOptimalBktapBacklog(int circuit)
+{
+  // Figure out which relays are involved into this circuit
+  vector<string> relays = GetCircuitRelays (circuit);
+
+  // Find out the minimum rate
+  DataRate bottleneck = GetCircuitDataRate (circuit, relays);
+
+  // Find out the overall one-way latency
+  Time latency = GetCircuitRtt (circuit, relays, true);
+
+  // The optimal backlog is the one-way BDP, but not less than the best cwnd
+  uint32_t one_way_bdp = static_cast<uint32_t>(latency.GetSeconds()/8.0 * bottleneck.GetBitRate());
+  uint32_t cwnd = GetOptimalBktapCircuitCwnd (circuit);
+
+  return std::max (one_way_bdp, cwnd);
+}
+
+uint32_t
+TorStarHelper::GetOptimalBktapCircuitCwnd(int circuit)
+{
+  // Figure out which relays are involved into this circuit
+  vector<string> relays = GetCircuitRelays (circuit);
+
+  // Find out the minimum rate
+  DataRate bottleneck = GetCircuitDataRate (circuit, relays);
+
+  // Find out the RTT between the exit node and the one after
+  string exit = relays[relays.size() - 1];
+  string middle = relays[relays.size() - 2];
+  Time local_rtt = GetRelayDelay(exit)*2 + GetRelayDelay(middle)*2;
+
+  return static_cast<uint32_t>(local_rtt.GetSeconds()/8.0 * bottleneck.GetBitRate());
+}
+
+vector<string>
+TorStarHelper::GetCircuitRelays (int circuit)
+{
+  auto circuit_it = m_circuits.find (circuit);
+  NS_ABORT_MSG_IF (circuit_it == m_circuits.end(), "Circuit not found");
+  CircuitDescriptor circ = circuit_it->second;
+
+  vector<string> relays;
+
+  if (!m_disableProxies)
+    relays.push_back ( circ.proxy() );
+
+  relays.push_back ( circ.entry() );
+  relays.push_back ( circ.middle() );
+  relays.push_back ( circ.exit() );
+
+  return relays;
+}
+
+Time
+TorStarHelper::GetRelayDelay (string relay)
+{
+  Time local_delay;
+
+  auto specific_it = m_specificLinkDelays.find (relay);
+  if (specific_it != m_specificLinkDelays.end())
   {
+    local_delay = specific_it->second;
+  }
+  else
+  {
+    local_delay = m_underlayLinkDelay;
+  }
+
+  return local_delay;
+}
+
+Time
+TorStarHelper::GetCircuitRtt (int circuit, vector<string> relays, bool one_way)
+{
+  // Figure out which relays are involved into this circuit
+  if (relays.size() == 0)
+    relays = GetCircuitRelays (circuit);
+
+  Time delay = Seconds(0);
+  for (auto it = relays.cbegin(); it != relays.cend(); ++it)
+  {
+    const string relay = *it;
+    Time local_delay = GetRelayDelay (relay);
+
+    // link is travelled in both directions unless we want the one-way latency
+    if (!one_way)
+      local_delay = local_delay*2;
+
+    // entries that are not first or last in the relays vector count twice,
+    // this is due to the star topoloy with a router in the center
+    if (it != relays.cbegin() && std::distance(it, relays.cend()) != 1)
+      local_delay = local_delay*2;
+
+    delay += local_delay;
+  }
+  
+  return delay;
+}
+
+DataRate
+TorStarHelper::GetCircuitDataRate (int circuit, vector<string> relays)
+{
+  // Figure out which relays are involved into this circuit
+  if ( relays.size() == 0)
+    relays = GetCircuitRelays (circuit);
+
+  DataRate bottleneck = m_underlayRate;
+  for (const string& relay : relays)
+  {
+    // app-layer limitations
     DataRateValue rate_value;
-    i->second.tapp->GetAttribute("BandwidthRate", rate_value);
+    m_relays[relay].tapp->GetAttribute("BandwidthRate", rate_value);
     DataRate rate = rate_value.Get();
 
     DataRateValue burst_value;
-    i->second.tapp->GetAttribute("BandwidthBurst", burst_value);
+    m_relays[relay].tapp->GetAttribute("BandwidthBurst", burst_value);
     DataRate burst = burst_value.Get();
 
     NS_ASSERT(rate == burst);
 
     if(rate < bottleneck)
       bottleneck = rate;
+
+    // slower relay-specific net devices
+    Ptr<Node> node = GetTorNode(relay);
+    DataRateValue dev_rate_val;
+    node->GetDevice(0)->GetObject<PointToPointNetDevice>()->GetAttribute ("DataRate", dev_rate_val);
+    rate = dev_rate_val.Get ();;
+
+    if(rate < bottleneck)
+      bottleneck = rate;
   }
 
-  // get delay
-  Time delay = m_disableProxies ? m_underlayLinkDelay*8 : m_underlayLinkDelay*12;
-
-  return static_cast<uint32_t>(delay.GetSeconds()/8.0 * bottleneck.GetBitRate());
+  return bottleneck;
 }
 
 map<string, Ptr<PointToPointNetDevice> >
@@ -475,6 +624,21 @@ TorStarHelper::GetRouterDevices ()
 }
 
 void
+TorStarHelper::SetLinkProperty (string node, string property, const AttributeValue& value)
+{
+  auto relay_it = m_relays.find(node);
+  NS_ABORT_MSG_IF (relay_it == m_relays.end(), "node not found");
+  RelayDescriptor relay = relay_it->second;
+
+  auto device = DynamicCast<PointToPointNetDevice> (
+      m_starHelper->GetHub()->GetDevice(relay.spokeId)
+  );
+  
+  Ptr<PointToPointChannel> link = DynamicCast<PointToPointChannel> (device->GetChannel ());
+  link->SetAttribute (property, value);
+}
+
+void
 TorStarHelper::PrintCircuits ()
 {
   map<int,CircuitDescriptor>::iterator i;
@@ -491,4 +655,27 @@ TorStarHelper::PrintCircuits ()
       cout << "\t" << e.exit () << "[" << m_relays[e.exit ()].spokeId + 1 << "]";
       cout << endl;
     }
+}
+
+std::map <int, std::vector<std::string> >
+TorStarHelper::GetCircuitRelays ()
+{
+  std::map <int, vector<std::string> > result;
+
+  for (auto it = m_circuits.begin(); it != m_circuits.end(); ++it)
+  {
+    int circId = it->first;
+    CircuitDescriptor desc = it->second;
+
+    std::vector<std::string> entries;
+    if (!m_disableProxies)
+      entries.push_back (desc.proxy());
+    entries.push_back (desc.entry());
+    entries.push_back (desc.middle());
+    entries.push_back (desc.exit());
+
+    result[circId] = entries;
+  }
+
+  return result;
 }
