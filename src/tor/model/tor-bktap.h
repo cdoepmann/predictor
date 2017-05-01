@@ -261,7 +261,7 @@ public:
   Time baseRtt;
   uint32_t cntRtt;
   uint32_t rttMultiplier;
-  bool doMinFiltering;
+  int percentile;
 
   SimpleRttEstimator ()
   {
@@ -269,27 +269,27 @@ public:
     estimatedRtt = Time (0);
     devRtt = Time (0);
     baseRtt = Time (Seconds (42));
-    doMinFiltering = false;
+    percentile = 90;
     ResetCurrRtt ();
   }
 
   // Enable min-filtering RTT sanmples over each complete RTT for obtaining
   // the "current" RTT. If disabled (the default), a 90th-percentile will be
   // used instead.
-  void EnableMinFilter (bool enabled)
+  void SetPercentile (int perc)
   {
-    doMinFiltering = enabled;
+    percentile = perc;
   }
 
 private:
   Time
-  CalculateCurrentRtt ()
+  CalculateCurrentRtt (int percentile)
   {
     Time rtt;
 
     NS_ABORT_MSG_IF (currentSamples.size () == 0, "cannot calculate current RTT from zero samples");
 
-    int pos = currentSamples.size () * 0.1 + 1;
+    int pos = currentSamples.size () * (100.0-percentile)/100 + 1;
     pos = std::min (pos, (int)currentSamples.size () - 1);
 
     auto it = currentSamples.crbegin ();
@@ -370,13 +370,13 @@ public:
         baseRtt = min (baseRtt,rtt);
         currentSamples.insert (rtt);
 
-        if (doMinFiltering)
+        if (percentile == 0)
         {
           currentRtt = min (rtt,currentRtt);
         }
         else
         {
-          currentRtt = CalculateCurrentRtt();
+          currentRtt = CalculateCurrentRtt(percentile);
         }
 
         ++cntRtt;
@@ -659,7 +659,7 @@ public:
   Ptr<SeqQueue> GetQueue (CellDirection);
   Ptr<UdpChannel> GetChannel (CellDirection direction);
 
-  void EnableMinFilter (bool enabled);
+  void SetPercentile (int percentile);
   
   static TypeId
   GetTypeId (void)
@@ -722,7 +722,7 @@ public:
   static void SetNagle(bool);
   static bool s_nagle;
 
-  bool m_minFiltering;
+  int m_percentile;
 
   EventId writeevent;
   EventId readevent;

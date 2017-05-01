@@ -197,17 +197,17 @@ BktapCircuit::GetQueue (CellDirection direction)
 }
 
 void
-BktapCircuit::EnableMinFilter (bool enabled)
+BktapCircuit::SetPercentile (int percentile)
 {
-  inbound->rttEstimator.EnableMinFilter (enabled);
+  inbound->rttEstimator.SetPercentile (percentile);
 
-  outbound->rttEstimator.EnableMinFilter (enabled);
+  outbound->rttEstimator.SetPercentile (percentile);
 
-  inboundQueue->virtRtt.EnableMinFilter (enabled);
-  inboundQueue->actRtt.EnableMinFilter (enabled);
+  inboundQueue->virtRtt.SetPercentile (percentile);
+  inboundQueue->actRtt.SetPercentile (percentile);
 
-  outboundQueue->virtRtt.EnableMinFilter (enabled);
-  outboundQueue->actRtt.EnableMinFilter (enabled);
+  outboundQueue->virtRtt.SetPercentile (percentile);
+  outboundQueue->actRtt.SetPercentile (percentile);
 }
 
 bool TorBktapApp::s_nagle = false;
@@ -232,10 +232,10 @@ TorBktapApp::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::TorBktapApp")
     .SetParent<TorBaseApp> ()
     .AddConstructor<TorBktapApp> ()
-    .AddAttribute ("MinFiltering", "Do min-filtering on the RTT samples for getting the current RTT (instead of using the 90th percentile). Do not use this when Slow Start is active!",
-                   BooleanValue (false),
-                   MakeBooleanAccessor (&TorBktapApp::m_minFiltering),
-                   MakeBooleanChecker ())
+    .AddAttribute ("Percentile", "The percentile to use when filtering the RTT samples for getting the current RTT (0 == min-filter, do not use this when Slow Start is active!)",
+                   IntegerValue (90),
+                   MakeIntegerAccessor (&TorBktapApp::m_percentile),
+                   MakeIntegerChecker <int> (0, 100))
     .AddTraceSource ("NewServerSocket",
                      "Trace indicating that a new pseudo server socket has been installed.",
                      MakeTraceSourceAccessor (&TorBktapApp::m_triggerNewPseudoServerSocket),
@@ -269,7 +269,7 @@ TorBktapApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p
   circ->outbound->circuits.push_back (circ);
   circ->outbound->app = this;
 
-  circ->EnableMinFilter (m_minFiltering);
+  circ->SetPercentile (m_percentile);
 }
 
 Ptr<UdpChannel>
