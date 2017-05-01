@@ -57,7 +57,16 @@ format_packet (Ptr<Packet> packet, bool raw=false)
     }
   else
     {
-      output << "DATA " << p->GetSize() << " bytes";
+      output << "DATA ";
+      if (!raw)
+        {
+          output << "[";
+          UdpCellHeader h;
+          p->RemoveHeader (h);
+          output << "SEQ=" << h.seq;
+          output << "] ";
+        }
+      output << p->GetSize() << " bytes";
     }
   return output.str();
 }
@@ -384,7 +393,8 @@ TorBktapApp::RefillReadCallback (int64_t prev_read_bucket)
 void
 TorBktapApp::RefillWriteCallback (int64_t prev_read_bucket)
 {
-  if (prev_read_bucket <= 0 && writeevent.IsExpired ())
+  cout << Simulator::Now().GetSeconds () << " " << GetNodeName() << " refill writebucket from " << prev_read_bucket << " to " << m_writebucket.GetSize () << endl;
+  if (prev_read_bucket < m_writebucket.GetSize () && writeevent.IsExpired ())
     {
       writeevent = Simulator::ScheduleNow (&TorBktapApp::WriteCallback, this);
     }
@@ -419,21 +429,12 @@ TorBktapApp::ReadFromRelay (Ptr<Socket> socket)
       Address from;
       if (data = socket->RecvFrom (from))
         {
-          cout << Simulator::Now() << " " << GetNodeName() << " got " << format_packet(data) << endl;
+          cout << Simulator::Now().GetSeconds () << " " << GetNodeName() << " got " << format_packet(data) << endl;
           data->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
           read_bytes += data->GetSize ();
           Ptr<UdpChannel> ch = channels[from];
 
           cout << GetNodeName()  << " from Address: " << InetSocketAddress::ConvertFrom (from).GetIpv4 () << endl;
-          map<Address,Ptr<UdpChannel> >::iterator it;
-          for ( it = channels.begin (); it != channels.end (); it++ )
-            {
-              cout << InetSocketAddress::ConvertFrom (it->first).GetIpv4 ();
-              if(!it->second)
-                cout << " (no UdpChannel)";
-              cout << endl;
-              //cout << it->first << endl;
-            }
 
           NS_ASSERT (ch);
           while (data->GetSize () > 0)
@@ -481,6 +482,15 @@ TorBktapApp::ReceivedRelayCell (Ptr<BktapCircuit> circ, CellDirection to_directi
   if (newseq) {
     m_readbucket.Decrement(cell->GetSize());
   }
+
+  string strdir;
+  if (to_direction == INBOUND)
+    strdir = "INBOUND";
+  else
+    strdir = "OUTBOUND";
+
+  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " " << strdir << " ReceivedRelayCell: seq=" << header.seq << " has to wait for " << header.seq - queue->nextTxSeq << " cells first." << endl;
+
   CellDirection oppdir = circ->GetOppositeDirection (to_direction);
   SendFeedbackCell (circ, oppdir, ACK, queue->tailSeq + 1);
 }
@@ -743,7 +753,6 @@ TorBktapApp::ReceivedFwd (Ptr<BktapCircuit> circ, CellDirection from_direction, 
 uint32_t
 TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
 {
-  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " reading from edge... ";
   Ptr<UdpChannel> ch = LookupChannel (socket);
   NS_ASSERT (ch);
   Ptr<BktapCircuit> circ = ch->circuits.front ();
@@ -753,13 +762,15 @@ TorBktapApp::ReadFromEdge (Ptr<Socket> socket)
   Ptr<SeqQueue> queue = circ->GetQueue (oppdir);
 
   uint32_t max_read = ((int) queue->cwnd - (int) queue->VirtSize () <= 0) ? 0 : (uint32_t) queue->cwnd - queue->VirtSize ();
+  cout << Simulator::Now().GetSeconds() << " " << GetNodeName() << " reading from edge... ";
+  cout << "cwnd=" << queue->cwnd << ", VirtSize()=" << queue->VirtSize () << ", max_read=" << max_read << endl;
   max_read *= CELL_PAYLOAD_SIZE;
 
   uint32_t read_bytes = 0;
 
   while (max_read - read_bytes >= CELL_PAYLOAD_SIZE && socket->GetRxAvailable () >= CELL_PAYLOAD_SIZE)
     {
-      cout << "[p] ";
+      cout << "... [p] ..." << endl;
       Ptr<Packet> data = socket->Recv (CELL_PAYLOAD_SIZE, 0);
       data->RemoveAllPacketTags (); //Fix for ns3 PacketTag Bug
       read_bytes += data->GetSize ();
