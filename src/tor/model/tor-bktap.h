@@ -337,33 +337,17 @@ public:
   void
   AddSample (Time rtt)
   {
-    std::cout << "AddSample rtt=" << rtt
-      << " estimatedRtt(old)=" << estimatedRtt
-      << " devRtt=" << devRtt
-      << " estimatedRtt(old)=" << estimatedRtt
-      << std::endl;
     if (rtt > 0)
       {
         double alpha = 0.125;
         double beta = 0.25;
         if (estimatedRtt > 0)
           {
-            std::cout << " >0";
-            std::cout
-              << " " << (1.0 - alpha)
-              << " " << estimatedRtt
-              << " " << Seconds((1.0 - alpha) * estimatedRtt.GetSeconds ())
-              << " " << alpha
-              << " " << rtt
-              << " " << Seconds(alpha * rtt.GetSeconds ())
-            ;
             estimatedRtt = Seconds((1.0 - alpha) * estimatedRtt.GetSeconds ()) + Seconds(alpha * rtt.GetSeconds ());
-            //estimatedRtt = (1.0 - alpha) * estimatedRtt + alpha * rtt;
             devRtt = (1.0 - beta) * devRtt + beta* Abs (rtt - estimatedRtt);
           }
         else
           {
-            std::cout << " <=0";
             estimatedRtt = rtt;
           }
 
@@ -381,7 +365,6 @@ public:
 
         ++cntRtt;
       }
-    std::cout << " estimatedRtt(new)=" << estimatedRtt << std::endl;
   }
 
   void
