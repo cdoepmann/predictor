@@ -127,6 +127,10 @@ public:
   uint32_t GetOutbufSize ();
   uint32_t GetInbufSize ();
 
+  static void RememberName (Ipv4Address, string);
+  string GetRemoteName ();
+  TorApp * GetTorApp() { return torapp; }
+
 private:
   TorApp* torapp;
   Ipv4Address remote;
@@ -143,6 +147,8 @@ private:
 
   EventId read_event;
   EventId write_event;
+
+  static map<Ipv4Address, string> remote_names;
 };
 
 
@@ -197,6 +203,13 @@ public:
                  Ptr<Socket>      // the new socket itself
                  > m_triggerNewSocket;
   typedef void (* TorNewSocketCallback) (Ptr<TorBaseApp>, CellDirection, Ptr<Socket>);
+
+  // Callback to trigger after a new pseudo server socket is added
+  TracedCallback<Ptr<TorBaseApp>, // this app
+                 int,              // circuit id
+                 Ptr<PseudoServerSocket>      // the new pseudo socket itself
+                 > m_triggerNewPseudoServerSocket;
+  typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBaseApp>, int, Ptr<PseudoServerSocket>);
 
 protected:
   virtual void DoDispose (void);

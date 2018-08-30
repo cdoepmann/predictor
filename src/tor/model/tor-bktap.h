@@ -713,11 +713,11 @@ public:
   uint32_t m_devQlimit;
 
   // Callback to trigger after a new pseudo server socket is added
-  TracedCallback<Ptr<TorBktapApp>, // this app
+  TracedCallback<Ptr<TorBaseApp>, // this app
                  int,              // circuit id
                  Ptr<PseudoServerSocket>      // the new pseudo socket itself
                  > m_triggerNewPseudoServerSocket;
-  typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBktapApp>, int, Ptr<PseudoServerSocket>);
+  typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBaseApp>, int, Ptr<PseudoServerSocket>);
 
   // Callback to trigger after a BackTap state change
   TracedCallback<Ptr<TorBktapApp>, // this app

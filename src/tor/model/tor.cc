@@ -1,4 +1,3 @@
-#define NS_LOG_APPEND_CONTEXT clog << Simulator::Now ().GetSeconds () << " ";
 
 #include "ns3/log.h"
 #include "ns3/random-variable-stream.h"
@@ -30,7 +29,11 @@ TorApp::GetTypeId (void)
     .AddTraceSource ("NewSocket",
                      "Trace indicating that a new socket has been installed.",
                      MakeTraceSourceAccessor (&TorApp::m_triggerNewSocket),
-                     "ns3::TorApp::TorNewSocketCallback");
+                     "ns3::TorApp::TorNewSocketCallback")
+    .AddTraceSource ("NewServerSocket",
+                     "Trace indicating that a new pseudo server socket has been installed.",
+                     MakeTraceSourceAccessor (&TorApp::m_triggerNewPseudoServerSocket),
+                     "ns3::TorApp::TorNewPseudoServerSocketCallback");
   return tid;
 }
 
@@ -148,6 +151,8 @@ TorApp::StartApplication (void)
       listen_socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
       listen_socket->Bind (m_local);
       listen_socket->Listen ();
+      Connection::RememberName(Ipv4Address::ConvertFrom (m_ip), GetNodeName());
+      cout << "remember " << Ipv4Address::ConvertFrom (m_ip) << " -> " << GetNodeName() << endl;
     }
 
   listen_socket->SetAcceptCallback (MakeNullCallback<bool,Ptr<Socket>,const Address &> (),
@@ -185,6 +190,9 @@ TorApp::StartApplication (void)
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
               m_triggerNewSocket(this, OUTBOUND, socket);
+
+              int circId = conn->GetActiveCircuits () ->GetId ();
+              m_triggerNewPseudoServerSocket(this, circId, DynamicCast<PseudoServerSocket>(socket));
             }
 
           if (conn->GetType () == PROXYEDGE)
@@ -250,7 +258,7 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
 
   if (conn->IsBlocked ())
     {
-      NS_LOG_LOGIC ("Reading blocked, return");
+      NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] Reading blocked, return");
       return;
     }
 
@@ -259,7 +267,7 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
 
   // find the minimum amount of data to read safely from the socket
   max_read = min (max_read, socket->GetRxAvailable ());
-  NS_LOG_LOGIC ("Read " << max_read << "/" << socket->GetRxAvailable () << " bytes from " << conn->GetRemote ());
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] Reading " << max_read << "/" << socket->GetRxAvailable () << " bytes");
 
   if (m_readbucket.GetSize() <= 0 && m_scheduleReadHead == 0) {
     m_scheduleReadHead = conn;
@@ -278,14 +286,18 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
   vector<Ptr<Packet> > packet_list;
   uint32_t read_bytes = conn->Read (&packet_list, max_read);
 
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] Got " << packet_list.size () << " packets (read " << read_bytes << " bytes)");
+
   for (uint32_t i = 0; i < packet_list.size (); i++)
     {
       if (conn->SpeaksCells ())
         {
+          NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] Handling relay cell...");
           ReceiveRelayCell (conn, packet_list[i]);
         }
       else
         {
+          NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] Handling non-relay cell, packaging it...");
           PackageRelayCell (conn, packet_list[i]);
         }
     }
@@ -310,17 +322,21 @@ TorApp::PackageRelayCell (Ptr<Connection> conn, Ptr<Packet> cell)
 {
   NS_ASSERT (conn);
   NS_ASSERT (cell);
-  Ptr<Circuit> circ = conn->GetActiveCircuits ();
+  Ptr<Circuit> circ = conn->GetActiveCircuits (); // TODO why?, but ok (only one circ on this side (server)
   NS_ASSERT (circ);
 
   PackageRelayCellImpl (circ->GetId (), cell);
 
   CellDirection direction = circ->GetOppositeDirection (conn);
   AppendCellToCircuitQueue (circ, cell, direction);
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Circuit " << circ->GetId () << "] Appended newly packaged cell to circ queue.");
   if (circ->GetPackageWindow () <= 0)
     {
-      NS_LOG_LOGIC ("[Circuit " << circ->GetId () << "] Package window empty. Block reading from " << conn->GetRemote ());
+      NS_LOG_LOGIC ("[" << GetNodeName() << ": Circuit " << circ->GetId () << "] Package window empty now. Block reading from " << conn->GetRemote());
       conn->SetBlocked (true);
+      // TODO blocking the whole connection if SENDME window for one of its
+      //      circuits is empty
+      //  ==> server only!!
     }
 }
 
@@ -343,6 +359,8 @@ TorApp::ReceiveRelayCell (Ptr<Connection> conn, Ptr<Packet> cell)
   NS_ASSERT (cell);
   Ptr<Circuit> circ = LookupCircuitFromCell (cell);
   NS_ASSERT (circ);
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] received relay cell.");
+  //NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << Ipv4Address::ConvertFrom (conn->GetRemote()) << "/" << conn->GetRemoteName () << "] received relay cell.");
 
   // find target connection for relaying
   CellDirection direction = circ->GetOppositeDirection (conn);
@@ -376,7 +394,7 @@ TorApp::AppendCellToCircuitQueue (Ptr<Circuit> circ, Ptr<Packet> cell, CellDirec
 
   circ->PushCell (cell, direction);
 
-  NS_LOG_LOGIC ("[Circuit " << circ->GetId () << "] Appended cell. Queue holds " << queue->size () << " cells.");
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Circuit " << circ->GetId () << "] Appended cell. Queue holds " << queue->size () << " cells.");
   conn->ScheduleWrite ();
 }
 
@@ -395,7 +413,7 @@ TorApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   uint32_t max_write = RoundRobin (base, m_writebucket.GetSize ());
   max_write = max_write > newtx ? newtx : max_write;
 
-  NS_LOG_LOGIC ("Write max " << max_write << " bytes to " << conn->GetRemote ());
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] writing at most " << max_write << " bytes into Conn");
 
   if (m_writebucket.GetSize() <= 0 && m_scheduleWriteHead == 0) {
     m_scheduleWriteHead = conn;
@@ -407,7 +425,7 @@ TorApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
     }
 
   written_bytes = conn->Write (max_write);
-  NS_LOG_LOGIC (written_bytes << " bytes written to " << conn->GetRemote ());
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] " << written_bytes << " bytes written");
 
   if (written_bytes > 0)
     {
@@ -645,7 +663,7 @@ Circuit::PopCell (CellDirection direction)
           if (deliver_window <= m_windowStart - m_windowIncrement)
             {
               IncDeliverWindow ();
-              NS_LOG_LOGIC ("[Circuit " << GetId () << "] Send SENDME cell ");
+              NS_LOG_LOGIC ("[" << conn->GetTorApp()->GetNodeName() << ": Circuit " << GetId () << "] Send SENDME cell ");
               Ptr<Packet> sendme_cell = CreateSendme ();
               GetQueue (BaseCircuit::GetOppositeDirection (direction))->push (sendme_cell);
               GetOppositeConnection (direction)->ScheduleWrite ();
@@ -683,7 +701,7 @@ Circuit::PushCell (Ptr<Packet> cell, CellDirection direction)
             {
               // update package window
               IncPackageWindow ();
-              NS_LOG_LOGIC ("[Circuit " << GetId () << "] Received SENDME cell. Package window now " << package_window);
+              NS_LOG_LOGIC ("[" << conn->GetTorApp()->GetNodeName() << ": Circuit " << GetId () << "] Received SENDME cell. Package window now " << package_window);
               if (conn->IsBlocked ())
                 {
                   conn->SetBlocked (false);
@@ -999,6 +1017,24 @@ Connection::GetRemote ()
   return remote;
 }
 
+map<Ipv4Address,string> Connection::remote_names;
+
+void
+Connection::RememberName (Ipv4Address address, string name)
+{
+  Connection::remote_names[address] = name;
+}
+
+string
+Connection::GetRemoteName ()
+{
+  if (Ipv4Mask ("255.0.0.0").IsMatch (GetRemote (), Ipv4Address ("127.0.0.1")) )
+    return "pseudo";
+
+  map<Ipv4Address,string>::const_iterator it = Connection::remote_names.find(GetRemote ());
+  NS_ASSERT(it != Connection::remote_names.end() );
+  return it->second;
+}
 
 
 
@@ -1007,17 +1043,29 @@ Connection::Read (vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 {
   if (reading_blocked)
     {
+      NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": Connection " << GetRemoteName () << "] Reading nothing: blocked");
       return 0;
     }
 
   uint8_t raw_data[max_read + this->inbuf.size];
   memcpy (raw_data, this->inbuf.data, this->inbuf.size);
+  uint32_t tmp_available = m_socket->GetRxAvailable ();
   int read_bytes = m_socket->Recv (&raw_data[this->inbuf.size], max_read, 0);
 
   uint32_t base = SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t datasize = read_bytes + inbuf.size;
   uint32_t leftover = datasize % base;
   int num_packages = datasize / base;
+
+  NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": Connection " << GetRemoteName () << "] " <<
+      "GetRxAvailable = " << tmp_available << ", "
+      "max_read = " << max_read << ", "
+      "read_bytes = " << read_bytes << ", "
+      "base = " << base << ", "
+      "datasize = " << datasize << ", "
+      "leftover = " << leftover << ", "
+      "num_packages = " << num_packages
+  );
 
   // slice data into packets
   Ptr<Packet> cell;
@@ -1052,6 +1100,8 @@ Connection::Write (uint32_t max_write)
   Ptr<Packet> cell = Ptr<Packet> (NULL);
   CellDirection direction;
 
+  NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": Connection " << GetRemoteName () << "] Trying to write cells from circuit queues");
+
   while (datasize < max_write)
     {
       circ = GetActiveCircuits ();
@@ -1064,6 +1114,7 @@ Connection::Write (uint32_t max_write)
         {
           datasize += cell->CopyData (&raw_data[datasize], cell->GetSize ());
           flushed_some = true;
+          NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": Connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
         }
 
       SetActiveCircuits (circ->GetNextCirc (this));
@@ -1084,12 +1135,16 @@ Connection::Write (uint32_t max_write)
     {
       written_bytes = m_socket->Send (raw_data, max_write, 0);
     }
+  NS_ASSERT(written_bytes >= 0);
 
   /* save leftover for next time */
   written_bytes = max (written_bytes,0);
   uint32_t leftover = datasize - written_bytes;
   memcpy (outbuf.data, &raw_data[datasize - leftover], leftover);
   outbuf.size = leftover;
+
+  if(leftover > 0)
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": Connection " << GetRemoteName () << "] " << leftover << " bytes left over for next conn write");
 
   return written_bytes;
 }

@@ -88,6 +88,9 @@ public:
   // Get the resulting circuits
   std::map <int, std::vector<std::string> > GetCircuitRelays ();
 
+  // Set maximum factor around each link delay
+  void SetLinkFuzziness (double);
+
   vector<int> circuitIds;
 
 protected:
@@ -174,6 +177,9 @@ public:
 
   map<int,CircuitDescriptor> m_circuits;
   map<string, RelayDescriptor> m_relays;
+
+  void MakeLinkDelaysFuzzy ();
+  double m_fuzziness;
 
   int m_nSpokes;
   bool m_disableProxies;

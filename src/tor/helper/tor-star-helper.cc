@@ -15,6 +15,7 @@ TorStarHelper::TorStarHelper ()
   m_disableProxies = false;
   m_enablePcap = false;
   m_factory.SetTypeId ("ns3::TorApp");
+  m_fuzziness = 0.0;
 }
 
 TorStarHelper::~TorStarHelper ()
@@ -235,6 +236,8 @@ TorStarHelper::BuildTopology ()
   {
     SetLinkProperty (it->first, "Delay", TimeValue (it->second));
   }
+
+  MakeLinkDelaysFuzzy ();
 
   // Disable high-level traffic control
   TrafficControlHelper tch;
@@ -636,6 +639,46 @@ TorStarHelper::SetLinkProperty (string node, string property, const AttributeVal
   
   Ptr<PointToPointChannel> link = DynamicCast<PointToPointChannel> (device->GetChannel ());
   link->SetAttribute (property, value);
+}
+
+void
+TorStarHelper::SetLinkFuzziness (double fuzziness)
+{
+  m_fuzziness = fuzziness;
+}
+
+void
+TorStarHelper::MakeLinkDelaysFuzzy ()
+{
+  if (m_fuzziness <= 0.00001)
+    return;
+
+  for (auto it = m_relays.begin(); it != m_relays.end(); ++it)
+  {
+    RelayDescriptor relay = it->second;
+
+    auto device = DynamicCast<PointToPointNetDevice> (
+        m_starHelper->GetHub()->GetDevice(relay.spokeId)
+    );
+    
+    Ptr<PointToPointChannel> link = DynamicCast<PointToPointChannel> (device->GetChannel ());
+
+    // Get delay
+    TimeValue old_delay;
+    link->GetAttribute ("Delay", old_delay);
+
+    // Apply fuzzyness
+    Ptr<UniformRandomVariable> stream = CreateObject<UniformRandomVariable> ();
+    stream->SetAttribute ("Max", DoubleValue (1.0 + m_fuzziness));
+    stream->SetAttribute ("Min", DoubleValue (std::max(0.01, 1.0 - m_fuzziness)));
+
+    double factor = stream->GetValue ();
+
+    Time new_delay = Seconds(old_delay.Get().GetSeconds()*factor);
+
+    // Set delay
+    link->SetAttribute ("Delay", TimeValue (new_delay));
+  }
 }
 
 void

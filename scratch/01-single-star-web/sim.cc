@@ -37,8 +37,18 @@ void VanillaPackageWindowChangeCallback (int id, string context, int32_t, int32_
 void TcpStateChangeCallback (int id, string context, TcpSocket::TcpStates_t oldValue, TcpSocket::TcpStates_t newValue);
 void TcpCongStateChangeCallback (int id, string context, TcpSocketState::TcpCongState_t oldValue, TcpSocketState::TcpCongState_t newValue);
 void NewSocketCallback (int id, string context, Ptr<TorBaseApp> app, CellDirection direction, Ptr<Socket> sock);
-void NewServerSocketCallback (Ptr<TorBktapApp> app, int id, Ptr<PseudoServerSocket> sock);
+void NewServerSocketCallback (Ptr<TorBaseApp> app, int id, Ptr<PseudoServerSocket> sock);
 void BktapStateChangeCallback (Ptr<TorBktapApp> app, int id, BktapState from, BktapState to);
+
+std::set<std::string> allowed_outputs;
+
+bool is_allowed_output(std::string type)
+{
+  if (allowed_outputs.size () == 0)
+    return true;
+
+  return (allowed_outputs.find(type) != allowed_outputs.end());
+}
 
 template <typename T,
          typename D1_1, typename D1_2,
@@ -53,6 +63,7 @@ void output(T type,
             D4_1 d4_1, D4_2 d4_2
            )
 {
+  if (!is_allowed_output(type)) return;
     std::cout << "OUTPUT[" << type << "] simtime=" << Simulator::Now().GetSeconds() << " "
       << d1_1 << "=" << d1_2 << " "
       << d2_1 << "=" << d2_2 << " "
@@ -72,6 +83,7 @@ void output(T type,
             D3_1 d3_1, D3_2 d3_2
            )
 {
+  if (!is_allowed_output(type)) return;
     std::cout << "OUTPUT[" << type << "] simtime=" << Simulator::Now().GetSeconds() << " "
       << d1_1 << "=" << d1_2 << " "
       << d2_1 << "=" << d2_2 << " "
@@ -81,16 +93,19 @@ void output(T type,
 
 template <typename T, typename U, typename V, typename W, typename X>
 void output(T type, U data, V data2, W data3, X data4) {
+  if (!is_allowed_output(type)) return;
     std::cout << "OUTPUT[" << type << "] simtime=" << Simulator::Now().GetSeconds() << " " << data << "=" << data2 << " " << data3 << "=" << data4 << std::endl;
 }
 
 template <typename T, typename U, typename V>
 void output(T type, U data, V data2) {
+  if (!is_allowed_output(type)) return;
     std::cout << "OUTPUT[" << type << "] simtime=" << Simulator::Now().GetSeconds() << " " << data << "=" << data2 << std::endl;
 }
 
 template <typename T, typename U>
 void output(T type, U data) {
+  if (!is_allowed_output(type)) return;
     std::cout << "OUTPUT[" << type << "] simtime=" << Simulator::Now().GetSeconds() << " " << data << std::endl;
 }
 
@@ -223,6 +238,19 @@ ParseNodeStringOption (map<string,string> * target, const string value)
 }
 
 bool
+ParseStringSet (set<string> * target, const string value)
+{
+  target->clear();
+
+  auto entries = split2vector(value, ",");
+  
+  for(auto it = entries.cbegin(); it != entries.cend(); ++it) {
+    target->insert(*it);
+  }
+  return true;
+}
+
+bool
 ParseIntSet (set<int> * target, const string value)
 {
   target->clear();
@@ -302,6 +330,10 @@ RandomSubset(int available, int size)
 string flavor = "vanilla";
 bool use_nsc = false;
 
+ofstream progress_stream;
+
+set<int> circuits_to_wait_for;
+
 int main (int argc, char *argv[]) {
     Time simTime = Time("60s");
     uint32_t n_circuits = 1;
@@ -312,6 +344,7 @@ int main (int argc, char *argv[]) {
     string bottleneck = "btlnk";
     string bottleneck_rate = "2Mb/s";
     string bottleneck_link_rate = "0";
+    string default_rate_limit = "0";
     string underlay_rate = "10Gb/s";
     string refill_interval = "100ms";
     string startup_scheme = "slow-start";
@@ -319,7 +352,7 @@ int main (int argc, char *argv[]) {
     uint32_t queue_max_packets = 0;
     bool disable_dack = false;
     bool nagle = true;
-    bool min_filtering = false;
+    int percentile = 90;
     map<string,uint32_t> node_rtts;
     map<string,string> node_rates;
     double beginning_interval = 0.9;
@@ -327,6 +360,8 @@ int main (int argc, char *argv[]) {
     int available_relays = -1;
     set<int> beginning_circids = {1};
     map<int,double> begin_at_circuits;
+    double fuzziness = 0.0;
+    string progress_file = "";
 
     CommandLine cmd;
     cmd.AddValue("circuits", "The number of circuits", n_circuits);
@@ -337,6 +372,7 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("bottleneck", "The node to be used as a bottleneck", bottleneck);
     cmd.AddValue("bottleneck-rate", "The rate of the bottleneck (application layer)", bottleneck_rate);
     cmd.AddValue("bottleneck-link-rate", "The rate of the bottleneck (underlay link)", bottleneck_link_rate);
+    cmd.AddValue("default-rate-limit", "The default rate of each relay (application layer)", default_rate_limit);
     cmd.AddValue("underlay-rate", "The rate of the underlay links", underlay_rate);
     cmd.AddValue("disable-proxy", "Disable proxy (default true)", disable_proxy);
     cmd.AddValue("enable-pcap", "Enable .pcap logging (default false)", enable_pcap);
@@ -349,12 +385,15 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("node-rtts", "Set per-node RTTs overriding the default. Comma-seperated node:rtt list", MakeBoundCallback(ParseNodeIntOption, &node_rtts));
     cmd.AddValue("node-rates", "Set per-node link data rates overriding the default. Comma-seperated node:rate list", MakeBoundCallback(ParseNodeStringOption, &node_rates));
     cmd.AddValue("nagle", "Enable BackTap's Nagle algorithm (default true)", nagle);
-    cmd.AddValue("min-filter", "Min-filter RTT samples instead of 90th percentile (default false)", min_filtering);
+    cmd.AddValue("percentile", "Percentile for RTT samples filtering (0 = minimum, default 90)", percentile);
     cmd.AddValue("beginning-interval", "Interval in seconds during which the initial circuits start (default 0.9)", beginning_interval);
     cmd.AddValue("circuit-topology", "The strategy that is used by circuits for choosing the circuit relays", circuit_topology);
     cmd.AddValue("available-relays", "The number of relays that are in the pool for random circuits", available_relays);
     cmd.AddValue("beginning-circuits", "Comma-seperated list of circuits that start in the beginning", MakeBoundCallback(ParseIntSet, &beginning_circids));
     cmd.AddValue("begin-at", "Comma-seperated list of circuit:start-time mappings.", MakeBoundCallback(ParseNodeIntDoubleOption, &begin_at_circuits));
+    cmd.AddValue("fuzziness", "fuzziness of the link delay (default 0.0)", fuzziness);
+    cmd.AddValue("allowed-outputs", "output messages that will be printed", MakeBoundCallback(ParseStringSet, &allowed_outputs));
+    cmd.AddValue("progress-file", "output simtime to file continuously", progress_file);
     cmd.Parse(argc, argv);
 
     /* set global defaults */
@@ -394,7 +433,7 @@ int main (int argc, char *argv[]) {
     NS_LOG_INFO("setup topology");
 
     // apply min-filter setting
-    Config::SetDefault ("ns3::TorBktapApp::MinFiltering", BooleanValue (min_filtering));
+    Config::SetDefault ("ns3::TorBktapApp::Percentile", IntegerValue (percentile));
 
     TorStarHelper th;
     if (flavor == "bktap")
@@ -421,6 +460,9 @@ int main (int argc, char *argv[]) {
     
     for (int circid=1; (uint32_t)circid <= n_circuits; circid++)
     {
+      // remember this circuit
+      circuits_to_wait_for.insert(circid);
+
       // Decide on relays
       string entry_name, middle_name, exit_name;
 
@@ -445,17 +487,18 @@ int main (int argc, char *argv[]) {
 
       // Decide on start time
       Ptr<RandomVariableStream> start_stream;
-      if(beginning_circids.find(circid) != beginning_circids.end())
-      {
-        start_stream = begin_time_stream;
-      }
-      else if(begin_at_circuits.find(circid) != begin_at_circuits.end())
+      if(begin_at_circuits.find(circid) != begin_at_circuits.end())
       {
         double this_start_time = begin_at_circuits[circid];
+        cout  << "(" << circid << ") " << "app_start: " << this_start_time << endl;
         Ptr<ConstantRandomVariable> this_start_stream = CreateObject<ConstantRandomVariable> ();
         this_start_stream->SetAttribute ("Constant", DoubleValue (this_start_time));
 
         start_stream = this_start_stream;
+      }
+      else if(beginning_circids.find(circid) != beginning_circids.end())
+      {
+        start_stream = begin_time_stream;
       }
       else
       {
@@ -470,7 +513,7 @@ int main (int argc, char *argv[]) {
 
       // Decide on think time
       Ptr<ConstantRandomVariable> think_stream = CreateObject<ConstantRandomVariable> ();
-      think_stream->SetAttribute ("Constant", DoubleValue (90.0));
+      think_stream->SetAttribute ("Constant", DoubleValue (99999.0));
 
       // Add the circuit
       th.AddCircuit(circid, entry_name, middle_name, exit_name,
@@ -481,6 +524,12 @@ int main (int argc, char *argv[]) {
           )
       );
     
+    }
+
+    if(DataRate(default_rate_limit).GetBitRate() > 0)
+    {
+      th.SetAllRelaysAttribute("BandwidthRate", DataRateValue(DataRate(default_rate_limit)));
+      th.SetAllRelaysAttribute("BandwidthBurst", DataRateValue(DataRate(default_rate_limit)));
     }
 
     if(circuit_topology == "single_bottleneck" /* || TODO */)
@@ -523,6 +572,10 @@ int main (int argc, char *argv[]) {
     for(auto it = node_rtts.cbegin(); it != node_rtts.cend(); ++it) {
       th.SetNodeRtt(it->first, MilliSeconds(it->second));
     }
+
+    // Apply link delay fuzziness
+    NS_ABORT_MSG_IF (fuzziness < -0.00001, "link fuzziness must not be negative");
+    th.SetLinkFuzziness (fuzziness);
 
     // th.PrintCircuits();
     th.BuildTopology(); // finally build topology, setup relays and seed circuits
@@ -666,6 +719,11 @@ int main (int argc, char *argv[]) {
             bktap_app->TraceConnectWithoutContext("NewServerSocket", MakeCallback(&NewServerSocketCallback));
             bktap_app->TraceConnectWithoutContext("State", MakeCallback(&BktapStateChangeCallback));
           }
+          Ptr<TorApp> tor_app = DynamicCast<TorApp> (app);
+          if (tor_app)
+          {
+            tor_app->TraceConnectWithoutContext("NewServerSocket", MakeCallback(&NewServerSocketCallback));
+          }
         }
     }
     
@@ -693,11 +751,17 @@ int main (int argc, char *argv[]) {
 
     output("PACKET_PAYLOAD_SIZE", "value", PACKET_PAYLOAD_SIZE);
 
+    if (progress_file.size() > 0)
+      progress_stream.open(progress_file);
+
     NS_LOG_INFO("start simulation");
     Simulator::Run ();
 
     NS_LOG_INFO("stop simulation");
     Simulator::Destroy ();
+
+    if (progress_file.size() > 0)
+      progress_stream.close();
 
     return 0;
 }
@@ -745,13 +809,13 @@ NewSocketCallback (int id, string context, Ptr<TorBaseApp> app, CellDirection di
     tcp->GetAttribute("InitialSlowStartThreshold", data);
     cout << context << " InitialSlowStartThreshold: " << data.Get() << endl;
   }
-  else if(server) {
-    server->TraceConnectWithoutContext("StartResponse", MakeBoundCallback(&StartResponseCallback, id));
-  }
+//  else if(server) {
+//    server->TraceConnectWithoutContext("StartResponse", MakeBoundCallback(&StartResponseCallback, id));
+//  }
 }
 
 void
-NewServerSocketCallback (Ptr<TorBktapApp> app, int id, Ptr<PseudoServerSocket> server)
+NewServerSocketCallback (Ptr<TorBaseApp> app, int id, Ptr<PseudoServerSocket> server)
 {
   cout << "new pseudo server socket" << endl;
   server->TraceConnectWithoutContext("StartResponse", MakeBoundCallback(&StartResponseCallback, id));
@@ -877,14 +941,16 @@ VanillaPackageWindowChangeCallback (int id, string context, int32_t oldValue, in
 void
 TtlbCallback (int id, double time, string hint)
 {
-    cout << Simulator::Now().GetSeconds() << " " << hint << " TTLB from id " << id << ": " << time << endl;
     output("last-byte", "circuit", id);
+
+    circuits_to_wait_for.erase(id);
+    if (circuits_to_wait_for.size() == 0)
+      Simulator::Stop ();
 }
 
 void
 TtfbCallback (int id, double time, string hint)
 {
-    cout << Simulator::Now().GetSeconds() << " " << hint << " TTFB from id " << id << ": " << time << endl;
     output("first-byte", "circuit", id);
 }
 
@@ -898,7 +964,11 @@ ClientRecvCallback (int id, uint32_t new_bytes, string hint)
 void
 StatsCallback(TorStarHelper* th, Time simTime)
 {
-    cout << setw(5) << Simulator::Now().GetSeconds() << " ";
+  if (progress_stream.good()) {
+    progress_stream << setw(5) << Simulator::Now().GetSeconds() << endl;
+    progress_stream.flush ();
+  }
+//    cout << setw(5) << Simulator::Now().GetSeconds() << " ";
     vector<int>::iterator id;
     for (id = th->circuitIds.begin(); id != th->circuitIds.end(); ++id) {
 
@@ -910,28 +980,28 @@ StatsCallback(TorStarHelper* th, Time simTime)
       Ptr<BaseCircuit> entryCirc = entryApp->baseCircuits[*id];
       Ptr<BaseCircuit> middleCirc = middleApp->baseCircuits[*id];
       Ptr<BaseCircuit> exitCirc = exitApp->baseCircuits[*id];
-      cout
-          << setw(8) << proxyCirc->GetBytesRead(OUTBOUND) << " "
-          << setw(8) << proxyCirc->GetBytesWritten(OUTBOUND) << " "
-          << setw(8) << proxyCirc->GetBytesRead(INBOUND) << " "
-          << setw(8) << proxyCirc->GetBytesWritten(INBOUND) << " |"
-
-          << setw(8) << entryCirc->GetBytesRead(OUTBOUND) << " "
-          << setw(8) << entryCirc->GetBytesWritten(OUTBOUND) << " "
-          << setw(8) << entryCirc->GetBytesRead(INBOUND) << " "
-          << setw(8) << entryCirc->GetBytesWritten(INBOUND) << " |"
-
-          << setw(8) << middleCirc->GetBytesRead(OUTBOUND) << " "
-          << setw(8) << middleCirc->GetBytesWritten(OUTBOUND) << " "
-          << setw(8) << middleCirc->GetBytesRead(INBOUND) << " "
-          << setw(8) << middleCirc->GetBytesWritten(INBOUND) << " |"
-
-          << setw(8) << exitCirc->GetBytesRead(OUTBOUND) << " "
-          << setw(8) << exitCirc->GetBytesWritten(OUTBOUND) << " "
-          << setw(8) << exitCirc->GetBytesRead(INBOUND) << " "
-          << setw(8) << exitCirc->GetBytesWritten(INBOUND)
-          ;
-      cout << endl;
+//      cout
+//          << setw(8) << proxyCirc->GetBytesRead(OUTBOUND) << " "
+//          << setw(8) << proxyCirc->GetBytesWritten(OUTBOUND) << " "
+//          << setw(8) << proxyCirc->GetBytesRead(INBOUND) << " "
+//          << setw(8) << proxyCirc->GetBytesWritten(INBOUND) << " |"
+//
+//          << setw(8) << entryCirc->GetBytesRead(OUTBOUND) << " "
+//          << setw(8) << entryCirc->GetBytesWritten(OUTBOUND) << " "
+//          << setw(8) << entryCirc->GetBytesRead(INBOUND) << " "
+//          << setw(8) << entryCirc->GetBytesWritten(INBOUND) << " |"
+//
+//          << setw(8) << middleCirc->GetBytesRead(OUTBOUND) << " "
+//          << setw(8) << middleCirc->GetBytesWritten(OUTBOUND) << " "
+//          << setw(8) << middleCirc->GetBytesRead(INBOUND) << " "
+//          << setw(8) << middleCirc->GetBytesWritten(INBOUND) << " |"
+//
+//          << setw(8) << exitCirc->GetBytesRead(OUTBOUND) << " "
+//          << setw(8) << exitCirc->GetBytesWritten(OUTBOUND) << " "
+//          << setw(8) << exitCirc->GetBytesRead(INBOUND) << " "
+//          << setw(8) << exitCirc->GetBytesWritten(INBOUND)
+//          ;
+//      cout << endl;
 
       output("node-written-so-far-sampled", "circuit", *id, "which", "proxy-inbound", "bytes", proxyCirc->GetBytesWritten(INBOUND));
       output("node-read-so-far-sampled", "circuit", *id, "which", "proxy-inbound", "bytes", proxyCirc->GetBytesRead(INBOUND));
@@ -960,8 +1030,6 @@ StatsCallback(TorStarHelper* th, Time simTime)
 
       output("server-written-so-far-sampled", "circuit", *id, "bytes", exitCirc->GetBytesWritten(INBOUND));
       output("client-read-so-far-sampled", "circuit", *id, "bytes", proxyCirc->GetBytesRead(INBOUND));
-      // cout << proxyCirc->GetBytesRead(OUTBOUND) << " " << exitCirc->GetBytesWritten(OUTBOUND) << " ";
-      // proxyCirc->ResetStats(); exitCirc->ResetStats();
     }
 
     Time resolution = MilliSeconds(10);
