@@ -468,7 +468,10 @@ PseudoClientSocket::Send (Ptr<Packet> p, uint32_t flags)
   uint32_t size = p->GetSize ();
   m_leftToRead -= size;
 
-  recvCallback (m_recvId, size, m_recvDesc);
+  if (recvCallback)
+    {
+      recvCallback (m_recvId, size, m_recvDesc);
+    }
 
   if (m_leftToRead <= 0)
     {
