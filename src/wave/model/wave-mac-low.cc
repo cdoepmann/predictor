@@ -19,7 +19,10 @@
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  *         Junling Bu <linlinjavaer@gmail.com>
  */
+
 #include "ns3/log.h"
+#include "ns3/event-id.h"
+#include "ns3/wifi-phy.h"
 #include "wave-mac-low.h"
 #include "higher-tx-tag.h"
 
@@ -85,13 +88,15 @@ WaveMacLow::GetDataTxVector (Ptr<const Packet> packet, const WifiMacHeader *hdr)
   txAdapter.SetChannelWidth (10);
   // the DataRate set by higher layer is the minimum data rate
   // which is the lower bound for the actual data rate.
-  if (txHigher.GetMode ().GetDataRate (txHigher.GetChannelWidth (), txHigher.IsShortGuardInterval (), 1) > txMac.GetMode ().GetDataRate (txMac.GetChannelWidth (), txMac.IsShortGuardInterval (), 1))
+  if (txHigher.GetMode ().GetDataRate (txHigher.GetChannelWidth ()) > txMac.GetMode ().GetDataRate (txMac.GetChannelWidth ()))
     {
       txAdapter.SetMode (txHigher.GetMode ());
+      txAdapter.SetPreambleType (txHigher.GetPreambleType ());
     }
   else
     {
       txAdapter.SetMode (txMac.GetMode ());
+      txAdapter.SetPreambleType (txMac.GetPreambleType ());
     }
   // the TxPwr_Level set by higher layer is the maximum transmit
   // power which is the upper bound for the actual transmit power;
@@ -104,15 +109,15 @@ void
 WaveMacLow::StartTransmission (Ptr<const Packet> packet,
                                const WifiMacHeader* hdr,
                                MacLowTransmissionParameters params,
-                               MacLowTransmissionListener *listener)
+                               Ptr<Txop> dca)
 {
-  NS_LOG_FUNCTION (this << packet << hdr << params << listener);
+  NS_LOG_FUNCTION (this << packet << hdr << params << dca);
   Ptr<WifiPhy> phy = MacLow::GetPhy ();
   uint32_t curChannel = phy->GetChannelNumber ();
   // if current channel access is not AlternatingAccess, just do as MacLow.
   if (!m_scheduler->IsAlternatingAccessAssigned (curChannel))
     {
-      MacLow::StartTransmission (packet, hdr, params, listener);
+      MacLow::StartTransmission (packet, hdr, params, dca);
       return;
     }
 
@@ -122,14 +127,14 @@ WaveMacLow::StartTransmission (Ptr<const Packet> packet,
   if (transmissionTime > remainingTime)
     {
       // The attempt for this transmission will be canceled;
-      // and this packet will be pending for next transmission by EdcaTxopN class
+      // and this packet will be pending for next transmission by QosTxop class
       NS_LOG_DEBUG ("Because the required transmission time = " << transmissionTime.GetMilliSeconds ()
                                                                 << "ms exceeds the remainingTime = " << remainingTime.GetMilliSeconds ()
                                                                 << "ms, currently this packet will not be transmitted.");
     }
   else
     {
-      MacLow::StartTransmission (packet, hdr, params, listener);
+      MacLow::StartTransmission (packet, hdr, params, dca);
     }
 }
 

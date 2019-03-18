@@ -18,7 +18,7 @@
  * Author: Dean Armstrong <deanarm@gmail.com>
  */
 
-#include "ns3/wifi-information-element.h"
+#include "wifi-information-element.h"
 
 namespace ns3 {
 
@@ -82,12 +82,6 @@ WifiInformationElement::DeserializeIfPresent (Buffer::Iterator i)
   i.Next (length);
 
   return i;
-}
-
-bool
-WifiInformationElement::operator< (WifiInformationElement const & a) const
-{
-  return (ElementId () < a.ElementId ());
 }
 
 bool

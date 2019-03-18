@@ -31,7 +31,6 @@ namespace ns3 {
 class UanTxMode;
 class UanModesList;
 
-
 /**
  * Default SINR model for UanPhyDual
  *
@@ -112,11 +111,9 @@ public:
   virtual void StartRxPacket (Ptr<Packet> pkt, double rxPowerDb, UanTxMode txMode, UanPdp pdp);
   virtual void SetReceiveOkCallback (RxOkCallback cb);
   virtual void SetReceiveErrorCallback (RxErrCallback cb);
-  virtual void SetRxGainDb (double gain);
   virtual void SetTxPowerDb (double txpwr);
-  NS_DEPRECATED virtual void SetRxThresholdDb (double thresh);
+  virtual void SetRxThresholdDb (double thresh);
   virtual void SetCcaThresholdDb (double thresh);
-  virtual double GetRxGainDb (void);
   virtual double GetTxPowerDb (void);
   virtual double GetRxThresholdDb (void);
   virtual double GetCcaThresholdDb (void);
@@ -140,6 +137,7 @@ public:
   virtual void Clear (void);
   virtual void SetSleepMode (bool sleep)
   {
+    NS_UNUSED (sleep);
     /// \todo This method has to be implemented
   }
   int64_t AssignStreams (int64_t stream);
@@ -178,14 +176,6 @@ public:
   /** \copydoc UanPhy::SetTxPowerDb */
   void SetTxPowerDbPhy2 (double txpwr);
 
-  /** \copydoc UanPhy::GetRxGainDb */
-  double GetRxGainDbPhy1 (void) const;
-  /** \copydoc UanPhy::GetRxGainDb */
-  double GetRxGainDbPhy2 (void) const;
-  /** \copydoc UanPhy::SetRxGainDb */
-  void SetRxGainDbPhy1 (double gain);
-  /** \copydoc UanPhy::SetRxGainDb */
-  void SetRxGainDbPhy2 (double gain);
 
   /**
    * Get the list of available modes.

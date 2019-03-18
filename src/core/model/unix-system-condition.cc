@@ -17,8 +17,9 @@
  */
 
 #include <pthread.h>
-#include <cerrno> // for ETIMEDOUT
-#include <sys/time.h>
+#include <cerrno>        // for ETIMEDOUT
+#include <time.h>        // for timespec
+#include <sys/time.h>    // for timeval, gettimeofday
 
 #include "fatal-error.h"
 #include "system-condition.h"
@@ -28,7 +29,7 @@
 /**
  * \file
  * \ingroup thread
- * Thread conditional wait implementation for Unix-like systems.
+ * ns3::SystemCondition and ns3::SystemConditionPrivate implementations.
  */
 
 namespace ns3 {
@@ -41,7 +42,7 @@ NS_LOG_COMPONENT_DEFINE ("SystemCondition");
  */
 class SystemConditionPrivate {
 public:
-  /// Conversion from ns to s.
+  /** Conversion from ns to s. */
   static const uint64_t NS_PER_SEC = (uint64_t)1000000000;
 
   /** Constructor. */

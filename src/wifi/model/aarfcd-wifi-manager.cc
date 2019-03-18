@@ -18,21 +18,17 @@
  * Author: Federico Maguolo <maguolof@dei.unipd.it>
  */
 
-#include "aarfcd-wifi-manager.h"
-#include "ns3/assert.h"
 #include "ns3/log.h"
-#include "ns3/simulator.h"
-#include "ns3/boolean.h"
-#include "ns3/double.h"
-#include "ns3/uinteger.h"
-#include <algorithm>
+#include "ns3/packet.h"
+#include "aarfcd-wifi-manager.h"
+#include "wifi-tx-vector.h"
 
 #define Min(a,b) ((a < b) ? a : b)
 #define Max(a,b) ((a > b) ? a : b)
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("Aarfcd");
+NS_LOG_COMPONENT_DEFINE ("AarfcdWifiManager");
 
 /**
  * \brief hold per-remote-station state for AARF-CD Wifi manager.
@@ -42,19 +38,19 @@ NS_LOG_COMPONENT_DEFINE ("Aarfcd");
  */
 struct AarfcdWifiRemoteStation : public WifiRemoteStation
 {
-  uint32_t m_timer;
-  uint32_t m_success;
-  uint32_t m_failed;
-  bool m_recovery;
-  bool m_justModifyRate;
-  uint32_t m_retry;
-  uint32_t m_successThreshold;
-  uint32_t m_timerTimeout;
-  uint32_t m_rate;
-  bool m_rtsOn;
-  uint32_t m_rtsWnd;
-  uint32_t m_rtsCounter;
-  bool m_haveASuccess;
+  uint32_t m_timer; ///< timer
+  uint32_t m_success; ///< success
+  uint32_t m_failed; ///< failed
+  bool m_recovery; ///< recovery
+  bool m_justModifyRate; ///< just modify rate
+  uint32_t m_retry; ///< retry
+  uint32_t m_successThreshold; ///< success threshold
+  uint32_t m_timerTimeout; ///< timer timeout
+  uint8_t m_rate; ///< rate
+  bool m_rtsOn; ///< RTS on
+  uint32_t m_rtsWnd; ///< RTS window
+  uint32_t m_rtsCounter; ///< RTS counter
+  bool m_haveASuccess; ///< have a success
 };
 
 NS_OBJECT_ENSURE_REGISTERED (AarfcdWifiManager);
@@ -110,12 +106,17 @@ AarfcdWifiManager::GetTypeId (void)
                    BooleanValue (true),
                    MakeBooleanAccessor (&AarfcdWifiManager::m_turnOnRtsAfterRateIncrease),
                    MakeBooleanChecker ())
+    .AddTraceSource ("Rate",
+                     "Traced value for rate changes (b/s)",
+                     MakeTraceSourceAccessor (&AarfcdWifiManager::m_currentRate),
+                     "ns3::TracedValueCallback::Uint64")
   ;
   return tid;
 }
 
 AarfcdWifiManager::AarfcdWifiManager ()
-  : WifiRemoteStationManager ()
+  : WifiRemoteStationManager (),
+    m_currentRate (0)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -304,13 +305,19 @@ AarfcdWifiManager::DoGetDataTxVector (WifiRemoteStation *st)
 {
   NS_LOG_FUNCTION (this << st);
   AarfcdWifiRemoteStation *station = (AarfcdWifiRemoteStation *) st;
-  uint32_t channelWidth = GetChannelWidth (station);
+  uint16_t channelWidth = GetChannelWidth (station);
   if (channelWidth > 20 && channelWidth != 22)
     {
       //avoid to use legacy rate adaptation algorithms for IEEE 802.11n/ac
       channelWidth = 20;
     }
-  return WifiTxVector (GetSupported (station, station->m_rate), GetDefaultTxPowerLevel (), GetLongRetryCount (station), false, 1, 0, channelWidth, GetAggregation (station), false);
+  WifiMode mode = GetSupported (station, station->m_rate);
+  if (m_currentRate != mode.GetDataRate (channelWidth))
+    {
+      NS_LOG_DEBUG ("New datarate: " << mode.GetDataRate (channelWidth));
+      m_currentRate = mode.GetDataRate (channelWidth);
+    }
+  return WifiTxVector (mode, GetDefaultTxPowerLevel (), GetPreambleForTransmission (mode, GetAddress (station)), 800, 1, 1, 0, channelWidth, GetAggregation (station), false);
 }
 
 WifiTxVector
@@ -320,21 +327,23 @@ AarfcdWifiManager::DoGetRtsTxVector (WifiRemoteStation *st)
   /// \todo we could/should implement the Aarf algorithm for
   /// RTS only by picking a single rate within the BasicRateSet.
   AarfcdWifiRemoteStation *station = (AarfcdWifiRemoteStation *) st;
-  uint32_t channelWidth = GetChannelWidth (station);
+  uint16_t channelWidth = GetChannelWidth (station);
   if (channelWidth > 20 && channelWidth != 22)
     {
       //avoid to use legacy rate adaptation algorithms for IEEE 802.11n/ac
       channelWidth = 20;
     }
   WifiTxVector rtsTxVector;
+  WifiMode mode;
   if (GetUseNonErpProtection () == false)
     {
-      rtsTxVector = WifiTxVector (GetSupported (station, 0), GetDefaultTxPowerLevel (), GetShortRetryCount (station), false, 1, 0, channelWidth, GetAggregation (station), false);
+      mode = GetSupported (station, 0);
     }
   else
     {
-      rtsTxVector = WifiTxVector (GetNonErpSupported (station, 0), GetDefaultTxPowerLevel (), GetShortRetryCount (station), false, 1, 0, channelWidth, GetAggregation (station), false);
+      mode = GetNonErpSupported (station, 0);
     }
+  rtsTxVector = WifiTxVector (mode, GetDefaultTxPowerLevel (), GetPreambleForTransmission (mode, GetAddress (station)), 800, 1, 1, 0, channelWidth, GetAggregation (station), false);
   return rtsTxVector;
 }
 
@@ -352,7 +361,6 @@ AarfcdWifiManager::DoNeedRts (WifiRemoteStation *st,
 bool
 AarfcdWifiManager::IsLowLatency (void) const
 {
-  NS_LOG_FUNCTION (this);
   return true;
 }
 
@@ -424,6 +432,14 @@ AarfcdWifiManager::SetVhtSupported (bool enable)
     }
 }
 
-
+void
+AarfcdWifiManager::SetHeSupported (bool enable)
+{
+  //HE is not supported by this algorithm.
+  if (enable)
+    {
+      NS_FATAL_ERROR ("WifiRemoteStationManager selected does not support HE rates");
+    }
+}
 
 } //namespace ns3

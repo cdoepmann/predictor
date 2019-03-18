@@ -55,19 +55,19 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("TcpVariantsComparison");
 
-bool firstCwnd = true;
-bool firstSshThr = true;
-bool firstRtt = true;
-bool firstRto = true;
-Ptr<OutputStreamWrapper> cWndStream;
-Ptr<OutputStreamWrapper> ssThreshStream;
-Ptr<OutputStreamWrapper> rttStream;
-Ptr<OutputStreamWrapper> rtoStream;
-Ptr<OutputStreamWrapper> nextTxStream;
-Ptr<OutputStreamWrapper> nextRxStream;
-Ptr<OutputStreamWrapper> inFlightStream;
-uint32_t cWndValue;
-uint32_t ssThreshValue;
+static bool firstCwnd = true;
+static bool firstSshThr = true;
+static bool firstRtt = true;
+static bool firstRto = true;
+static Ptr<OutputStreamWrapper> cWndStream;
+static Ptr<OutputStreamWrapper> ssThreshStream;
+static Ptr<OutputStreamWrapper> rttStream;
+static Ptr<OutputStreamWrapper> rtoStream;
+static Ptr<OutputStreamWrapper> nextTxStream;
+static Ptr<OutputStreamWrapper> nextRxStream;
+static Ptr<OutputStreamWrapper> inFlightStream;
+static uint32_t cWndValue;
+static uint32_t ssThreshValue;
 
 
 static void
@@ -129,18 +129,21 @@ RtoTracer (Time oldval, Time newval)
 static void
 NextTxTracer (SequenceNumber32 old, SequenceNumber32 nextTx)
 {
+  NS_UNUSED (old);
   *nextTxStream->GetStream () << Simulator::Now ().GetSeconds () << " " << nextTx << std::endl;
 }
 
 static void
 InFlightTracer (uint32_t old, uint32_t inFlight)
 {
+  NS_UNUSED (old);
   *inFlightStream->GetStream () << Simulator::Now ().GetSeconds () << " " << inFlight << std::endl;
 }
 
 static void
 NextRxTracer (SequenceNumber32 old, SequenceNumber32 nextRx)
 {
+  NS_UNUSED (old);
   *nextRxStream->GetStream () << Simulator::Now ().GetSeconds () << " " << nextRx << std::endl;
 }
 
@@ -211,20 +214,23 @@ int main (int argc, char *argv[])
   std::string access_delay = "45ms";
   bool tracing = false;
   std::string prefix_file_name = "TcpVariantsComparison";
-  double data_mbytes = 0;
+  uint64_t data_mbytes = 0;
   uint32_t mtu_bytes = 400;
   uint16_t num_flows = 1;
-  float duration = 100;
+  double duration = 100.0;
   uint32_t run = 0;
   bool flow_monitor = false;
   bool pcap = false;
+  bool sack = true;
   std::string queue_disc_type = "ns3::PfifoFastQueueDisc";
+  std::string recovery = "ns3::TcpClassicRecovery";
 
 
   CommandLine cmd;
   cmd.AddValue ("transport_prot", "Transport protocol to use: TcpNewReno, "
                 "TcpHybla, TcpHighSpeed, TcpHtcp, TcpVegas, TcpScalable, TcpVeno, "
-                "TcpBic, TcpYeah, TcpIllinois, TcpWestwood, TcpWestwoodPlus ", transport_prot);
+                "TcpBic, TcpYeah, TcpIllinois, TcpWestwood, TcpWestwoodPlus, TcpLedbat, "
+		"TcpLp", transport_prot);
   cmd.AddValue ("error_p", "Packet error rate", error_p);
   cmd.AddValue ("bandwidth", "Bottleneck bandwidth", bandwidth);
   cmd.AddValue ("delay", "Bottleneck delay", delay);
@@ -240,7 +246,11 @@ int main (int argc, char *argv[])
   cmd.AddValue ("flow_monitor", "Enable flow monitor", flow_monitor);
   cmd.AddValue ("pcap_tracing", "Enable or disable PCAP tracing", pcap);
   cmd.AddValue ("queue_disc_type", "Queue disc type for gateway (e.g. ns3::CoDelQueueDisc)", queue_disc_type);
+  cmd.AddValue ("sack", "Enable or disable SACK option", sack);
+  cmd.AddValue ("recovery", "Recovery algorithm type to use (e.g., ns3::TcpPrrRecovery", recovery);
   cmd.Parse (argc, argv);
+
+  transport_prot = std::string ("ns3::") + transport_prot;
 
   SeedManager::SetSeed (1);
   SeedManager::SetRun (run);
@@ -263,69 +273,29 @@ int main (int argc, char *argv[])
   NS_LOG_LOGIC ("TCP ADU size is: " << tcp_adu_size);
 
   // Set the simulation start and stop time
-  float start_time = 0.1;
-  float stop_time = start_time + duration;
+  double start_time = 0.1;
+  double stop_time = start_time + duration;
 
   // 4 MB of TCP buffer
   Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (1 << 21));
   Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (1 << 21));
+  Config::SetDefault ("ns3::TcpSocketBase::Sack", BooleanValue (sack));
 
+  Config::SetDefault ("ns3::TcpL4Protocol::RecoveryType",
+                      TypeIdValue (TypeId::LookupByName (recovery)));
   // Select TCP variant
-  if (transport_prot.compare ("TcpNewReno") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpNewReno::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpHybla") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpHybla::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpHighSpeed") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpHighSpeed::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpVegas") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpVegas::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpScalable") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpScalable::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpHtcp") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpHtcp::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpVeno") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpVeno::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpBic") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpBic::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpYeah") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpYeah::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpIllinois") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpIllinois::GetTypeId ()));
-    }
-  else if (transport_prot.compare ("TcpWestwood") == 0)
-    { // the default protocol type in ns3::TcpWestwood is WESTWOOD
+  if (transport_prot.compare ("ns3::TcpWestwoodPlus") == 0)
+    { 
+      // TcpWestwoodPlus is not an actual TypeId name; we need TcpWestwood here
       Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpWestwood::GetTypeId ()));
-      Config::SetDefault ("ns3::TcpWestwood::FilterType", EnumValue (TcpWestwood::TUSTIN));
-    }
-  else if (transport_prot.compare ("TcpWestwoodPlus") == 0)
-    {
-      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpWestwood::GetTypeId ()));
+      // the default protocol type in ns3::TcpWestwood is WESTWOOD
       Config::SetDefault ("ns3::TcpWestwood::ProtocolType", EnumValue (TcpWestwood::WESTWOODPLUS));
-      Config::SetDefault ("ns3::TcpWestwood::FilterType", EnumValue (TcpWestwood::TUSTIN));
     }
   else
     {
-      NS_LOG_DEBUG ("Invalid TCP version");
-      exit (1);
+      TypeId tcpTid;
+      NS_ABORT_MSG_UNLESS (TypeId::LookupByNameFailSafe (transport_prot, &tcpTid), "TypeId " << transport_prot << " not found");
+      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TypeId::LookupByName (transport_prot)));
     }
 
   // Create gateways, sources, and sinks
@@ -376,15 +346,15 @@ int main (int argc, char *argv[])
   Time access_d (access_delay);
   Time bottle_d (delay);
 
-  Config::SetDefault ("ns3::CoDelQueueDisc::Mode", EnumValue (Queue::QUEUE_MODE_BYTES));
+  uint32_t size = static_cast<uint32_t>((std::min (access_b, bottle_b).GetBitRate () / 8) *
+    ((access_d + bottle_d) * 2).GetSeconds ());
 
-  uint32_t size = (std::min (access_b, bottle_b).GetBitRate () / 8) *
-    ((access_d + bottle_d) * 2).GetSeconds ();
+  Config::SetDefault ("ns3::PfifoFastQueueDisc::MaxSize",
+                      QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, size / mtu_bytes)));
+  Config::SetDefault ("ns3::CoDelQueueDisc::MaxSize",
+                      QueueSizeValue (QueueSize (QueueSizeUnit::BYTES, size)));
 
-  Config::SetDefault ("ns3::PfifoFastQueueDisc::Limit", UintegerValue (size / mtu_bytes));
-  Config::SetDefault ("ns3::CoDelQueueDisc::MaxBytes", UintegerValue (size));
-
-  for (int i = 0; i < num_flows; i++)
+  for (uint32_t i = 0; i < num_flows; i++)
     {
       NetDeviceContainer devices;
       devices = LocalLink.Install (sources.Get (i), gateways.Get (0));
@@ -420,40 +390,20 @@ int main (int argc, char *argv[])
   for (uint16_t i = 0; i < sources.GetN (); i++)
     {
       AddressValue remoteAddress (InetSocketAddress (sink_interfaces.GetAddress (i, 0), port));
+      Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (tcp_adu_size));
+      BulkSendHelper ftp ("ns3::TcpSocketFactory", Address ());
+      ftp.SetAttribute ("Remote", remoteAddress);
+      ftp.SetAttribute ("SendSize", UintegerValue (tcp_adu_size));
+      ftp.SetAttribute ("MaxBytes", UintegerValue (data_mbytes * 1000000));
 
-      if (transport_prot.compare ("TcpNewReno") == 0
-          || transport_prot.compare ("TcpWestwood") == 0
-          || transport_prot.compare ("TcpWestwoodPlus") == 0
-          || transport_prot.compare ("TcpHybla") == 0
-          || transport_prot.compare ("TcpHighSpeed") == 0
-          || transport_prot.compare ("TcpHtcp") == 0
-          || transport_prot.compare ("TcpVegas") == 0
-          || transport_prot.compare ("TcpVeno") == 0
-          || transport_prot.compare ("TcpBic") == 0
-          || transport_prot.compare ("TcpScalable") == 0
-          || transport_prot.compare ("TcpYeah") == 0
-          || transport_prot.compare ("TcpIllinois") == 0)
-        {
-          Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (tcp_adu_size));
-          BulkSendHelper ftp ("ns3::TcpSocketFactory", Address ());
-          ftp.SetAttribute ("Remote", remoteAddress);
-          ftp.SetAttribute ("SendSize", UintegerValue (tcp_adu_size));
-          ftp.SetAttribute ("MaxBytes", UintegerValue (int(data_mbytes * 1000000)));
+      ApplicationContainer sourceApp = ftp.Install (sources.Get (i));
+      sourceApp.Start (Seconds (start_time * i));
+      sourceApp.Stop (Seconds (stop_time - 3));
 
-          ApplicationContainer sourceApp = ftp.Install (sources.Get (i));
-          sourceApp.Start (Seconds (start_time * i));
-          sourceApp.Stop (Seconds (stop_time - 3));
-
-          sinkHelper.SetAttribute ("Protocol", TypeIdValue (TcpSocketFactory::GetTypeId ()));
-          ApplicationContainer sinkApp = sinkHelper.Install (sinks);
-          sinkApp.Start (Seconds (start_time * i));
-          sinkApp.Stop (Seconds (stop_time));
-        }
-      else
-        {
-          NS_LOG_DEBUG ("Invalid transport protocol " << transport_prot << " specified");
-          exit (1);
-        }
+      sinkHelper.SetAttribute ("Protocol", TypeIdValue (TcpSocketFactory::GetTypeId ()));
+      ApplicationContainer sinkApp = sinkHelper.Install (sinks.Get (i));
+      sinkApp.Start (Seconds (start_time * i));
+      sinkApp.Stop (Seconds (stop_time));
     }
 
   // Set up tracing if enabled

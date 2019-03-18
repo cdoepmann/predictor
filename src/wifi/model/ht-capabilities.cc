@@ -20,12 +20,8 @@
  */
 
 #include "ht-capabilities.h"
-#include "ns3/assert.h"
-#include "ns3/log.h"
 
 namespace ns3 {
-
-NS_LOG_COMPONENT_DEFINE ("HtCapabilities");
 
 HtCapabilities::HtCapabilities ()
   : m_ldpc (0),
@@ -90,9 +86,9 @@ HtCapabilities::HtCapabilities ()
     m_reservedASel (0),
     m_htSupported (0)
 {
-  for (uint32_t k = 0; k < MAX_SUPPORTED_MCS; k++)
+  for (uint8_t i = 0; i < MAX_SUPPORTED_MCS; i++)
     {
-      m_rxMcsBitmask[k] = 0;
+      m_rxMcsBitmask[i] = 0;
     }
 }
 
@@ -183,7 +179,7 @@ HtCapabilities::SetTxRxMcsSetUnequal (uint8_t txrxmcssetunequal)
 void
 HtCapabilities::SetTxMaxNSpatialStreams (uint8_t maxtxspatialstreams)
 {
-  m_txMaxNSpatialStreams = maxtxspatialstreams;
+  m_txMaxNSpatialStreams = maxtxspatialstreams - 1; //0 for 1 SS, 1 for 2 SSs, etc
 }
 
 void
@@ -216,38 +212,6 @@ HtCapabilities::GetShortGuardInterval20 (void) const
   return m_shortGuardInterval20;
 }
 
-uint8_t
-HtCapabilities::GetShortGuardInterval40 (void) const
-{
-  return m_shortGuardInterval40;
-}
-
-uint8_t
-HtCapabilities::GetMaxAmsduLength (void) const
-{
-  return m_maxAmsduLength;
-}
-
-uint8_t
-HtCapabilities::GetLSigProtectionSupport (void) const
-{
-  return m_lsigProtectionSupport;
-}
-
-uint8_t
-HtCapabilities::GetMaxAmpduLength (void) const
-{
-  return m_maxAmpduLength;
-}
-
-uint8_t*
-HtCapabilities::GetRxMcsBitmask ()
-{
-  uint8_t* p;
-  p = m_rxMcsBitmask;
-  return p;
-}
-
 bool
 HtCapabilities::IsSupportedMcs (uint8_t mcs) const
 {
@@ -262,47 +226,16 @@ uint8_t
 HtCapabilities::GetRxHighestSupportedAntennas (void) const
 {
   for (uint8_t nRx = 2; nRx <= 4; nRx++)
-  {
-    for (uint8_t mcs = (nRx - 1) * 8; mcs <= ((7 * nRx) + (nRx - 1)); mcs++)
     {
-      if (IsSupportedMcs (mcs) == false)
+      for (uint8_t mcs = (nRx - 1) * 8; mcs <= ((7 * nRx) + (nRx - 1)); mcs++)
         {
-          return (nRx - 1);
+          if (IsSupportedMcs (mcs) == false)
+            {
+              return (nRx - 1);
+            }
         }
     }
-  }
   return 4;
-}
-
-uint16_t
-HtCapabilities::GetRxHighestSupportedDataRate (void) const
-{
-  return m_rxHighestSupportedDataRate;
-}
-
-uint8_t
-HtCapabilities::GetTxMcsSetDefined (void) const
-{
-  return m_txMcsSetDefined;
-}
-
-uint8_t
-HtCapabilities::GetTxRxMcsSetUnequal (void) const
-{
-  return m_txRxMcsSetUnequal;
-}
-
-
-uint8_t
-HtCapabilities::GetTxMaxNSpatialStreams (void) const
-{
-  return m_txMaxNSpatialStreams;
-}
-
-uint8_t
-HtCapabilities::GetTxUnequalModulation (void) const
-{
-  return m_txUnequalModulation;
 }
 
 uint8_t
@@ -590,29 +523,26 @@ HtCapabilities::DeserializeInformationField (Buffer::Iterator start,
   return length;
 }
 
-ATTRIBUTE_HELPER_CPP (HtCapabilities);
-
+/**
+ * output stream output operator
+ *
+ * \param os output stream
+ * \param htcapabilities the HT capabilities
+ *
+ * \returns output stream
+ */
 std::ostream &
 operator << (std::ostream &os, const HtCapabilities &htcapabilities)
 {
-  os <<  bool (htcapabilities.GetLdpc ())
+  os << bool (htcapabilities.GetLdpc ())
      << "|" << bool (htcapabilities.GetSupportedChannelWidth ())
      << "|" << bool (htcapabilities.GetGreenfield ())
-     << "|" << bool (htcapabilities.GetShortGuardInterval20 ());
-
+     << "|" << bool (htcapabilities.GetShortGuardInterval20 ()) << "|";
+  for (uint8_t i = 0; i < MAX_SUPPORTED_MCS; i++)
+    {
+      os << htcapabilities.IsSupportedMcs (i) << " ";
+    }
   return os;
-}
-
-std::istream &operator >> (std::istream &is, HtCapabilities &htcapabilities)
-{
-  bool c1, c2, c3, c4;
-  is >> c1 >> c2 >> c3 >> c4;
-  htcapabilities.SetLdpc (c1);
-  htcapabilities.SetSupportedChannelWidth (c2);
-  htcapabilities.SetGreenfield (c3);
-  htcapabilities.SetShortGuardInterval20 (c4);
-
-  return is;
 }
 
 } //namespace ns3

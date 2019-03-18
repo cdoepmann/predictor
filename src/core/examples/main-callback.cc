@@ -19,10 +19,12 @@
 
 #include "ns3/callback.h"
 #include "ns3/assert.h"
+#include "ns3/command-line.h"
 #include <iostream>
 
 /**
  * \file
+ * \ingroup core-examples
  * \ingroup callback
  * Example program illustrating use of callback functions and methods.
  *
@@ -31,6 +33,8 @@
 
 using namespace ns3;
 
+namespace {
+  
 /**
  * Example Callback function.
  *
@@ -60,9 +64,14 @@ public:
   }
 };
 
+}  // unnamed namespace
+
 
 int main (int argc, char *argv[])
 {
+  CommandLine cmd;
+  cmd.Parse(argc, argv);
+  
   // return type: double
   // first arg type: double
   // second arg type: double

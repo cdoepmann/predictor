@@ -46,6 +46,7 @@ except ImportError:
 #
 interesting_config_items = [
     "NS3_ENABLED_MODULES",
+    "NS3_ENABLED_CONTRIBUTED_MODULES",
     "NS3_MODULE_PATH",
     "NSC_ENABLED",
     "ENABLE_REAL_TIME",
@@ -158,7 +159,7 @@ def parse_examples_to_run_file(
         cpp_examples = get_list_from_file(examples_to_run_path, "cpp_examples")
         for example_name, do_run, do_valgrind_run in cpp_examples:
 
-            # Seperate the example name from its arguments.
+            # Separate the example name from its arguments.
             example_name_original = example_name
             example_name_parts = example_name.split(' ', 1)
             if len(example_name_parts) == 1:
@@ -203,7 +204,7 @@ def parse_examples_to_run_file(
         #
         python_examples = get_list_from_file(examples_to_run_path, "python_examples")
         for example_name, do_run in python_examples:
-            # Seperate the example name from its arguments.
+            # Separate the example name from its arguments.
             example_name_parts = example_name.split(' ', 1)
             if len(example_name_parts) == 1:
                 example_name      = example_name_parts[0]
@@ -339,7 +340,7 @@ def translate_to_html(results_file, html_file):
 
         #
         # If the suite crashed or is skipped, there is no further information, so just
-        # delare a new table row with the result (CRASH or SKIP) in it.  Looks like:
+        # declare a new table row with the result (CRASH or SKIP) in it.  Looks like:
         #
         #   +--------+
         #   | Result |
@@ -571,7 +572,7 @@ def sigint_hook(signal, frame):
 # for relevant configuration items.  
 #
 # XXX This function pokes around in the waf internal state file.  To be a
-# little less hacky, we should add a commmand to waf to return this info
+# little less hacky, we should add a command to waf to return this info
 # and use that result.
 #
 def read_waf_config():
@@ -732,7 +733,7 @@ def make_paths():
 # I added the following to the testpy.supp file for this particular error:
 #
 #   {
-#     Supress invalid read size errors in SendPreq() when using HwmpProtocolMac
+#     Suppress invalid read size errors in SendPreq() when using HwmpProtocolMac
 #     Memcheck:Addr8
 #     fun:*HwmpProtocolMac*SendPreq*
 #   }
@@ -753,7 +754,7 @@ def run_job_synchronously(shell_command, directory, valgrind, is_python, build_p
             path_cmd = os.path.join (NS3_BUILDDIR, shell_command)
 
     if valgrind:
-        cmd = "valgrind --suppressions=%s --leak-check=full --show-reachable=yes --error-exitcode=2 %s" % (suppressions_path, 
+        cmd = "valgrind --suppressions=%s --leak-check=full --show-reachable=yes --error-exitcode=2 --errors-for-leak-kinds=all %s" % (suppressions_path,
             path_cmd)
     else:
         cmd = path_cmd
@@ -780,18 +781,6 @@ def run_job_synchronously(shell_command, directory, valgrind, is_python, build_p
         print(stderr_results)
         retval = 1
 
-    #
-    # valgrind sometimes has its own idea about what kind of memory management
-    # errors are important.  We want to detect *any* leaks, so the way to do 
-    # that is to look for the presence of a valgrind leak summary section.
-    #
-    # If another error has occurred (like a test suite has failed), we don't 
-    # want to trump that error, so only do the valgrind output scan if the 
-    # test has otherwise passed (return code was zero).
-    #
-    if valgrind and retval == 0 and "== LEAK SUMMARY:" in stderr_results:
-        retval = 2
-    
     if options.verbose:
         print("Return code = ", retval)
         print("stderr = ", stderr_results)
@@ -868,7 +857,7 @@ class Job:
         self.build_path = build_path
 
     #
-    # This is the dispaly name of the job, typically the test suite or example 
+    # This is the display name of the job, typically the test suite or example 
     # name.  For example,
     #
     #  "some-test-suite" or "udp-echo"
@@ -1153,6 +1142,26 @@ def run_tests():
             example_tests,
             example_names_original,
             python_tests)
+            
+    for module in NS3_ENABLED_CONTRIBUTED_MODULES:
+        # Remove the "ns3-" from the module name.
+        module = module[len("ns3-"):]
+
+        # Set the directories and paths for this example. 
+        module_directory     = os.path.join("contrib", module)
+        example_directory    = os.path.join(module_directory, "examples")
+        examples_to_run_path = os.path.join(module_directory, "test", "examples-to-run.py")
+        cpp_executable_dir   = os.path.join(NS3_BUILDDIR, example_directory)
+        python_script_dir    = os.path.join(example_directory)
+
+        # Parse this module's file.
+        parse_examples_to_run_file(
+            examples_to_run_path,
+            cpp_executable_dir,
+            python_script_dir,
+            example_tests,
+            example_names_original,
+            python_tests)
 
     #
     # If lots of logging is enabled, we can crash Python when it tries to 
@@ -1208,7 +1217,7 @@ def run_tests():
     # pass.
     #
     # The second main use case is when detailed status is requested (with the
-    # --text or --html options).  Typicall this will be text if a developer
+    # --text or --html options).  Typically this will be text if a developer
     # finds a problem, or HTML for nightly builds.  In these cases, an
     # XML file is written containing the status messages from the test suites.
     # This file is then read and translated into text or HTML.  It is expected
@@ -1563,7 +1572,7 @@ def run_tests():
                             # well together, so we skip them under valgrind.
                             # We go through the trouble of doing all of this
                             # work to report the skipped tests in a consistent
-                            # way throught the output formatter.
+                            # way through the output formatter.
                             #
                             if options.valgrind:
                                 job.set_is_skip (True)
@@ -1765,17 +1774,9 @@ def run_tests():
                     f = open(xml_results_file, 'a')
                     f.write("<Test>\n")
                     f.write("  <Name>%s</Name>\n" % job.display_name)
-                    f.write('  <Result>CRASH</Suite>\n')
+                    f.write('  <Result>CRASH</Result>\n')
                     f.write("</Test>\n")
                     f.close()
-
-                    if job.returncode == 2:
-                        f = open(xml_results_file, 'a')
-                        f.write("<Test>\n")
-                        f.write("  <Name>%s</Name>\n" % job.display_name)
-                        f.write('  <Result>VALGR</Result>\n')
-                        f.write("</Test>\n")
-                        f.close()
 
     #
     # We have all of the tests run and the results written out.  One final 
@@ -1886,8 +1887,8 @@ def main(argv):
     parser.add_option("-u", "--update-data", action="store_true", dest="update_data", default=False,
                       help="If examples use reference data files, get them to re-generate them")
 
-    parser.add_option("-f", "--fullness", action="store", type="string", dest="fullness", default="QUICK",
-                      metavar="FULLNESS",
+    parser.add_option("-f", "--fullness", action="store", type="choice", dest="fullness", default="QUICK",
+                      metavar="FULLNESS", choices=["QUICK", "EXTENSIVE", "TAKES_FOREVER"],
                       help="choose the duration of tests to run: QUICK, EXTENSIVE, or TAKES_FOREVER, where EXTENSIVE includes QUICK and TAKES_FOREVER includes QUICK and EXTENSIVE (only QUICK tests are run by default)")
 
     parser.add_option("-g", "--grind", action="store_true", dest="valgrind", default=False,

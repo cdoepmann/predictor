@@ -18,20 +18,17 @@
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
 
-#include "wifi-net-device.h"
-#include "regular-wifi-mac.h"
-#include "wifi-phy.h"
-#include "wifi-remote-station-manager.h"
-#include "wifi-channel.h"
-#include "qos-utils.h"
 #include "ns3/llc-snap-header.h"
-#include "ns3/packet.h"
+#include "ns3/channel.h"
 #include "ns3/socket.h"
-#include "ns3/uinteger.h"
 #include "ns3/pointer.h"
-#include "ns3/node.h"
-#include "ns3/trace-source-accessor.h"
 #include "ns3/log.h"
+#include "ns3/node.h"
+#include "ns3/net-device-queue-interface.h"
+#include "wifi-net-device.h"
+#include "wifi-phy.h"
+#include "regular-wifi-mac.h"
+#include "wifi-mac-queue.h"
 
 namespace ns3 {
 
@@ -53,8 +50,8 @@ WifiNetDevice::GetTypeId (void)
                    MakeUintegerChecker<uint16_t> (1,MAX_MSDU_SIZE - LLC_SNAP_HEADER_LENGTH))
     .AddAttribute ("Channel", "The channel attached to this device",
                    PointerValue (),
-                   MakePointerAccessor (&WifiNetDevice::DoGetChannel),
-                   MakePointerChecker<WifiChannel> ())
+                   MakePointerAccessor (&WifiNetDevice::GetChannel),
+                   MakePointerChecker<Channel> ())
     .AddAttribute ("Phy", "The PHY layer attached to this device.",
                    PointerValue (),
                    MakePointerAccessor (&WifiNetDevice::GetPhy,
@@ -103,6 +100,7 @@ WifiNetDevice::DoDispose (void)
 void
 WifiNetDevice::DoInitialize (void)
 {
+  NS_LOG_FUNCTION_NOARGS ();
   m_phy->Initialize ();
   m_mac->Initialize ();
   m_stationManager->Initialize ();
@@ -142,46 +140,82 @@ WifiNetDevice::NotifyNewAggregate (void)
       if (ndqi != 0)
         {
           m_queueInterface = ndqi;
-          if (m_mac == 0)
-            {
-              NS_LOG_WARN ("A mac has not been installed yet, using a single tx queue");
-            }
-          else
-            {
-              Ptr<RegularWifiMac> mac = DynamicCast<RegularWifiMac> (m_mac);
-              if (mac != 0)
-                {
-                  BooleanValue qosSupported;
-                  mac->GetAttributeFailSafe ("QosSupported", qosSupported);
-                  if (qosSupported.Get ())
-                    {
-                      m_queueInterface->SetTxQueuesN (4);
-                      // register the select queue callback
-                      m_queueInterface->SetSelectQueueCallback (MakeCallback (&WifiNetDevice::SelectQueue, this));
-                    }
-                }
-            }
+          // register the select queue callback
+          m_queueInterface->SetSelectQueueCallback (MakeCallback (&WifiNetDevice::SelectQueue, this));
+          m_queueInterface->SetLateTxQueuesCreation (true);
+          FlowControlConfig ();
         }
     }
   NetDevice::NotifyNewAggregate ();
 }
 
 void
-WifiNetDevice::SetMac (Ptr<WifiMac> mac)
+WifiNetDevice::FlowControlConfig (void)
 {
-  m_mac = mac;
-  CompleteConfig ();
+  if (m_mac == 0 || m_queueInterface == 0)
+    {
+      return;
+    }
+
+  Ptr<RegularWifiMac> mac = DynamicCast<RegularWifiMac> (m_mac);
+  if (mac == 0)
+    {
+      NS_LOG_WARN ("Flow control is only supported by RegularWifiMac");
+      return;
+    }
+
+  BooleanValue qosSupported;
+  mac->GetAttributeFailSafe ("QosSupported", qosSupported);
+  PointerValue ptr;
+  Ptr<WifiMacQueue> wmq;
+  if (qosSupported.Get ())
+    {
+      m_queueInterface->SetTxQueuesN (4);
+      m_queueInterface->CreateTxQueues ();
+
+      mac->GetAttributeFailSafe ("BE_Txop", ptr);
+      wmq = ptr.Get<QosTxop> ()->GetWifiMacQueue ();
+      m_queueInterface->ConnectQueueTraces<WifiMacQueueItem> (wmq, 0);
+
+      mac->GetAttributeFailSafe ("BK_Txop", ptr);
+      wmq = ptr.Get<QosTxop> ()->GetWifiMacQueue ();
+      m_queueInterface->ConnectQueueTraces<WifiMacQueueItem> (wmq, 1);
+
+      mac->GetAttributeFailSafe ("VI_Txop", ptr);
+      wmq = ptr.Get<QosTxop> ()->GetWifiMacQueue ();
+      m_queueInterface->ConnectQueueTraces<WifiMacQueueItem> (wmq, 2);
+
+      mac->GetAttributeFailSafe ("VO_Txop", ptr);
+      wmq = ptr.Get<QosTxop> ()->GetWifiMacQueue ();
+      m_queueInterface->ConnectQueueTraces<WifiMacQueueItem> (wmq, 3);
+    }
+  else
+    {
+      m_queueInterface->CreateTxQueues ();
+
+      mac->GetAttributeFailSafe ("Txop", ptr);
+      wmq = ptr.Get<Txop> ()->GetWifiMacQueue ();
+      m_queueInterface->ConnectQueueTraces<WifiMacQueueItem> (wmq, 0);
+    }
 }
 
 void
-WifiNetDevice::SetPhy (Ptr<WifiPhy> phy)
+WifiNetDevice::SetMac (const Ptr<WifiMac> mac)
+{
+  m_mac = mac;
+  CompleteConfig ();
+  FlowControlConfig ();
+}
+
+void
+WifiNetDevice::SetPhy (const Ptr<WifiPhy> phy)
 {
   m_phy = phy;
   CompleteConfig ();
 }
 
 void
-WifiNetDevice::SetRemoteStationManager (Ptr<WifiRemoteStationManager> manager)
+WifiNetDevice::SetRemoteStationManager (const Ptr<WifiRemoteStationManager> manager)
 {
   m_stationManager = manager;
   CompleteConfig ();
@@ -219,12 +253,6 @@ WifiNetDevice::GetIfIndex (void) const
 
 Ptr<Channel>
 WifiNetDevice::GetChannel (void) const
-{
-  return m_phy->GetChannel ();
-}
-
-Ptr<WifiChannel>
-WifiNetDevice::DoGetChannel (void) const
 {
   return m_phy->GetChannel ();
 }
@@ -335,7 +363,7 @@ WifiNetDevice::GetNode (void) const
 }
 
 void
-WifiNetDevice::SetNode (Ptr<Node> node)
+WifiNetDevice::SetNode (const Ptr<Node> node)
 {
   m_node = node;
   CompleteConfig ();
@@ -358,7 +386,7 @@ WifiNetDevice::ForwardUp (Ptr<Packet> packet, Mac48Address from, Mac48Address to
 {
   NS_LOG_FUNCTION (this << packet << from << to);
   LlcSnapHeader llc;
-  enum NetDevice::PacketType type;
+  NetDevice::PacketType type;
   if (to.IsBroadcast ())
     {
       type = NetDevice::PACKET_BROADCAST;
@@ -386,7 +414,7 @@ WifiNetDevice::ForwardUp (Ptr<Packet> packet, Mac48Address from, Mac48Address to
     {
       packet->RemoveHeader (llc);
     }
-    
+
   if (!m_promiscRx.IsNull ())
     {
       m_mac->NotifyPromiscRx (packet);
@@ -470,7 +498,7 @@ WifiNetDevice::SelectQueue (Ptr<QueueItem> item) const
   // if the admission control were implemented, here we should check whether
   // the access category assigned to the packet should be downgraded
 
-  return QosUtilsMapTidToAc (priority);
+  return static_cast<uint8_t> (QosUtilsMapTidToAc (priority));
 }
 
 } //namespace ns3

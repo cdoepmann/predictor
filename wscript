@@ -30,11 +30,8 @@ modules_enabled  = ['all_modules']
 examples_enabled = False
 tests_enabled    = False
 
-# Compiler warning suppressions
-
-# Bug 1868:  be conservative about -Wstrict-overflow for optimized builds
-# on older compilers; it can generate spurious warnings.  
-gcc_version_warn_strict_overflow = ('4', '8', '2')
+# GCC minimum version requirements for C++11 support
+gcc_min_version = (4, 9, 2)
 
 # Bug 2181:  clang warnings about unused local typedefs and potentially
 # evaluated expressions affecting darwin clang/LLVM version 7.0.0 (Xcode 7)
@@ -241,12 +238,15 @@ def options(opt):
                    help=('Log all events in a json file with the name of the executable (which must call CommandLine::Parse(argc, argv)'),
                    action="store_true", default=False,
                    dest='enable_desmetrics')
+    opt.add_option('--cxx-standard',
+                   help=('Compile NS-3 with the given C++ standard'),
+                   type='string', default='-std=c++11', dest='cxx_standard')
 
     # options provided in subdirectories
     opt.recurse('src')
     opt.recurse('bindings/python')
     opt.recurse('src/internet')
-
+    opt.recurse('contrib')
 
 def _check_compilation_flag(conf, flag, mode='cxx', linkflags=None):
     """
@@ -388,6 +388,11 @@ def configure(conf):
     env['APPNAME'] = wutils.APPNAME
     env['VERSION'] = wutils.VERSION
 
+    if conf.env['CXX_NAME'] in ['gcc']:
+        if tuple(map(int, conf.env['CC_VERSION'])) < gcc_min_version:
+            conf.fatal('gcc version %s older than minimum supported version %s' %
+                       ('.'.join(conf.env['CC_VERSION']), '.'.join(map(str, gcc_min_version))))
+
     if conf.env['CXX_NAME'] in ['gcc', 'icc']:
         if Options.options.build_profile == 'release': 
             env.append_value('CXXFLAGS', '-fomit-frame-pointer') 
@@ -395,7 +400,7 @@ def configure(conf):
             if conf.check_compilation_flag('-march=native'):
                 env.append_value('CXXFLAGS', '-march=native') 
             env.append_value('CXXFLAGS', '-fstrict-overflow')
-            if conf.env['CC_VERSION'] >= gcc_version_warn_strict_overflow:
+            if conf.env['CXX_NAME'] in ['gcc']:
                 env.append_value('CXXFLAGS', '-Wstrict-overflow=2')
 
         if sys.platform == 'win32':
@@ -412,13 +417,13 @@ def configure(conf):
         if libstdcxx_location:
             conf.env.append_value('NS3_MODULE_PATH', libstdcxx_location)
 
-        if Options.platform in ['linux']:
+        if Utils.unversioned_sys_platform() in ['linux']:
             if conf.check_compilation_flag('-Wl,--soname=foo'):
                 env['WL_SONAME_SUPPORTED'] = True
 
     # bug 2181 on clang warning suppressions
     if conf.env['CXX_NAME'] in ['clang']:
-        if Options.platform == 'darwin':
+        if Utils.unversioned_sys_platform() == 'darwin':
             if conf.env['CC_VERSION'] >= darwin_clang_version_warn_unused_local_typedefs:
                 env.append_value('CXXFLAGS', '-Wno-unused-local-typedefs')
             if conf.env['CC_VERSION'] >= darwin_clang_version_warn_potentially_evaluated: 
@@ -430,7 +435,7 @@ def configure(conf):
                 env.append_value('CXXFLAGS', '-Wno-potentially-evaluated-expression')
     env['ENABLE_STATIC_NS3'] = False
     if Options.options.enable_static:
-        if Options.platform == 'darwin':
+        if Utils.unversioned_sys_platform() == 'darwin':
             if conf.check_compilation_flag(flag=[], linkflags=['-Wl,-all_load']):
                 conf.report_optional_feature("static", "Static build", True, '')
                 env['ENABLE_STATIC_NS3'] = True
@@ -445,8 +450,12 @@ def configure(conf):
                 conf.report_optional_feature("static", "Static build", False,
                                              "Link flag -Wl,--whole-archive,-Bstatic does not work")
 
-    # Enable C++-11 support
-    env.append_value('CXXFLAGS', '-std=c++11')
+    # Enables C++-11 support by default, unless user specified another option
+    # Warn the user if the CXX Standard flag provided was not recognized  
+    if conf.check_compilation_flag(Options.options.cxx_standard):
+        env.append_value('CXXFLAGS', Options.options.cxx_standard)
+    else:
+        Logs.warn("CXX Standard flag " + Options.options.cxx_standard + " was not recognized, using compiler's default")
 
     # Set this so that the lists won't be printed at the end of this
     # configure command.
@@ -457,21 +466,46 @@ def configure(conf):
     conf.recurse('bindings/python')
 
     conf.recurse('src')
+    conf.recurse('contrib')
 
     # Set the list of enabled modules.
     if Options.options.enable_modules:
         # Use the modules explicitly enabled. 
-        conf.env['NS3_ENABLED_MODULES'] = ['ns3-'+mod for mod in
-                                           Options.options.enable_modules.split(',')]
+        _enabled_mods = []
+        _enabled_contrib_mods = []
+        for mod in Options.options.enable_modules.split(','): 
+            if mod in conf.env['NS3_MODULES'] and mod.startswith('ns3-'): 
+                _enabled_mods.append(mod)
+            elif 'ns3-' + mod in conf.env['NS3_MODULES']: 
+                _enabled_mods.append('ns3-' + mod)
+            elif mod in conf.env['NS3_CONTRIBUTED_MODULES'] and mod.startswith('ns3-'): 
+                _enabled_contrib_mods.append(mod)
+            elif 'ns3-' + mod in conf.env['NS3_CONTRIBUTED_MODULES']: 
+                _enabled_contrib_mods.append('ns3-' + mod)
+        conf.env['NS3_ENABLED_MODULES'] = _enabled_mods
+        conf.env['NS3_ENABLED_CONTRIBUTED_MODULES'] = _enabled_contrib_mods
+        
     else:
         # Use the enabled modules list from the ns3 configuration file.
         if modules_enabled[0] == 'all_modules':
             # Enable all modules if requested.
             conf.env['NS3_ENABLED_MODULES'] = conf.env['NS3_MODULES']
+            conf.env['NS3_ENABLED_CONTRIBUTED_MODULES'] = conf.env['NS3_CONTRIBUTED_MODULES']
         else:
             # Enable the modules from the list.
-            conf.env['NS3_ENABLED_MODULES'] = ['ns3-'+mod for mod in
-                                               modules_enabled]
+            _enabled_mods = []
+            _enabled_contrib_mods = []
+            for mod in modules_enabled: 
+                if mod in conf.env['NS3_MODULES'] and mod.startswith('ns3-'): 
+                    _enabled_mods.append(mod)
+                elif 'ns3-' + mod in conf.env['NS3_MODULES']: 
+                    _enabled_mods.append('ns3-' + mod)
+                elif mod in conf.env['NS3_CONTRIBUTED_MODULES'] and mod.startswith('ns3-'): 
+                    _enabled_contrib_mods.append(mod)
+                elif 'ns3-' + mod in conf.env['NS3_CONTRIBUTED_MODULES']: 
+                    _enabled_contrib_mods.append('ns3-' + mod)
+            conf.env['NS3_ENABLED_MODULES'] = _enabled_mods
+            conf.env['NS3_ENABLED_CONTRIBUTED_MODULES'] = _enabled_contrib_mods
 
     # Add the template module to the list of enabled modules that
     # should not be built if this is a static build on Darwin.  They
@@ -487,6 +521,8 @@ def configure(conf):
             conf.env['NS3_ENABLED_MODULES'].remove(not_built_name)
             if not conf.env['NS3_ENABLED_MODULES']:
                 raise WafError('Exiting because the ' + not_built + ' module can not be built and it was the only one enabled.')
+        elif not_built_name in conf.env['NS3_ENABLED_CONTRIBUTED_MODULES']:
+            conf.env['NS3_ENABLED_CONTRIBUTED_MODULES'].remove(not_built_name)
 
     conf.recurse('src/mpi')
 
@@ -607,7 +643,6 @@ def configure(conf):
             if conf.check_compilation_flag(flag, mode='cc'):
                 env.append_value('CCFLAGS', flag)
 
-    add_gcc_flag('-Wno-error=deprecated-declarations')
     add_gcc_flag('-fstrict-aliasing')
     add_gcc_flag('-Wstrict-aliasing')
 
@@ -719,7 +754,8 @@ def add_examples_programs(bld):
             return
 
 def add_scratch_programs(bld):
-    all_modules = [mod[len("ns3-"):] for mod in bld.env['NS3_ENABLED_MODULES']]
+    all_modules = [mod[len("ns3-"):] for mod in bld.env['NS3_ENABLED_MODULES'] + bld.env['NS3_ENABLED_CONTRIBUTED_MODULES']]
+
     try:
         for filename in os.listdir("scratch"):
             if filename.startswith('.') or filename == 'CVS':
@@ -772,21 +808,20 @@ def _find_ns3_module(self, name):
 
 # Parse the waf lockfile generated by latest 'configure' operation
 def get_build_profile(env=None):
-    if env == None:
-        lockfile = os.environ.get('WAFLOCK', '.lock-waf_%s_build' % sys.platform)
-        profile = "not found"
-        with open(lockfile, "r") as f:
-            for line in f:
-                if line.startswith("options ="):
-                    key, val = line.split('=')
-                    arr = val.split(',')
-                    for x in arr:
-                        optkey,optval = x.split(':')
-                        if (optkey.lstrip() == '\'build_profile\''):
-                            profile = str(optval.lstrip()).replace("'","")
-    else:
-        profile = Options.options.build_profile
-    return profile
+    if env:
+        return Options.options.build_profile
+
+    lockfile = os.environ.get('WAFLOCK', '.lock-waf_%s_build' % sys.platform)
+    with open(lockfile, "r") as f:
+        for line in f:
+            if line.startswith("options ="):
+                _, val = line.split('=', 1)
+                for x in val.split(','):
+                    optkey, optval = x.split(':')
+                    if (optkey.lstrip() == '\'build_profile\''):
+                        return str(optval.lstrip()).replace("'","")
+
+    return "not found"
 
 def build(bld):
     env = bld.env
@@ -835,18 +870,21 @@ def build(bld):
 
     # process subfolders from here
     bld.recurse('src')
+    bld.recurse('contrib')
 
     # If modules have been enabled, then set lists of enabled modules
     # and enabled module test libraries.
-    if env['NS3_ENABLED_MODULES']:
+    if env['NS3_ENABLED_MODULES'] or env['NS3_ENABLED_CONTRIBUTED_MODULES']:
+
         modules = env['NS3_ENABLED_MODULES']
+        contribModules = env['NS3_ENABLED_CONTRIBUTED_MODULES']
 
         # Find out about additional modules that need to be enabled
         # due to dependency constraints.
         changed = True
         while changed:
             changed = False
-            for module in modules:
+            for module in modules + contribModules:
                 module_obj = bld.get_tgen_by_name(module)
                 if module_obj is None:
                     raise ValueError("module %s not found" % module)
@@ -854,31 +892,42 @@ def build(bld):
                 for dep in module_obj.use:
                     if not dep.startswith('ns3-'):
                         continue
-                    if dep not in modules:
-                        modules.append(dep)
-                        changed = True
+                    if dep not in modules and dep not in contribModules:
+                        if dep in env['NS3_MODULES']: 
+                            modules.append(dep)
+                            changed = True
+                        elif dep in env['NS3_CONTRIBUTED_MODULES']: 
+                            contribModules.append(dep)
+                            changed = True
+                        else:
+                            Logs.error("Error:  Cannot find dependency \'" + dep[4:] + "\' of module \'"
+                                       + module[4:] + "\'; check the module wscript for errors.")
+                            raise SystemExit(1)
 
         env['NS3_ENABLED_MODULES'] = modules
+
+        env['NS3_ENABLED_CONTRIBUTED_MODULES'] = contribModules
 
         # If tests are being built, then set the list of the enabled
         # module test libraries.
         if env['ENABLE_TESTS']:
             for (mod, testlib) in bld.env['NS3_MODULES_WITH_TEST_LIBRARIES']:
-                if mod in bld.env['NS3_ENABLED_MODULES']:
+                if mod in bld.env['NS3_ENABLED_MODULES'] or mod in bld.env['NS3_ENABLED_CONTRIBUTED_MODULES']:
                     bld.env.append_value('NS3_ENABLED_MODULE_TEST_LIBRARIES', testlib)
 
     add_examples_programs(bld)
     add_scratch_programs(bld)
 
-    if env['NS3_ENABLED_MODULES']:
+    if env['NS3_ENABLED_MODULES'] or env['NS3_ENABLED_CONTRIBUTED_MODULES']:
         modules = env['NS3_ENABLED_MODULES']
+        contribModules = env['NS3_ENABLED_CONTRIBUTED_MODULES']
 
         # Exclude the programs other misc task gens that depend on disabled modules
         for obj in list(bld.all_task_gen):
 
             # check for ns3moduleheader_taskgen
             if 'ns3moduleheader' in getattr(obj, "features", []):
-                if ("ns3-%s" % obj.module) not in modules:
+                if ("ns3-%s" % obj.module) not in modules and ("ns3-%s" % obj.module) not in contribModules:
                     obj.mode = 'remove' # tell it to remove headers instead of installing
 
             # check for programs
@@ -886,7 +935,7 @@ def build(bld):
                 # this is an NS-3 program (bld.create_ns3_program)
                 program_built = True
                 for dep in obj.ns3_module_dependencies:
-                    if dep not in modules: # prog. depends on a module that isn't enabled?
+                    if dep not in modules and dep not in contribModules: # prog. depends on a module that isn't enabled?
                         bld.exclude_taskgen(obj)
                         program_built = False
                         break
@@ -907,38 +956,42 @@ def build(bld):
                     bld.env.append_value('NS3_RUNNABLE_PROGRAMS', object_relative_path)
 
             # disable the modules themselves
-            if hasattr(obj, "is_ns3_module") and obj.name not in modules:
+            if hasattr(obj, "is_ns3_module") and obj.name not in modules and obj.name not in contribModules:
                 bld.exclude_taskgen(obj) # kill the module
 
             # disable the module test libraries
             if hasattr(obj, "is_ns3_module_test_library"):
-                if not env['ENABLE_TESTS'] or (obj.module_name not in modules):
+                if not env['ENABLE_TESTS'] or ((obj.module_name not in modules) and (obj.module_name not in contribModules)) :
                     bld.exclude_taskgen(obj) # kill the module test library
 
             # disable the ns3header_taskgen
             if 'ns3header' in getattr(obj, "features", []):
-                if ("ns3-%s" % obj.module) not in modules:
+                if ("ns3-%s" % obj.module) not in modules and ("ns3-%s" % obj.module) not in contribModules:
                     obj.mode = 'remove' # tell it to remove headers instead of installing 
 
             # disable the ns3privateheader_taskgen
             if 'ns3privateheader' in getattr(obj, "features", []):
-                if ("ns3-%s" % obj.module) not in modules:
+                if ("ns3-%s" % obj.module) not in modules and ("ns3-%s" % obj.module) not in contribModules:
+
                     obj.mode = 'remove' # tell it to remove headers instead of installing 
 
             # disable pcfile taskgens for disabled modules
             if 'ns3pcfile' in getattr(obj, "features", []):
-                if obj.module not in bld.env.NS3_ENABLED_MODULES:
+                if obj.module not in bld.env.NS3_ENABLED_MODULES and obj.module not in bld.env.NS3_ENABLED_CONTRIBUTED_MODULES:
                     bld.exclude_taskgen(obj)
 
 
     if env['NS3_ENABLED_MODULES']:
         env['NS3_ENABLED_MODULES'] = list(modules)
 
+    if env['NS3_ENABLED_CONTRIBUTED_MODULES']:
+        env['NS3_ENABLED_CONTRIBUTED_MODULES'] = list(contribModules)
+
     # Determine which scripts will be runnable.
     for (script, dependencies) in bld.env['NS3_SCRIPT_DEPENDENCIES']:
         script_runnable = True
         for dep in dependencies:
-            if dep not in modules:
+            if dep not in modules and dep not in contribModules:
                 script_runnable = False
                 break
 
@@ -975,6 +1028,8 @@ def build(bld):
         for gen in bld.all_task_gen:
             if type(gen).__name__ in ['ns3header_taskgen', 'ns3privateheader_taskgen', 'ns3moduleheader_taskgen']:
                 gen.post()
+
+    if Options.options.run or Options.options.pyrun:
         bld.env['PRINT_BUILT_MODULES_AT_END'] = False 
 
     if Options.options.doxygen_no_build:
@@ -989,6 +1044,7 @@ def _cleandir(name):
 
 def _cleandocs():
     _cleandir('doc/html')
+    _cleandir('doc/html-warn')
     _cleandir('doc/manual/build')
     _cleandir('doc/manual/source-temp')
     _cleandir('doc/tutorial/build')
@@ -1016,7 +1072,7 @@ def shutdown(ctx):
         print()
         print('Modules built:')
         names_without_prefix = []
-        for name in env['NS3_ENABLED_MODULES']:
+        for name in env['NS3_ENABLED_MODULES'] + env['NS3_ENABLED_CONTRIBUTED_MODULES']:
             name1 = name[len('ns3-'):]
             if name not in env.MODULAR_BINDINGS_MODULES:
                 name1 += " (no Python)"

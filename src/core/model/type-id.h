@@ -156,14 +156,14 @@ public:
    *
    * \returns The number of TypeId instances registered.
    */
-  static uint32_t GetRegisteredN (void);
+  static uint16_t GetRegisteredN (void);
   /**
    * Get a TypeId by index.
    *
    * \param [in] i Index of the TypeId.
    * \returns The TypeId instance whose index is \c i.
    */
-  static TypeId GetRegistered (uint32_t i);
+  static TypeId GetRegistered (uint16_t i);
 
   /**
    * Constructor.
@@ -247,26 +247,26 @@ public:
    *
    * \returns The number of attributes associated to this TypeId
    */
-  uint32_t GetAttributeN (void) const;
+  std::size_t GetAttributeN (void) const;
   /**
    * Get Attribute information by index.
    *
    * \param [in] i Index into attribute array
    * \returns The information associated to attribute whose index is \p i.
    */
-  struct TypeId::AttributeInformation GetAttribute(uint32_t i) const;
+  struct TypeId::AttributeInformation GetAttribute (std::size_t i) const;
   /**
    * Get the Attribute name by index.
    *
    * \param [in] i Index into attribute array
    * \returns The full name associated to the attribute whose index is \p i.
    */
-  std::string GetAttributeFullName (uint32_t i) const;
+  std::string GetAttributeFullName (std::size_t i) const;
 
   /**
    * Get the constructor callback.
    *
-   * \returns A callback which can be used to instanciate an object
+   * \returns A callback which can be used to instantiate an object
    *          of this type.
    */
   Callback<ObjectBase *> GetConstructor (void) const;
@@ -284,14 +284,14 @@ public:
    *
    * \returns The number of trace sources defined in this TypeId.
    */
-  uint32_t GetTraceSourceN (void) const;
+  std::size_t GetTraceSourceN (void) const;
   /**
    * Get the trace source by index.
    *
    * \param [in] i Index into trace source array.
    * \returns Detailed information about the requested trace source.
    */
-  struct TypeId::TraceSourceInformation GetTraceSource(uint32_t i) const;
+  struct TypeId::TraceSourceInformation GetTraceSource (std::size_t i) const;
 
   /**
    * Set the parent TypeId.
@@ -368,11 +368,11 @@ public:
    * \param [in] supportMsg Upgrade hint if this attribute is no longer
    *             supported.  If the attribute is \c DEPRECATED the attribute
    *             behavior still exists, but user code should be updated
-   *             following guidance in the hint..
+   *             following guidance in the hint.
    *             If the attribute is \c OBSOLETE, the hint should indicate
    *             which class the attribute functional has been moved to,
    *             or that the functionality is no longer supported.
-   *             See test file \file type-id-test-suite.cc for examples.
+   *             See test file type-id-test-suite.cc for examples.
    * \returns This TypeId instance
    */
   TypeId AddAttribute (std::string name,
@@ -388,10 +388,10 @@ public:
    *
    * \param [in] i The attribute to manipulate
    * \param [in] initialValue The new initial value to use for this attribute.
-   * \returns \c true if the call was successfuly.
+   * \returns \c true if the call was successfully.
    */
-  bool SetAttributeInitialValue(uint32_t i, 
-                                Ptr<const AttributeValue> initialValue);
+  bool SetAttributeInitialValue (std::size_t i,
+                                 Ptr<const AttributeValue> initialValue);
 
   /**
    * Record in this TypeId the fact that a new attribute exists.
@@ -459,7 +459,7 @@ public:
    *             If the attribute is \c OBSOLETE, the hint should indicate
    *             which class the attribute functional has been moved to,
    *             or that the functionality is no longer supported.
-   *             See test file \file type-id-test-suite.cc for examples.
+   *             See test file type-id-test-suite.cc for examples.
    * \returns This TypeId instance.
    */
   TypeId AddTraceSource (std::string name,

@@ -47,11 +47,15 @@ namespace ns3 {
  */
 class EpcSgwPgwApplication : public Application
 {
+  /// allow MemberEpcS11SapSgw<EpcSgwPgwApplication> class friend access
   friend class MemberEpcS11SapSgw<EpcSgwPgwApplication>;
 
 public:
 
-  // inherited from Object
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
   virtual void DoDispose ();
 
@@ -63,6 +67,7 @@ public:
    * internet over GTP-U/UDP/IP on the S1-U interface
    * \param s1uSocket socket used to send GTP-U packets to the eNBs
    */
+
   EpcSgwPgwApplication (const Ptr<VirtualNetDevice> tunDevice, const Ptr<Socket> s1uSocket);
 
   /** 
@@ -98,6 +103,7 @@ public:
    * Send a packet to the internet via the Gi interface of the SGW/PGW
    * 
    * \param packet 
+   * \param teid the Tunnel Enpoint Identifier
    */
   void SendToTunDevice (Ptr<Packet> packet, uint32_t teid);
 
@@ -150,13 +156,45 @@ public:
    */
   void SetUeAddress (uint64_t imsi, Ipv4Address ueAddr);
 
+  /** 
+   * set the address of a previously added UE
+   * 
+   * \param imsi the unique identifier of the UE
+   * \param ueAddr the IPv6 address of the UE
+   */
+  void SetUeAddress6 (uint64_t imsi, Ipv6Address ueAddr);
+
+  /**
+   * TracedCallback signature for data Packet reception event.
+   *
+   * \param [in] packet The data packet sent from the internet.
+   */
+  typedef void (* RxTracedCallback)
+    (Ptr<Packet> packet);
+
 private:
 
   // S11 SAP SGW methods
+  /**
+   * Create session request function
+   * \param msg EpcS11SapSgw::CreateSessionRequestMessage
+   */
   void DoCreateSessionRequest (EpcS11SapSgw::CreateSessionRequestMessage msg);
+  /**
+   * Modify bearer request function
+   * \param msg EpcS11SapSgw::ModifyBearerRequestMessage
+   */
   void DoModifyBearerRequest (EpcS11SapSgw::ModifyBearerRequestMessage msg);  
 
+  /**
+   * Delete bearer command function
+   * \param req EpcS11SapSgw::DeleteBearerCommandMessage
+   */
   void DoDeleteBearerCommand (EpcS11SapSgw::DeleteBearerCommandMessage req);
+  /**
+   * Delete bearer response function
+   * \param req EpcS11SapSgw::DeleteBearerResponseMessage
+   */
   void DoDeleteBearerResponse (EpcS11SapSgw::DeleteBearerResponseMessage req);
 
 
@@ -178,7 +216,7 @@ public:
 
     /** 
      * \brief Function, deletes contexts of bearer on SGW and PGW side
-     * \param bearerId, the Bearer Id whose contexts to be removed
+     * \param bearerId the Bearer Id whose contexts to be removed
      */
     void RemoveBearer (uint8_t bearerId);
 
@@ -206,23 +244,35 @@ public:
     void SetEnbAddr (Ipv4Address addr);
 
     /** 
-     * \return the address of the UE
+     * \return the IPv4 address of the UE
      */
     Ipv4Address GetUeAddr ();
 
     /** 
-     * set the address of the UE
+     * set the IPv4 address of the UE
      * 
-     * \param addr the address of the UE
+     * \param addr the IPv4 address of the UE
      */
     void SetUeAddr (Ipv4Address addr);
 
+    /**
+     * \return the IPv6 address of the UE
+     */
+    Ipv6Address GetUeAddr6 ();
+
+    /**
+     * set the IPv6 address of the UE
+     *
+     * \param addr the IPv6 address of the UE
+     */
+    void SetUeAddr6 (Ipv6Address addr);
 
   private:
-    EpcTftClassifier m_tftClassifier;
-    Ipv4Address m_enbAddr;
-    Ipv4Address m_ueAddr;
-    std::map<uint8_t, uint32_t> m_teidByBearerIdMap;
+    EpcTftClassifier m_tftClassifier; ///< TFT classifier
+    Ipv4Address m_enbAddr; ///< ENB IPv4 address
+    Ipv4Address m_ueAddr; ///< UE IPv4 address
+    Ipv6Address m_ueAddr6; ///< UE IPv6 address
+    std::map<uint8_t, uint32_t> m_teidByBearerIdMap; ///< TEID By bearer ID Map
   };
 
 
@@ -238,9 +288,14 @@ public:
   Ptr<VirtualNetDevice> m_tunDevice;
 
   /**
-   * Map telling for each UE address the corresponding UE info 
+   * Map telling for each UE IPv4 address the corresponding UE info 
    */
   std::map<Ipv4Address, Ptr<UeInfo> > m_ueInfoByAddrMap;
+
+  /**
+   * Map telling for each UE IPv6 address the corresponding UE info 
+   */
+  std::map<Ipv6Address, Ptr<UeInfo> > m_ueInfoByAddrMap6;
 
   /**
    * Map telling for each IMSI the corresponding UE info 
@@ -252,6 +307,9 @@ public:
    */
   uint16_t m_gtpuUdpPort;
 
+  /**
+   * TEID count
+   */
   uint32_t m_teidCount;
 
   /**
@@ -266,13 +324,24 @@ public:
    */
   EpcS11SapSgw* m_s11SapSgw;
 
+  /// EnbInfo structure
   struct EnbInfo
   {
-    Ipv4Address enbAddr;
-    Ipv4Address sgwAddr;    
+    Ipv4Address enbAddr; ///< eNB IPv4 address
+    Ipv4Address sgwAddr; ///< SGW IPV4 address
   };
 
-  std::map<uint16_t, EnbInfo> m_enbInfoByCellId;
+  std::map<uint16_t, EnbInfo> m_enbInfoByCellId; ///< eNB info by cell ID
+
+  /**
+   * \brief Callback to trace RX (reception) data packets at Tun Net Device from internet.
+   */
+  TracedCallback<Ptr<Packet> > m_rxTunPktTrace;
+
+  /**
+   * \brief Callback to trace RX (reception) data packets from S1-U socket.
+   */
+  TracedCallback<Ptr<Packet> > m_rxS1uPktTrace;
 };
 
 } //namespace ns3

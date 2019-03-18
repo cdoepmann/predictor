@@ -23,14 +23,11 @@
 #include "ns3/mesh-wifi-beacon.h"
 #include "ns3/log.h"
 #include "ns3/boolean.h"
-#include "ns3/wifi-phy.h"
-#include "ns3/dcf-manager.h"
-#include "ns3/mac-rx-middle.h"
 #include "ns3/mac-low.h"
-#include "ns3/dca-txop.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/simulator.h"
 #include "ns3/yans-wifi-phy.h"
+#include "ns3/wifi-utils.h"
 #include "ns3/pointer.h"
 #include "ns3/double.h"
 #include "ns3/trace-source-accessor.h"
@@ -209,7 +206,7 @@ MeshWifiInterfaceMac::SwitchFrequencyChannel (uint16_t new_id)
   Ptr<YansWifiPhy> phy = m_phy->GetObject<YansWifiPhy> ();
   phy->SetChannelNumber (new_id);
   // Don't know NAV on new channel
-  m_dcfManager->NotifyNavResetNow (Seconds (0));
+  m_channelAccessManager->NotifyNavResetNow (Seconds (0));
 }
 //-----------------------------------------------------------------------------
 // Forward frame down
@@ -231,7 +228,7 @@ MeshWifiInterfaceMac::ForwardDown (Ptr<const Packet> const_packet, Mac48Address 
   hdr.SetQosNoEosp ();
   hdr.SetQosNoAmsdu ();
   hdr.SetQosTxopLimit (0);
-  // Address 1 is unknwon here. Routing plugin is responsible to correctly set it.
+  // Address 1 is unknown here. Routing plugin is responsible to correctly set it.
   hdr.SetAddr1 (Mac48Address ());
   // Filter packet through all installed plugins
   for (PluginList::const_iterator i = m_plugins.end () - 1; i != m_plugins.begin () - 1; i--)
@@ -319,13 +316,15 @@ MeshWifiInterfaceMac::GetSupportedRates () const
   for (uint32_t i = 0; i < m_phy->GetNModes (); i++)
     {
       WifiMode mode = m_phy->GetMode (i);
-      rates.AddSupportedRate (mode.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), 1));
+      uint16_t gi = ConvertGuardIntervalToNanoSeconds (mode, m_phy->GetShortGuardInterval (), m_phy->GetGuardInterval ());
+      rates.AddSupportedRate (mode.GetDataRate (m_phy->GetChannelWidth (), gi, 1));
     }
   // set the basic rates
   for (uint32_t j = 0; j < m_stationManager->GetNBasicModes (); j++)
     {
       WifiMode mode = m_stationManager->GetBasicMode (j);
-      rates.SetBasicRate (mode.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), 1));
+      uint16_t gi = ConvertGuardIntervalToNanoSeconds (mode, m_phy->GetShortGuardInterval (), m_phy->GetGuardInterval ());
+      rates.SetBasicRate (mode.GetDataRate (m_phy->GetChannelWidth (), gi, 1));
     }
   return rates;
 }
@@ -335,7 +334,8 @@ MeshWifiInterfaceMac::CheckSupportedRates (SupportedRates rates) const
   for (uint32_t i = 0; i < m_stationManager->GetNBasicModes (); i++)
     {
       WifiMode mode = m_stationManager->GetBasicMode (i);
-      if (!rates.IsSupportedRate (mode.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), 1)))
+      uint16_t gi = ConvertGuardIntervalToNanoSeconds (mode, m_phy->GetShortGuardInterval (), m_phy->GetGuardInterval ());
+      if (!rates.IsSupportedRate (mode.GetDataRate (m_phy->GetChannelWidth (), gi, 1)))
         {
           return false;
         }
@@ -412,7 +412,7 @@ MeshWifiInterfaceMac::SendBeacon ()
     {
       (*i)->UpdateBeacon (beacon);
     }
-  m_dca->Queue (beacon.CreatePacket (), beacon.CreateHeader (GetAddress (), GetMeshPointAddress ()));
+  m_txop->Queue (beacon.CreatePacket (), beacon.CreateHeader (GetAddress (), GetMeshPointAddress ()));
 
   ScheduleNextBeacon ();
 }
@@ -442,10 +442,12 @@ MeshWifiInterfaceMac::Receive (Ptr<Packet> packet, WifiMacHeader const *hdr)
           for (uint32_t i = 0; i < m_phy->GetNModes (); i++)
             {
               WifiMode mode = m_phy->GetMode (i);
-              if (rates.IsSupportedRate (mode.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), 1)))
+              uint16_t gi = ConvertGuardIntervalToNanoSeconds (mode, m_phy->GetShortGuardInterval (), m_phy->GetGuardInterval ());
+              uint64_t rate = mode.GetDataRate (m_phy->GetChannelWidth (), gi, 1);
+              if (rates.IsSupportedRate (rate))
                 {
                   m_stationManager->AddSupportedMode (hdr->GetAddr2 (), mode);
-                  if (rates.IsBasicRate (mode.GetDataRate (m_phy->GetChannelWidth (), m_phy->GetGuardInterval (), 1)))
+                  if (rates.IsBasicRate (rate))
                     {
                       m_stationManager->AddBasicMode (mode);
                     }
@@ -554,9 +556,9 @@ MeshWifiInterfaceMac::FinishConfigureStandard (enum WifiPhyStandard standard)
   // We use the single DCF provided by WifiMac for the purpose of
   // Beacon transmission. For this we need to reconfigure the channel
   // access parameters slightly, and do so here.
-  m_dca->SetMinCw (0);
-  m_dca->SetMaxCw (0);
-  m_dca->SetAifsn (1);
+  m_txop->SetMinCw (0);
+  m_txop->SetMaxCw (0);
+  m_txop->SetAifsn (1);
 }
 WifiPhyStandard
 MeshWifiInterfaceMac::GetPhyStandard () const

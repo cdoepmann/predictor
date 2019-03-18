@@ -21,6 +21,7 @@
 #define ATTRIBUTE_ACCESSOR_HELPER_H
 
 #include "attribute.h"
+#include "unused.h"
 
 /**
  * \file
@@ -325,6 +326,8 @@ public:
     {}
 private:
     virtual bool DoSet (T *object, const V *v) const {
+      NS_UNUSED (object);
+      NS_UNUSED (v);
       return false;
     }
     virtual bool DoGet (const T *object, V *v) const {
@@ -361,7 +364,7 @@ inline
 Ptr<const AttributeAccessor>
 DoMakeAccessorHelperOne (void (T::*setter)(U))
 {
-  /* AttributeAccessor implemenation with a class set method returning void. */
+  /* AttributeAccessor implementation with a class set method returning void. */
   class MemberMethod : public AccessorHelper<T,V>
   {
 public:
@@ -385,6 +388,8 @@ private:
       return true;
     }
     virtual bool DoGet (const T *object, V *v) const {
+      NS_UNUSED(object);
+      NS_UNUSED(v);
       return false;
     }
     virtual bool HasGetter (void) const {
@@ -423,7 +428,7 @@ DoMakeAccessorHelperTwo (void (T::*setter)(U),
                          V (T::*getter)(void) const)
 {
   /*
-   * AttributeAccessor implemenation with class get functor and set method,
+   * AttributeAccessor implementation with class get functor and set method,
    * returning void.
    */
   class MemberMethod : public AccessorHelper<T,W>
@@ -506,7 +511,7 @@ DoMakeAccessorHelperTwo (bool (T::*setter)(U),
                          V (T::*getter)(void) const)
 {
   /*
-   * AttributeAccessor implemenation with class get functor and
+   * AttributeAccessor implementation with class get functor and
    * set method, returning bool.
    */
   class MemberMethod : public AccessorHelper<T,W>

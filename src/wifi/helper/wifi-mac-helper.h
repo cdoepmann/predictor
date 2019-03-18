@@ -21,8 +21,6 @@
 #ifndef WIFI_MAC_HELPER_H
 #define WIFI_MAC_HELPER_H
 
-#include <string>
-#include "ns3/attribute.h"
 #include "ns3/object-factory.h"
 
 namespace ns3 {
@@ -33,17 +31,13 @@ class WifiMac;
  * \brief create MAC layers for a ns3::WifiNetDevice.
  *
  * This class can create MACs of type ns3::ApWifiMac, ns3::StaWifiMac and ns3::AdhocWifiMac.
- * Its purpose is to allow a WifiHelper to configure and install WifiMac objects on a collection 
- * of nodes. The WifiMac objects themselves are mainly composed of TxMiddle, RxMiddle, DcfManager, 
- * MacLow, WifiRemoteStationManager, MpduAggregator and MsduAggregartor objects, so this helper 
- * offers the opportunity to configure attribute values away from their default values, on a 
- * per-NodeContainer basis. By default, it creates an Adhoc MAC layer without QoS. Typically, 
+ * Its purpose is to allow a WifiHelper to configure and install WifiMac objects on a collection
+ * of nodes. The WifiMac objects themselves are mainly composed of TxMiddle, RxMiddle, ChannelAccessManager,
+ * MacLow, WifiRemoteStationManager, MpduAggregator and MsduAggregartor objects, so this helper
+ * offers the opportunity to configure attribute values away from their default values, on a
+ * per-NodeContainer basis. By default, it creates an Adhoc MAC layer without QoS. Typically,
  * it is used to set type and attribute values, then hand this object over to the WifiHelper that
  * finishes the job of installing.
- *
- * This class is a merge of two previous helpers (ns3::NqosWifiMacHelper and ns::3 QosWifiMacHelper)
- * that Mirko Banchi (mk.banchi@gmail.com) originally contributed.
- * It should now be used instead of those two deprecated helpers.
  *
  * This class may be further subclassed (WaveMacHelper is an example of this).
  *
@@ -113,7 +107,7 @@ public:
 
 
 protected:
-  ObjectFactory m_mac;
+  ObjectFactory m_mac; ///< MAC object factory
 };
 
 } // namespace ns3

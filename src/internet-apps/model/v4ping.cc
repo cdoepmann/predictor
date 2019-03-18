@@ -128,7 +128,7 @@ V4Ping::Receive (Ptr<Socket> socket)
       NS_ASSERT (ipv4.GetProtocol () == 1); // protocol should be icmp.
       Icmpv4Header icmp;
       p->RemoveHeader (icmp);
-      if (icmp.GetType () == Icmpv4Header::ECHO_REPLY)
+      if (icmp.GetType () == Icmpv4Header::ICMPV4_ECHO_REPLY)
         {
           Icmpv4Echo echo;
           p->RemoveHeader (echo);
@@ -178,7 +178,7 @@ V4Ping::Receive (Ptr<Socket> socket)
 void
 V4Ping::Write32 (uint8_t *buffer, const uint32_t data)
 {
-  NS_LOG_FUNCTION (this << buffer << data);
+  NS_LOG_FUNCTION (this << (void *) buffer << data);
   buffer[0] = (data >> 0) & 0xff;
   buffer[1] = (data >> 8) & 0xff;
   buffer[2] = (data >> 16) & 0xff;
@@ -189,7 +189,7 @@ V4Ping::Write32 (uint8_t *buffer, const uint32_t data)
 void
 V4Ping::Read32 (const uint8_t *buffer, uint32_t &data)
 {
-  NS_LOG_FUNCTION (this << buffer << data);
+  NS_LOG_FUNCTION (this << (void *) buffer << data);
   data = (buffer[3] << 24) + (buffer[2] << 16) + (buffer[1] << 8) + buffer[0];
 }
 
@@ -225,7 +225,7 @@ V4Ping::Send ()
   echo.SetData (dataPacket);
   p->AddHeader (echo);
   Icmpv4Header header;
-  header.SetType (Icmpv4Header::ECHO);
+  header.SetType (Icmpv4Header::ICMPV4_ECHO);
   header.SetCode (0);
   if (Node::ChecksumEnabled ())
     {

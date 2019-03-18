@@ -23,30 +23,47 @@
 #include "ns3/tcp-socket-base.h"
 #include "ns3/tcp-hybla.h"
 
-namespace ns3 {
+using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("TcpHyblaTestSuite");
 
 /**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
  * \brief Testing the congestion avoidance increment on TcpHybla
  */
 class TcpHyblaIncrementTest : public TestCase
 {
 public:
+  /**
+   * \brief Constructor.
+   * \param cWnd Congestion window.
+   * \param ssThresh Slow Start Threshold.
+   * \param segmentSize Segment size.
+   * \param rtt Round trip time.
+   * \param name Test description.
+   */
   TcpHyblaIncrementTest (uint32_t cWnd, uint32_t ssThresh,
                          uint32_t segmentSize, const Time& rtt,
                          const std::string &name);
 
 private:
   virtual void DoRun (void);
+
+  /**
+   * \brief Tracks TCP Hybla rho parameter changes.
+   * \param oldVal Previous value.
+   * \param newVal Actual value.
+   */
   void RhoUpdated (double oldVal, double newVal);
 
-  uint32_t m_cWnd;
-  uint32_t m_ssThresh;
-  uint32_t m_segmentSize;
-  Time m_rtt;
-  double m_rho;
-  Ptr<TcpSocketState> m_state;
+  uint32_t m_cWnd;        //!< Congestion window.
+  uint32_t m_ssThresh;    //!< Slow Start Threshold.
+  uint32_t m_segmentSize; //!< Segment size.
+  Time m_rtt;             //!< Round trip time.
+  double m_rho;           //!< TCP Hybla rho parameter.
+  Ptr<TcpSocketState> m_state;  //!< TCP socket state.
 };
 
 TcpHyblaIncrementTest::TcpHyblaIncrementTest (uint32_t cWnd, uint32_t ssThresh,
@@ -64,6 +81,7 @@ TcpHyblaIncrementTest::TcpHyblaIncrementTest (uint32_t cWnd, uint32_t ssThresh,
 void
 TcpHyblaIncrementTest::RhoUpdated (double oldVal, double newVal)
 {
+  NS_UNUSED (oldVal);
   m_rho = newVal;
 }
 
@@ -75,6 +93,7 @@ TcpHyblaIncrementTest::DoRun ()
   m_state->m_cWnd = m_cWnd;
   m_state->m_ssThresh = m_ssThresh;
   m_state->m_segmentSize = m_segmentSize;
+  m_state->m_minRtt = m_rtt;
 
   Ptr<TcpHybla> cong = CreateObject <TcpHybla> ();
 
@@ -90,7 +109,7 @@ TcpHyblaIncrementTest::DoRun ()
 
   double calcRho = std::max (m_rtt.GetSeconds () / rRtt.Get ().GetSeconds (), 1.0);
 
-  NS_TEST_ASSERT_MSG_NE (m_rho, 0,
+  NS_TEST_ASSERT_MSG_NE (m_rho, 0.0,
                          "Rho never updated by implementation");
   NS_TEST_ASSERT_MSG_EQ_TOL (calcRho, m_rho, MilliSeconds (10),
                          "Different rho values between implementation and test");
@@ -124,9 +143,15 @@ TcpHyblaIncrementTest::DoRun ()
 
 }
 
-// -------------------------------------------------------------------
 
-static class TcpHyblaTestSuite : public TestSuite
+
+/**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
+ * \brief TCP Hybla TestSuite
+ */
+class TcpHyblaTestSuite : public TestSuite
 {
 public:
   TcpHyblaTestSuite () : TestSuite ("tcp-hybla-test", UNIT)
@@ -144,6 +169,6 @@ public:
     AddTestCase (new TcpHyblaIncrementTest (1000, 500, 500, Seconds (0.75), "Rho=30, cong avoid"),
                  TestCase::QUICK);
   }
-} g_tcpHyblaTest;
+};
 
-} // namespace ns3
+static TcpHyblaTestSuite g_tcpHyblaTest; //!< Static variable for test initialization

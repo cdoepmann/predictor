@@ -27,13 +27,13 @@
 #include <cstring>
 
 
-#if defined (HAVE_DIRENT_H) and defined (HAVE_SYS_TYPES_H)
+#if defined (HAVE_DIRENT_H) && defined (HAVE_SYS_TYPES_H)
 /** Do we have an \c opendir function? */
 #define HAVE_OPENDIR
 #include <sys/types.h>
 #include <dirent.h>
 #endif
-#if defined (HAVE_SYS_STAT_H) and defined (HAVE_SYS_TYPES_H)
+#if defined (HAVE_SYS_STAT_H) && defined (HAVE_SYS_TYPES_H)
 /** Do we have a \c makedir function? */
 #define HAVE_MKDIR_H
 #include <sys/types.h>
@@ -66,7 +66,7 @@
 /**
  * \file
  * \ingroup systempath
- * System-independent file and directory functions implementation.
+ * ns3::SystemPath implementation.
  */
 
 namespace ns3 {
@@ -134,8 +134,9 @@ std::string FindSelfDirectory (void)
   }
 #elif defined (__win32__)
   {
-    /// \todo untested. it should work if code is compiled with
-    /// LPTSTR = char *
+    /** \todo untested. it should work if code is compiled with
+     *  LPTSTR = char *
+     */
     DWORD size = 1024;
     LPTSTR lpFilename = (LPTSTR) malloc (sizeof(TCHAR) * size);
     DWORD status = GetModuleFilename (0, lpFilename, size);
@@ -169,7 +170,7 @@ std::string FindSelfDirectory (void)
 #elif defined (__FreeBSD__)
   {
     int     mib[4];
-    size_t  bufSize = 1024;
+    std::size_t  bufSize = 1024;
     char   *buf = (char *) malloc(bufSize);
 
     mib[0] = CTL_KERN;
@@ -256,7 +257,7 @@ std::list<std::string> ReadFiles (std::string path)
     }
   closedir (dp);
 #elif defined (HAVE_FIND_FIRST_FILE)
-  /// \todo untested
+  /** \todo untested */
   HANDLE hFind;
   WIN32_FIND_DATA fileData;
   
@@ -330,25 +331,29 @@ MakeDirectories (std::string path)
 
   // Make sure all directories on the path exist
   std::list<std::string> elements = Split (path);
-  for (std::list<std::string>::const_iterator i = elements.begin (); i != elements.end (); ++i)
+  auto i = elements.begin ();
+  while (i != elements.end ())
     {
+      if (*i == "")
+        {
+          NS_LOG_LOGIC ("skipping empty directory name");
+          ++i;
+          continue;
+        }
+      NS_LOG_LOGIC ("creating directory " << *i);
+      ++i;  // Now points to one past the directory we want to create
       std::string tmp = Join (elements.begin (), i);
+      bool makeDirErr = false;
+      
 #if defined(HAVE_MKDIR_H)
-      if (mkdir (tmp.c_str (), S_IRWXU))
+      makeDirErr = mkdir (tmp.c_str (), S_IRWXU);
+#endif
+
+      if (makeDirErr)
         {
           NS_LOG_ERROR ("failed creating directory " << tmp);
         }
-#endif
     }
-
-  // Make the final directory.  Is this redundant with last iteration above?
-#if defined(HAVE_MKDIR_H)
-  if (mkdir (path.c_str (), S_IRWXU))
-    {
-      NS_LOG_ERROR ("failed creating directory " << path);
-    }
-#endif
-
 }
 
 } // namespace SystemPath

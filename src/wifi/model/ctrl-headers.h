@@ -22,18 +22,9 @@
 #define CTRL_HEADERS_H
 
 #include "ns3/header.h"
+#include "block-ack-type.h"
 
 namespace ns3 {
-
-/**
- * Enumeration for different block ACK policies.
- */
-enum BlockAckType
-{
-  BASIC_BLOCK_ACK,
-  COMPRESSED_BLOCK_ACK,
-  MULTI_TID_BLOCK_ACK
-};
 
 /**
  * \ingroup wifi
@@ -52,12 +43,16 @@ class CtrlBAckRequestHeader : public Header
 public:
   CtrlBAckRequestHeader ();
   ~CtrlBAckRequestHeader ();
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
-  virtual TypeId GetInstanceTypeId (void) const;
-  virtual void Print (std::ostream &os) const;
-  virtual uint32_t GetSerializedSize (void) const;
-  virtual void Serialize (Buffer::Iterator start) const;
-  virtual uint32_t Deserialize (Buffer::Iterator start);
+  TypeId GetInstanceTypeId (void) const;
+  void Print (std::ostream &os) const;
+  uint32_t GetSerializedSize (void) const;
+  void Serialize (Buffer::Iterator start) const;
+  uint32_t Deserialize (Buffer::Iterator start);
 
   /**
    * Enable or disable HT immediate ACK.
@@ -70,7 +65,7 @@ public:
    *
    * \param type
    */
-  void SetType (enum BlockAckType type);
+  void SetType (BlockAckType type);
   /**
    * Set Traffic ID (TID).
    *
@@ -163,11 +158,11 @@ private:
    * For now only non HT immediate block ack is implemented so this field
    * is here only for a future implementation of HT delayed variant.
    */
-  bool m_barAckPolicy;
-  bool m_multiTid;
-  bool m_compressed;
-  uint16_t m_tidInfo;
-  uint16_t m_startingSeq;
+  bool m_barAckPolicy; ///< bar ack policy
+  bool m_multiTid; ///< multi TID
+  bool m_compressed; ///< compressed
+  uint16_t m_tidInfo; ///< TID info
+  uint16_t m_startingSeq; ///< starting seq
 };
 
 
@@ -188,12 +183,16 @@ class CtrlBAckResponseHeader : public Header
 public:
   CtrlBAckResponseHeader ();
   ~CtrlBAckResponseHeader ();
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
-  virtual TypeId GetInstanceTypeId (void) const;
-  virtual void Print (std::ostream &os) const;
-  virtual uint32_t GetSerializedSize (void) const;
-  virtual void Serialize (Buffer::Iterator start) const;
-  virtual uint32_t Deserialize (Buffer::Iterator start);
+  TypeId GetInstanceTypeId (void) const;
+  void Print (std::ostream &os) const;
+  uint32_t GetSerializedSize (void) const;
+  void Serialize (Buffer::Iterator start) const;
+  uint32_t Deserialize (Buffer::Iterator start);
 
   /**
    * Enable or disable HT immediate ACK.
@@ -206,7 +205,7 @@ public:
    *
    * \param type
    */
-  void SetType (enum BlockAckType type);
+  void SetType (BlockAckType type);
   /**
    * Set Traffic ID (TID).
    *
@@ -375,7 +374,7 @@ private:
    * to set to 1 in the compressed bitmap to indicate that packet having
    * sequence number equals to <i>seq</i> was correctly received.
    */
-  uint8_t IndexInBitmap (uint16_t seq) const;
+  uint16_t IndexInBitmap (uint16_t seq) const;
 
   /**
    * Checks if sequence number <i>seq</i> can be acknowledged in the bitmap.
@@ -392,17 +391,17 @@ private:
    * For now only non HT immediate block ack is implemented so this field
    * is here only for a future implementation of HT delayed variant.
    */
-  bool m_baAckPolicy;
-  bool m_multiTid;
-  bool m_compressed;
-  uint16_t m_tidInfo;
-  uint16_t m_startingSeq;
+  bool m_baAckPolicy; ///< BA ack policy
+  bool m_multiTid; ///< multi TID
+  bool m_compressed; ///< compressed
+  uint16_t m_tidInfo; ///< TID info
+  uint16_t m_startingSeq; ///< starting seq
 
   union
   {
-    uint16_t m_bitmap[64];
-    uint64_t m_compressedBitmap;
-  } bitmap;
+    uint16_t m_bitmap[64]; ///< the block ack bitmap
+    uint64_t m_compressedBitmap; ///< the compressed block ack bitmap
+  } bitmap; ///< bitmap union type
 };
 
 } //namespace ns3

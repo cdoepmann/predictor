@@ -19,12 +19,8 @@
  */
 
 #include "erp-information.h"
-#include "ns3/assert.h"
-#include "ns3/log.h"
 
 namespace ns3 {
-
-NS_LOG_COMPONENT_DEFINE ("ErpInformation");
 
 ErpInformation::ErpInformation ()
   : m_erpInformation (0),
@@ -83,14 +79,14 @@ ErpInformation::GetNonErpPresent (void) const
 uint8_t
 ErpInformation::GetInformationFieldSize () const
 {
-  NS_ASSERT (m_erpSupported > 0);
+  NS_ASSERT (m_erpSupported);
   return 1;
 }
 
 Buffer::Iterator
 ErpInformation::Serialize (Buffer::Iterator i) const
 {
-  if (m_erpSupported < 1)
+  if (!m_erpSupported)
     {
       return i;
     }
@@ -100,7 +96,7 @@ ErpInformation::Serialize (Buffer::Iterator i) const
 uint16_t
 ErpInformation::GetSerializedSize () const
 {
-  if (m_erpSupported < 1)
+  if (!m_erpSupported)
     {
       return 0;
     }
@@ -110,7 +106,7 @@ ErpInformation::GetSerializedSize () const
 void
 ErpInformation::SerializeInformationField (Buffer::Iterator start) const
 {
-  if (m_erpSupported == 1)
+  if (m_erpSupported)
     {
       start.WriteU8 (m_erpInformation);
     }
@@ -125,8 +121,14 @@ ErpInformation::DeserializeInformationField (Buffer::Iterator start,
   return length;
 }
 
-ATTRIBUTE_HELPER_CPP (ErpInformation);
-
+/**
+ * output stream output operator
+ *
+ * \param os output stream
+ * \param erpinformation
+ *
+ * \returns output stream
+ */
 std::ostream &
 operator << (std::ostream &os, const ErpInformation &erpinformation)
 {
@@ -135,17 +137,6 @@ operator << (std::ostream &os, const ErpInformation &erpinformation)
      << "|" << bool (erpinformation.GetNonErpPresent ());
 
   return os;
-}
-
-std::istream &operator >> (std::istream &is, ErpInformation &erpinformation)
-{
-  bool c1, c2, c3;
-  is >> c1 >> c2 >> c3;
-  erpinformation.SetBarkerPreambleMode (c1);
-  erpinformation.SetUseProtection (c2);
-  erpinformation.SetNonErpPresent (c3);
-
-  return is;
 }
 
 } //namespace ns3

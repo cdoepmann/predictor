@@ -47,7 +47,7 @@ public:
    *
    * \code
    *   RngSeedManger::SetSeed(15);
-   *   UniformVariable x(2,3);     // These will give the same output everytime
+   *   UniformVariable x(2,3);     // These will give the same output every time
    *   ExponentialVariable y(120); // as long as the seed stays the same.
    * \endcode
    * \param [in] seed The seed value to use.
@@ -78,7 +78,7 @@ public:
    *   UniformVariable x(0,10);
    *   ExponentialVariable y(2902);
    * \endcode
-   * In this example, \c N could successivly be equal to 1,2,3, _etc._
+   * In this example, \c N could successively be equal to 1,2,3, _etc._
    * and the user would continue to get independent runs out of the
    * single simulation.  For this simple example, the following might work:
    * \code

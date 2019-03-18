@@ -558,7 +558,7 @@ private:
 
   /**
    * Cancel an ongoing ED procedure. This is called when the transceiver is
-   * switched off or set to TX mode. This calls the appropiate confirm callback
+   * switched off or set to TX mode. This calls the appropriate confirm callback
    * of the MAC.
    *
    * \param state the new state which is the cause for canceling ED
@@ -595,6 +595,7 @@ private:
   /**
    * Calculate the time required for sending the PPDU header, that is the
    * preamble, SFD and PHR.
+   * \returns The time required for sending the PPDU header.
    */
   Time GetPpduHeaderTxTime (void);
 

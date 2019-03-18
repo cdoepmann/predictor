@@ -15,9 +15,6 @@ def build(bld):
     obj = bld.create_ns3_program('main-ptr', ['core'] )
     obj.source = 'main-ptr.cc'
 
-    obj = bld.create_ns3_program('main-random-variable', ['core', 'config-store','stats'])
-    obj.source = 'main-random-variable.cc'
-
     obj = bld.create_ns3_program('main-random-variable-stream', ['core', 'config-store','stats'])
     obj.source = 'main-random-variable-stream.cc'
 
@@ -36,6 +33,9 @@ def build(bld):
     obj = bld.create_ns3_program('hash-example',
                                  ['core'])
     obj.source = 'hash-example.cc'
+
+    obj = bld.create_ns3_program('sample-log-time-format', ['core'])
+    obj.source = 'sample-log-time-format.cc'
 
     obj = bld.create_ns3_program('test-string-value-formatting', ['core'])
     obj.source = 'test-string-value-formatting.cc'

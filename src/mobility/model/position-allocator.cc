@@ -87,6 +87,12 @@ ListPositionAllocator::AssignStreams (int64_t stream)
   return 0;
 }
 
+uint32_t
+ListPositionAllocator::GetSize (void) const
+{
+  return m_positions.size ();
+}
+
 NS_OBJECT_ENSURE_REGISTERED (GridPositionAllocator);
 
 TypeId 
@@ -96,7 +102,7 @@ GridPositionAllocator::GetTypeId (void)
     .SetParent<PositionAllocator> ()
     .SetGroupName ("Mobility")
     .AddConstructor<GridPositionAllocator> ()
-    .AddAttribute ("GridWidth", "The number of objects layed out on a line.",
+    .AddAttribute ("GridWidth", "The number of objects laid out on a line.",
                    UintegerValue (10),
                    MakeUintegerAccessor (&GridPositionAllocator::m_n),
                    MakeUintegerChecker<uint32_t> ())

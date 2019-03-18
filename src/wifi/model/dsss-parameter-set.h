@@ -21,10 +21,7 @@
 #ifndef DSSS_PARAMETER_SET_H
 #define DSSS_PARAMETER_SET_H
 
-#include <stdint.h>
-#include <ostream>
-#include "ns3/buffer.h"
-#include "ns3/wifi-information-element.h"
+#include "wifi-information-element.h"
 
 namespace ns3 {
 
@@ -38,27 +35,43 @@ class DsssParameterSet : public WifiInformationElement
 {
 public:
   DsssParameterSet ();
+  /**
+   * Set DSSS supported
+   * \param DsssSupported the DSSS supported indicator
+   */
   void SetDsssSupported (uint8_t DsssSupported);
-  
+
   /**
    * Set the Current Channel field in the DsssParameterSet information element.
    *
-   * \param qosInfo the CurrentChannel field in the DsssParameterSet information element
+   * \param currentChannel the CurrentChannel field in the DsssParameterSet information element
    */
   void SetCurrentChannel (uint8_t currentChannel);
-  
-  /*
-   * Return the Current Channel field in the DsssParameterSet information element.
-   *
-   * \return the Current Channel field in the DsssParameterSet information element
+
+  /**
+   * Element ID function
+   * \returns the wifi information element ID
    */
-  uint8_t GetCurrentChannel (void) const;
-  
   WifiInformationElementId ElementId () const;
+  /**
+   * Get information field size function
+   * \returns the information field size
+   */
   uint8_t GetInformationFieldSize () const;
+  /**
+   * Serialize information field function
+   * \param start the iterator
+   * \returns the updated iterator
+   */
   void SerializeInformationField (Buffer::Iterator start) const;
+  /**
+   * Deserialize infornamtion field function
+   * \param start the iterator
+   * \param length the length
+   * \returns the updated iterator
+   */
   uint8_t DeserializeInformationField (Buffer::Iterator start, uint8_t length);
-    
+
   /**
    * This information element is a bit special in that it is only
    * included if the STA does support DSSS. To support this we
@@ -77,17 +90,13 @@ public:
    */
   uint16_t GetSerializedSize () const;
 
-private:
-  uint8_t m_currentChannel;
 
-  //This is used to decide whether this element should be added to the frame or not
+private:
+  uint8_t m_currentChannel; ///< current channel number
+
+  /// This is used to decide whether this element should be added to the frame or not
   bool m_dsssSupported;
 };
-
-std::ostream &operator << (std::ostream &os, const DsssParameterSet &dsssParameterSet);
-std::istream &operator >> (std::istream &is, DsssParameterSet &dsssParameterSet);
-
-ATTRIBUTE_HELPER_HEADER (DsssParameterSet);
 
 } //namespace ns3
 

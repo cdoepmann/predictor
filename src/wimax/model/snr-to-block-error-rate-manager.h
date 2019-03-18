@@ -82,7 +82,7 @@ public:
    */
   GetSNRToBlockErrorRateRecord (double SNR, uint8_t modulation);
   /**
-   * \brief Loads the traces form the repository specified in the constructor or setted by SetTraceFilePath function. If
+   * \brief Loads the traces form the repository specified in the constructor or set by SetTraceFilePath function. If
    * no repository is provided, default traces will be loaded from default-traces.h file
    */
 
@@ -97,15 +97,16 @@ public:
   void ReLoadTraces (void);
   /**
    * \brief If activate loss is called with false, all the returned BlcER will be 0 (no losses)
+   * \param loss true to activates losses
    */
   void ActivateLoss (bool loss);
 private:
+  /// Clear records function
   void ClearRecords (void);
-  uint8_t m_activateLoss;
-  static const unsigned int TRACE_FILE_PATH_SIZE = 1024;
-  char m_traceFilePath[TRACE_FILE_PATH_SIZE];
+  uint8_t m_activateLoss; ///< activate loss
+  std::string m_traceFilePath; ///< trace file path
 
-  std::vector<SNRToBlockErrorRateRecord *> * m_recordModulation[7];
+  std::vector<SNRToBlockErrorRateRecord *> * m_recordModulation[7]; ///< record modulation
 
 };
 }

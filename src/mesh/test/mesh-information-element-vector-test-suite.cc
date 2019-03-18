@@ -34,9 +34,17 @@
 
 using namespace ns3;
 
-// Unit tests
-//-----------------------------------------------------------------------------
-/// Built-in self test for MeshInformationElementVector and all IE
+/**
+ * \ingroup mesh
+ * \defgroup mesh-test mesh module tests
+ */
+
+/**
+ * \ingroup mesh-test
+ * \ingroup tests
+ *
+ * \brief Built-in self test for MeshInformationElementVector and all IE
+ */
 struct MeshInformationElementVectorBist : public TestCase
 {
   MeshInformationElementVectorBist () :
@@ -137,11 +145,18 @@ MeshInformationElementVectorBist::DoRun ()
   }
   Ptr<Packet> packet = Create<Packet> ();
   packet->AddHeader (vector);
+  uint32_t size = vector.GetSerializedSize ();
   MeshInformationElementVector resultVector;
-  packet->RemoveHeader (resultVector);
+  packet->RemoveHeader (resultVector, size);
   NS_TEST_ASSERT_MSG_EQ (vector, resultVector, "Roundtrip serialization of all known information elements works");
 }
 
+/**
+ * \ingroup mesh-test
+ * \ingroup tests
+ *
+ * \brief Mesh Test Suite
+ */
 class MeshTestSuite : public TestSuite
 {
 public:
@@ -154,5 +169,5 @@ MeshTestSuite::MeshTestSuite ()
   AddTestCase (new MeshInformationElementVectorBist, TestCase::QUICK);
 }
 
-static MeshTestSuite g_meshTestSuite;
+static MeshTestSuite g_meshTestSuite; ///< the test suite
 

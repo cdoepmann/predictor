@@ -94,7 +94,7 @@ LenaTestBearerDeactivateSuite::LenaTestBearerDeactivateSuite ()
   AddTestCase (new LenaDeactivateBearerTestCase (dist_1,estThrPssDl_1,packetSize_1,1,errorModel,true), TestCase::QUICK);
 }
 
-static LenaTestBearerDeactivateSuite lenaTestBearerDeactivateSuite;
+static LenaTestBearerDeactivateSuite lenaTestBearerDeactivateSuite; ///< the test suite
 
 
 std::string
@@ -255,13 +255,14 @@ LenaDeactivateBearerTestCase::DoRun (void)
   uint16_t dlPort = 1234;
   uint16_t ulPort = 2000;
   PacketSinkHelper dlPacketSinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), dlPort));
-  PacketSinkHelper ulPacketSinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), ulPort));
   ApplicationContainer clientApps;
   ApplicationContainer serverApps;
+
   for (uint32_t u = 0; u < ueNodes.GetN (); ++u)
     {
       ++ulPort;
       serverApps.Add (dlPacketSinkHelper.Install (ueNodes.Get (u))); // receive packets from remotehost
+      PacketSinkHelper ulPacketSinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), ulPort));
       serverApps.Add (ulPacketSinkHelper.Install (remoteHost));  // receive packets from UEs
 
       UdpClientHelper dlClient (ueIpIface.GetAddress (u), dlPort); // uplink packets generator

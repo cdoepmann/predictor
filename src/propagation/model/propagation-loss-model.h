@@ -81,7 +81,7 @@ public:
   Ptr<PropagationLossModel> GetNext ();
 
   /**
-   * Returns the Rx Power taking into account all the PropagatinLossModel(s)
+   * Returns the Rx Power taking into account all the PropagationLossModel(s)
    * chained to the current one.
    *
    * \param txPowerDbm current transmission power (in dBm)
@@ -123,7 +123,7 @@ private:
 
   /**
    * Returns the Rx Power taking into account only the particular
-   * PropagatinLossModel.
+   * PropagationLossModel.
    *
    * \param txPowerDbm current transmission power (in dBm)
    * \param a the mobility model of the source

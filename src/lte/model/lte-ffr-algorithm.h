@@ -60,7 +60,10 @@ public:
   LteFfrAlgorithm ();
   virtual ~LteFfrAlgorithm ();
 
-  // inherited from Object
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId ();
 
   /**
@@ -197,7 +200,7 @@ protected:
 
   /**
    * \brief DoGetMinContinuousUlBandwidth in number of RB
-   * \return number of RB in min continous UL Bandwidth
+   * \return number of RB in min continuous UL Bandwidth
    */
   virtual uint8_t DoGetMinContinuousUlBandwidth () = 0;
 
@@ -239,7 +242,7 @@ protected:
   int GetRbgSize (int dlbandwidth);
 
 
-  uint16_t m_cellId;
+  uint16_t m_cellId; /**< cell ID */
 
   uint8_t m_dlBandwidth; /**< downlink bandwidth in RBs */
   uint8_t m_ulBandwidth; /**< uplink bandwidth in RBs */

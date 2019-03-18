@@ -21,7 +21,10 @@
 #define TCPBIC_H
 
 #include "ns3/tcp-congestion-ops.h"
-#include "ns3/traced-value.h"
+#include "ns3/tcp-recovery-ops.h"
+
+class TcpBicIncrementTest;
+class TcpBicDecrementTest;
 
 namespace ns3 {
 
@@ -106,19 +109,29 @@ public:
 protected:
   /**
    * \brief Bic window update after a new ack received
+   * \param tcb the socket state.
+   * \returns The number of segments acked since the last cwnd increment.
    */
   virtual uint32_t Update (Ptr<TcpSocketState> tcb);
 
 private:
-  friend class TcpBicIncrementTest;
-  friend class TcpBicDecrementTest;
+  /**
+   * \brief TcpBicIncrementTest friend class (for tests).
+   * \relates TcpBicIncrementTest
+   */
+  friend class ::TcpBicIncrementTest;
+  /**
+   * \brief TcpBicDecrementTest friend class (for tests).
+   * \relates TcpBicDecrementTest
+   */
+  friend class ::TcpBicDecrementTest;
 
   // User parameters
   bool     m_fastConvergence;  //!< Enable or disable fast convergence algorithm
   double   m_beta;             //!< Beta for cubic multiplicative increase
   uint32_t m_maxIncr;          //!< Maximum window increment
   uint32_t m_lowWnd;           //!< Lower bound on congestion window
-  int      m_smoothPart;       //!< Number of RTT needed to reach Wmax from Wmax-B
+  uint32_t m_smoothPart;       //!< Number of RTT needed to reach Wmax from Wmax-B
 
   // Bic parameters
   uint32_t     m_cWndCnt;         //!<  cWnd integer-to-float counter
