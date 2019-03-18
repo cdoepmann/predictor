@@ -7,7 +7,7 @@
 #     conf.check_nonfatal(header_name='stdint.h', define_name='HAVE_STDINT_H')
 
 def build(bld):
-    module = bld.create_ns3_module('tor', ['internet', 'applications'])
+    module = bld.create_ns3_module('tor', ['internet', 'applications', 'point-to-point', 'point-to-point-layout', 'flow-monitor'])
     module.source = [
         'model/tor-base.cc',
         'model/tor.cc',
