@@ -15,16 +15,13 @@
  *
  * Author: Junling Bu <linlinjavaer@gmail.com>
  */
-#include "ns3/wifi-mac.h"
-#include "ns3/wifi-phy.h"
+
 #include "ns3/log.h"
 #include "ns3/pointer.h"
 #include "ns3/string.h"
-#include "ns3/wifi-mode.h"
 #include "ns3/config.h"
 #include "ns3/names.h"
 #include "ns3/abort.h"
-#include "ns3/ampdu-subframe-header.h"
 #include "ns3/wave-net-device.h"
 #include "ns3/minstrel-wifi-manager.h"
 #include "ns3/radiotap-header.h"
@@ -36,6 +33,15 @@ NS_LOG_COMPONENT_DEFINE ("WaveHelper");
 
 namespace ns3 {
 
+/**
+ * ASCII Phy transmit sink with context
+ * \param stream the output stream
+ * \param context the context
+ * \param p the packet
+ * \param mode the mode
+ * \param preamble the preamble
+ * \param txLevel transmit level
+ */
 static void
 AsciiPhyTransmitSinkWithContext (
   Ptr<OutputStreamWrapper> stream,
@@ -49,6 +55,14 @@ AsciiPhyTransmitSinkWithContext (
   *stream->GetStream () << "t " << Simulator::Now ().GetSeconds () << " " << context << " " << *p << std::endl;
 }
 
+/**
+ * ASCII Phy transmit sink without context
+ * \param stream the output stream
+ * \param p the packet
+ * \param mode the mode
+ * \param preamble the preamble
+ * \param txLevel transmit level
+ */
 static void
 AsciiPhyTransmitSinkWithoutContext (
   Ptr<OutputStreamWrapper> stream,
@@ -61,6 +75,15 @@ AsciiPhyTransmitSinkWithoutContext (
   *stream->GetStream () << "t " << Simulator::Now ().GetSeconds () << " " << *p << std::endl;
 }
 
+/**
+ * ASCII Phy receive sink with context
+ * \param stream the output stream
+ * \param context the context
+ * \param p the packet
+ * \param snr the SNR
+ * \param mode the mode
+ * \param preamble the preamble
+ */
 static void
 AsciiPhyReceiveSinkWithContext (
   Ptr<OutputStreamWrapper> stream,
@@ -74,6 +97,14 @@ AsciiPhyReceiveSinkWithContext (
   *stream->GetStream () << "r " << Simulator::Now ().GetSeconds () << " " << context << " " << *p << std::endl;
 }
 
+/**
+ * ASCII Phy receive sink without context
+ * \param stream the output stream
+ * \param p the packet
+ * \param snr the SNR
+ * \param mode the mode
+ * \param preamble the preamble
+ */
 static void
 AsciiPhyReceiveSinkWithoutContext (
   Ptr<OutputStreamWrapper> stream,
@@ -441,25 +472,25 @@ WaveHelper::AssignStreams (NetDeviceContainer c, int64_t stream)
                 }
 
               PointerValue ptr;
-              rmac->GetAttribute ("DcaTxop", ptr);
-              Ptr<DcaTxop> dcaTxop = ptr.Get<DcaTxop> ();
-              currentStream += dcaTxop->AssignStreams (currentStream);
+              rmac->GetAttribute ("Txop", ptr);
+              Ptr<Txop> txop = ptr.Get<Txop> ();
+              currentStream += txop->AssignStreams (currentStream);
 
-              rmac->GetAttribute ("VO_EdcaTxopN", ptr);
-              Ptr<EdcaTxopN> vo_edcaTxopN = ptr.Get<EdcaTxopN> ();
-              currentStream += vo_edcaTxopN->AssignStreams (currentStream);
+              rmac->GetAttribute ("VO_Txop", ptr);
+              Ptr<QosTxop> vo_txop = ptr.Get<QosTxop> ();
+              currentStream += vo_txop->AssignStreams (currentStream);
 
-              rmac->GetAttribute ("VI_EdcaTxopN", ptr);
-              Ptr<EdcaTxopN> vi_edcaTxopN = ptr.Get<EdcaTxopN> ();
-              currentStream += vi_edcaTxopN->AssignStreams (currentStream);
+              rmac->GetAttribute ("VI_Txop", ptr);
+              Ptr<QosTxop> vi_txop = ptr.Get<QosTxop> ();
+              currentStream += vi_txop->AssignStreams (currentStream);
 
-              rmac->GetAttribute ("BE_EdcaTxopN", ptr);
-              Ptr<EdcaTxopN> be_edcaTxopN = ptr.Get<EdcaTxopN> ();
-              currentStream += be_edcaTxopN->AssignStreams (currentStream);
+              rmac->GetAttribute ("BE_Txop", ptr);
+              Ptr<QosTxop> be_txop = ptr.Get<QosTxop> ();
+              currentStream += be_txop->AssignStreams (currentStream);
 
-              rmac->GetAttribute ("BK_EdcaTxopN", ptr);
-              Ptr<EdcaTxopN> bk_edcaTxopN = ptr.Get<EdcaTxopN> ();
-              currentStream += bk_edcaTxopN->AssignStreams (currentStream);
+              rmac->GetAttribute ("BK_Txop", ptr);
+              Ptr<QosTxop> bk_txop = ptr.Get<QosTxop> ();
+              currentStream += bk_txop->AssignStreams (currentStream);
             }
         }
     }

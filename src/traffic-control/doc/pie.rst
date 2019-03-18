@@ -47,8 +47,7 @@ Attributes
 
 The key attributes that the PieQueue class holds include the following: 
 
-* ``Mode:`` PIE operating mode (BYTES or PACKETS). The default mode is PACKETS. 
-* ``QueueLimit:`` The maximum number of bytes or packets the queue can hold. The default value is 25 bytes / packets.
+* ``MaxSize:`` The maximum number of bytes or packets the queue can hold.
 * ``MeanPktSize:`` Mean packet size in bytes. The default value is 1000 bytes.
 * ``Tupdate:`` Time period to calculate drop probability. The default value is 30 ms. 
 * ``Supdate:`` Start time of the update timer. The default value is 0 ms. 
@@ -64,7 +63,7 @@ Examples
 The example for PIE is `pie-example.cc` located in ``src/traffic-control/examples``.  To run the file (the first invocation below shows the available
 command-line options):
 
-:: 
+.. sourcecode:: bash
 
    $ ./waf --run "pie-example --PrintHelp"
    $ ./waf --run "pie-example --writePcap=1" 
@@ -74,14 +73,17 @@ The expected output from the previous commands are 10 .pcap files.
 Validation
 **********
 
-The PIE model is tested using :cpp:class:`PieQueueDiscTestSuite` class defined in `src/traffic-control/test/pie-queue-test-suite.cc`. The suite includes 2 test cases:
+The PIE model is tested using :cpp:class:`PieQueueDiscTestSuite` class defined in `src/traffic-control/test/pie-queue-test-suite.cc`. The suite includes 5 test cases:
 
-* Test 1: The first test checks the enqueue/dequeue with no drops and makes sure that PIE attributes can be set correctly.
-* Test 2: The second test checks the enqueue/dequeue with drops according to PIE algorithm
+* Test 1: simple enqueue/dequeue with defaults, no drops
+* Test 2: more data with defaults, unforced drops but no forced drops
+* Test 3: same as test 2, but with higher QueueDelayReference
+* Test 4: same as test 2, but with reduced dequeue rate
+* Test 5: same dequeue rate as test 4, but with higher Tupdate
 
 The test suite can be run using the following commands: 
 
-::
+.. sourcecode:: bash
 
   $ ./waf configure --enable-examples --enable-tests
   $ ./waf build
@@ -89,7 +91,7 @@ The test suite can be run using the following commands:
 
 or  
 
-::
+.. sourcecode:: bash
 
   $ NS_LOG="PieQueueDisc" ./waf --run "test-runner --suite=pie-queue-disc"
 

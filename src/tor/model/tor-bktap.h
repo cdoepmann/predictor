@@ -609,7 +609,7 @@ public:
   void Flush ();
   EventId m_flushEvent;
   queue<Ptr<Packet> > m_flushQueue;
-  Ptr<Queue> m_devQ;
+  Ptr<Queue<Packet>> m_devQ;
   uint32_t m_devQlimit;
 
   Ptr<Socket> m_socket;
@@ -709,7 +709,7 @@ public:
 
   EventId writeevent;
   EventId readevent;
-  Ptr<Queue> m_devQ;
+  Ptr<Queue<Packet>> m_devQ;
   uint32_t m_devQlimit;
 
   // Callback to trigger after a new pseudo server socket is added

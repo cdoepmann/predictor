@@ -20,9 +20,9 @@
 
 #include <cmath>
 #include "ns3/test.h"
-#include "ns3/dsss-error-rate-model.h"
-#include "ns3/yans-error-rate-model.h"
 #include "ns3/nist-error-rate-model.h"
+#include "ns3/dsss-error-rate-model.h"
+#include "ns3/wifi-tx-vector.h"
 
 using namespace ns3;
 
@@ -38,6 +38,12 @@ FromRss (double rssDbw)
   return pow (10.0, sinrDb / 10.0);
 }
 
+/**
+ * \ingroup wifi-test
+ * \ingroup tests
+ *
+ * \brief Wifi Error Rate Models Test Case Dsss
+ */
 class WifiErrorRateModelsTestCaseDsss : public TestCase
 {
 public:
@@ -62,7 +68,7 @@ WifiErrorRateModelsTestCaseDsss::DoRun (void)
 {
 
   // 1024 bytes plus headers
-  uint32_t size = (1024 + 40 + 14) * 8;
+  uint64_t size = (1024 + 40 + 14) * 8;
   // Spot test some values returned from DsssErrorRateModel
   // Values taken from sample 80211b.c program used in validation paper
   double value;
@@ -142,6 +148,12 @@ WifiErrorRateModelsTestCaseDsss::DoRun (void)
 #endif
 }
 
+/**
+ * \ingroup wifi-test
+ * \ingroup tests
+ *
+ * \brief Wifi Error Rate Models Test Case Nist
+ */
 class WifiErrorRateModelsTestCaseNist : public TestCase
 {
 public:
@@ -279,6 +291,12 @@ WifiErrorRateModelsTestCaseNist::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ_TOL (ps, 0.999, 0.001, "Not equal within tolerance");
 }
 
+/**
+ * \ingroup wifi-test
+ * \ingroup tests
+ *
+ * \brief Wifi Error Rate Models Test Suite
+ */
 class WifiErrorRateModelsTestSuite : public TestSuite
 {
 public:
@@ -292,5 +310,5 @@ WifiErrorRateModelsTestSuite::WifiErrorRateModelsTestSuite ()
   AddTestCase (new WifiErrorRateModelsTestCaseNist, TestCase::QUICK);
 }
 
-static WifiErrorRateModelsTestSuite wifiErrorRateModelsTestSuite;
+static WifiErrorRateModelsTestSuite wifiErrorRateModelsTestSuite; ///< the test suite
 

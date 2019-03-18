@@ -23,11 +23,15 @@
 #include "ns3/error-model.h"
 #include "ns3/tcp-socket-base.h"
 #include "ns3/tcp-congestion-ops.h"
+#include "ns3/tcp-recovery-ops.h"
 #include "ns3/test.h"
 
 namespace ns3 {
 
 /**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
  * \brief Class for inserting callbacks special points of the flow of TCP sockets
  *
  * This subclass is born to extend TcpSocketBase, inserting callbacks in certain
@@ -41,29 +45,43 @@ namespace ns3 {
  *
  * \see SetRcvAckCb
  * \see SetProcessedAckCb
- * \see SetRetransmitCb
+ * \see SetAfterRetransmitCb
+ * \see SetBeforeRetransmitCb
  */
-class TcpSocketMsgBase : public TcpSocketBase
+class TcpSocketMsgBase : public ns3::TcpSocketBase
 {
 public:
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
 
   TcpSocketMsgBase () : TcpSocketBase ()
   {
   }
 
+  /**
+   * \brief Constructor.
+   * \param other The object to copy from.
+   */
   TcpSocketMsgBase (const TcpSocketMsgBase &other) : TcpSocketBase (other)
   {
     m_rcvAckCb = other.m_rcvAckCb;
     m_processedAckCb = other.m_processedAckCb;
-    m_retrCallback = other.m_retrCallback;
+    m_beforeRetrCallback = other.m_beforeRetrCallback;
+    m_afterRetrCallback = other.m_afterRetrCallback;
     m_forkCb = other.m_forkCb;
+    m_updateRttCb = other.m_updateRttCb;
   }
 
+  /// Callback for the ACK management.
   typedef Callback<void, Ptr<const Packet>, const TcpHeader&,
                    Ptr<const TcpSocketBase> > AckManagementCb;
+  /// Callback for the packet retransmission management.
   typedef Callback<void, Ptr<const TcpSocketState>,
                    Ptr<const TcpSocketBase> > RetrCb;
+  /// Callback for the RTT update management.
   typedef Callback<void, Ptr<const TcpSocketBase>, const SequenceNumber32&,
                    uint32_t, bool> UpdateRttCallback;
 
@@ -88,7 +106,14 @@ public:
    *
    * \param cb callback
    */
-  void SetRetransmitCb (RetrCb cb);
+  void SetAfterRetransmitCb (RetrCb cb);
+
+  /**
+   * \brief Set the callback invoked before the processing of a retransmit timeout
+   *
+   * \param cb callback
+   */
+  void SetBeforeRetransmitCb (RetrCb cb);
 
   /**
    * \brief Set the callback invoked after the forking
@@ -105,7 +130,7 @@ public:
 
 protected:
   virtual void ReceivedAck (Ptr<Packet> packet, const TcpHeader& tcpHeader);
-  virtual void Retransmit (void);
+  virtual void ReTxTimeout (void);
   virtual Ptr<TcpSocketBase> Fork (void);
   virtual void CompleteFork (Ptr<Packet> p, const TcpHeader& tcpHeader,
                              const Address& fromAddress, const Address& toAddress);
@@ -113,15 +138,19 @@ protected:
                                  bool isRetransmission);
 
 private:
-  AckManagementCb m_rcvAckCb;
-  AckManagementCb m_processedAckCb;
-  RetrCb m_retrCallback;
-  Callback<void, Ptr<TcpSocketMsgBase> > m_forkCb;
-  UpdateRttCallback m_updateRttCb;
+  AckManagementCb m_rcvAckCb;       //!< Receive ACK callback.
+  AckManagementCb m_processedAckCb; //!< Processed ACK callback.
+  RetrCb m_beforeRetrCallback;      //!< Before retransmission callback.
+  RetrCb m_afterRetrCallback;       //!< After retransmission callback.
+  Callback<void, Ptr<TcpSocketMsgBase> > m_forkCb;  //!< Fork callback.
+  UpdateRttCallback m_updateRttCb;  //!< Update RTT callback.
 };
 
 
 /**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
  * \brief A TCP socket which sends ACKs smaller than the segment received.
  *
  * Usually, a TCP socket which receives the sequence number "x" replies with
@@ -138,6 +167,10 @@ private:
 class TcpSocketSmallAcks : public TcpSocketMsgBase
 {
 public:
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
 
   TcpSocketSmallAcks ()
@@ -148,6 +181,10 @@ public:
   {
   }
 
+  /**
+   * \brief Constructor.
+   * \param other The object to copy from.
+   */
   TcpSocketSmallAcks (const TcpSocketSmallAcks &other)
     : TcpSocketMsgBase (other),
       m_bytesToAck (other.m_bytesToAck),
@@ -156,6 +193,10 @@ public:
   {
   }
 
+  /**
+   * \brief Set the bytes to be ACKed.
+   * \param bytes The number of bytes.
+   */
   void SetBytesToAck (uint32_t bytes)
   {
     m_bytesToAck = bytes;
@@ -165,49 +206,52 @@ protected:
   virtual void SendEmptyPacket (uint8_t flags);
   Ptr<TcpSocketBase> Fork (void);
 
-  uint32_t m_bytesToAck;
-  uint32_t m_bytesLeftToBeAcked;
-  SequenceNumber32 m_lastAckedSeq;
+  uint32_t m_bytesToAck;            //!< Number of bytes to be ACKed.
+  uint32_t m_bytesLeftToBeAcked;    //!< Number of bytes to be ACKed left.
+  SequenceNumber32 m_lastAckedSeq;  //!< Last sequence number ACKed.
 };
 
 /**
-* \brief General infrastructure for TCP testing
-*
-* The class provides a simple setup for a connection testing. Implement
-* or modify the virtual methods in order to install a specified
-* channel, a specified socket and a specified error model on this simulation.
-* Default values are a null error model, and as a channel a SimpleChannel with
-* the propagation delay set through the constructor.
-*
-* Check DoRun documentation for more information on the environment setup.
-*
-* Apart from setting up the environment for testing, subclassing permits also
-* to track and check what is happening inside the two connected sockets. Thanks
-* to TcpSocketMsgBase, there are many information provided to children:
-*
-* - Tracing of states inside the state machines (TCP and ACK ones, through
-*   functions CongStateTrace and TcpStateTrace)
-* - cWnd tracing (through CWndTrace)
-* - Socket closing: error state, or normal state (NormalClose and ErrorClose)
-* - Packet drop, inside queue or over the link (QueueDrop, PhyDrop)
-* - Ack received (RcvAck) and Ack processed (ProcessedAck). The first is used to
-*   signal that an ACK has been received; after the processing of it, the Second
-*   is called
-* - A packet is transmitted to IP layer or received from IP layer (Tx and Rx)
-* - The RTO expires (RTOExpired)
-*
-* The default version of such methods is empty; implement their behavior differently,
-* based on what you want to test. Default is empty to avoid the need to implement
-* useless pure virtual function.
-*
-* If you need values from TcpSocketBase, thanks to the friend relationship between
-* this class and TcpSocketBase itself you can get it. Remember that friendship
-* isn't passed by inheritance, so the way to go is to write a Getters (like
-* GetSegSize) and call it in the subclass.
-*
-* \see DoRun
-* \see TcpSocketMsgBase
-*/
+ * \ingroup internet-test
+ * \ingroup tests
+ *
+ * \brief General infrastructure for TCP testing
+ *
+ * The class provides a simple setup for a connection testing. Implement
+ * or modify the virtual methods in order to install a specified
+ * channel, a specified socket and a specified error model on this simulation.
+ * Default values are a null error model, and as a channel a SimpleChannel with
+ * the propagation delay set through the constructor.
+ *
+ * Check DoRun documentation for more information on the environment setup.
+ *
+ * Apart from setting up the environment for testing, subclassing permits also
+ * to track and check what is happening inside the two connected sockets. Thanks
+ * to TcpSocketMsgBase, there are many information provided to children:
+ *
+ * - Tracing of states inside the state machines (TCP and ACK ones, through
+ *   functions CongStateTrace and TcpStateTrace)
+ * - cWnd tracing (through CWndTrace)
+ * - Socket closing: error state, or normal state (NormalClose and ErrorClose)
+ * - Packet drop, inside queue or over the link (QueueDrop, PhyDrop)
+ * - Ack received (RcvAck) and Ack processed (ProcessedAck). The first is used to
+ *   signal that an ACK has been received; after the processing of it, the Second
+ *   is called
+ * - A packet is transmitted to IP layer or received from IP layer (Tx and Rx)
+ * - The RTO expires (RTOExpired)
+ *
+ * The default version of such methods is empty; implement their behavior differently,
+ * based on what you want to test. Default is empty to avoid the need to implement
+ * useless pure virtual function.
+ *
+ * If you need values from TcpSocketBase, thanks to the friend relationship between
+ * this class and TcpSocketBase itself you can get it. Remember that friendship
+ * isn't passed by inheritance, so the way to go is to write a Getters (like
+ * GetSegSize) and call it in the subclass.
+ *
+ * \see DoRun
+ * \see TcpSocketMsgBase
+ */
 class TcpGeneralTest : public TestCase
 {
 public:
@@ -272,11 +316,24 @@ protected:
    * \brief Create a socket
    *
    * \param node associated node
+   * \param socketType Type of the TCP socket
    * \param congControl congestion control
    * \return a pointer to the newer created socket
    */
   virtual Ptr<TcpSocketMsgBase> CreateSocket (Ptr<Node> node, TypeId socketType,
                                               TypeId congControl);
+
+  /**
+   * \brief Create a socket
+   *
+   * \param node associated node
+   * \param socketType Type of the TCP socket
+   * \param congControl congestion control
+   * \param recoveryAlgorithm recovery algorithm
+   * \return a pointer to the newer created socket
+   */
+  virtual Ptr<TcpSocketMsgBase> CreateSocket (Ptr<Node> node, TypeId socketType,
+                                              TypeId congControl, TypeId recoveryAlgorithm);
 
   /**
    * \brief Get the pointer to a previously created sender socket
@@ -315,7 +372,7 @@ protected:
   virtual void DoRun (void);
 
   /**
-   * \brief Change the configuration of the evironment
+   * \brief Change the configuration of the environment
    */
   virtual void ConfigureEnvironment (void);
 
@@ -380,12 +437,14 @@ protected:
 
   /**
    * \brief Get the initial slow start threshold
+   * \param who node to get the parameter from
    * \return initial slow start threshold
    */
   uint32_t GetInitialSsThresh (SocketWho who);
 
   /**
    * \brief Get the initial congestion window
+   * \param who node to get the parameter from
    * \return initial cwnd
    */
   uint32_t GetInitialCwnd (SocketWho who);
@@ -420,7 +479,7 @@ protected:
   Time GetRto (SocketWho who);
 
   /**
-   * \brief Get the minimun RTO attribute
+   * \brief Get the minimum RTO attribute
    *
    * \param who node to get the parameter from
    * \return minimum RTO time
@@ -524,6 +583,14 @@ protected:
   void SetInitialCwnd (SocketWho who, uint32_t initialCwnd);
 
   /**
+   * \brief Forcefully set the ecn mode on
+   *
+   * \param who socket to force
+   * \param ecnMode Mode of ECN. Currently NoEcn and ClassicEcn is supported.
+   */
+  void SetEcn (SocketWho who, TcpSocketBase::EcnMode_t ecnMode);
+
+  /**
    * \brief Forcefully set the initial ssth
    *
    * \param who socket to force
@@ -578,6 +645,13 @@ protected:
   void SetCongestionControl (TypeId congControl) { m_congControlTypeId = congControl; }
 
   /**
+   * \brief recovery algorithm of the sender socket
+   *
+   * \param recovery typeid of the recovery algorithm
+   */
+  void SetRecoveryAlgorithm (TypeId reccovery) { m_recoveryTypeId = reccovery; }
+
+  /**
    * \brief MTU of the bottleneck link
    *
    * \param mtu MTU
@@ -592,16 +666,32 @@ protected:
   virtual void CongStateTrace (const TcpSocketState::TcpCongState_t oldValue,
                                const TcpSocketState::TcpCongState_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
-   * \brief Congestion window changes
+   * \brief Tracks the congestion window changes
    *
    * \param oldValue old value
    * \param newValue new value
    */
   virtual void CWndTrace (uint32_t oldValue, uint32_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief Tracks the inflated congestion window changes
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void CWndInflTrace (uint32_t oldValue, uint32_t newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -609,11 +699,13 @@ protected:
    *
    * This applies only for sender socket.
    *
-   * \param oldValue old value
-   * \param newValue new value
+   * \param oldTime old value
+   * \param newTime new value
    */
   virtual void RttTrace (Time oldTime, Time newTime)
   {
+    NS_UNUSED (oldTime);
+    NS_UNUSED (newTime);
   }
 
   /**
@@ -621,12 +713,13 @@ protected:
    *
    * This applies only for sender socket.
    *
-   *
    * \param oldValue old value
    * \param newValue new value
    */
   virtual void SsThreshTrace (uint32_t oldValue, uint32_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -639,6 +732,50 @@ protected:
    */
   virtual void BytesInFlightTrace (uint32_t oldValue, uint32_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief RTO changes
+   *
+   * This applies only for sender socket.
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void RtoTrace (Time oldValue, Time newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief Next tx seq changes
+   *
+   * This applies only for sender socket.
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void NextTxSeqTrace (SequenceNumber32 oldValue, SequenceNumber32 newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief Highest tx seq changes
+   *
+   * This applies only for sender socket.
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void HighestTxSeqTrace (SequenceNumber32 oldValue, SequenceNumber32 newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -647,6 +784,7 @@ protected:
    */
   virtual void NormalClose (SocketWho who)
   {
+    NS_UNUSED (who);
   }
 
   /**
@@ -657,6 +795,7 @@ protected:
   virtual void ErrorClose  (SocketWho who)
   {
     /** \todo indicate the error */
+    NS_UNUSED (who);
   }
 
   /**
@@ -665,6 +804,7 @@ protected:
    */
   virtual void QueueDrop   (SocketWho who)
   {
+    NS_UNUSED (who);
   }
 
   /**
@@ -673,6 +813,7 @@ protected:
    */
   virtual void PhyDrop     (SocketWho who)
   {
+    NS_UNUSED (who);
   }
 
   /**
@@ -687,6 +828,9 @@ protected:
   virtual void RcvAck      (const Ptr<const TcpSocketState> tcb,
                             const TcpHeader& h, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (h);
+    NS_UNUSED (who);
   }
 
   /**
@@ -701,6 +845,9 @@ protected:
   virtual void ProcessedAck (const Ptr<const TcpSocketState> tcb,
                              const TcpHeader& h, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (h);
+    NS_UNUSED (who);
   }
 
   /**
@@ -727,8 +874,22 @@ protected:
    * \param tcb Transmission control block
    * \param who where the RTO has expired (SENDER or RECEIVER)
    */
-  virtual void RTOExpired (const Ptr<const TcpSocketState> tcb, SocketWho who)
+  virtual void AfterRTOExpired (const Ptr<const TcpSocketState> tcb, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (who);
+  }
+
+  /**
+   * \brief Rto has expired
+   *
+   * \param tcb Transmission control block
+   * \param who where the RTO has expired (SENDER or RECEIVER)
+   */
+  virtual void BeforeRTOExpired (const Ptr<const TcpSocketState> tcb, SocketWho who)
+  {
+    NS_UNUSED (tcb);
+    NS_UNUSED (who);
   }
 
   /**
@@ -741,6 +902,10 @@ protected:
   virtual void UpdatedRttHistory (const SequenceNumber32 & seq, uint32_t sz,
                                   bool isRetransmission, SocketWho who)
   {
+    NS_UNUSED (seq);
+    NS_UNUSED (sz);
+    NS_UNUSED (isRetransmission);
+    NS_UNUSED (who);
   }
 
   /**
@@ -751,11 +916,12 @@ protected:
    */
   virtual void DataSent (uint32_t size, SocketWho who)
   {
+    NS_UNUSED (size);
+    NS_UNUSED (who);
   }
 
   /**
    * \brief Performs the (eventual) final checks through test asserts
-   *
    */
   virtual void FinalChecks ()
   {
@@ -817,6 +983,7 @@ protected:
   }
 
   TypeId   m_congControlTypeId;      //!< Congestion control
+  TypeId   m_recoveryTypeId;         //!< Recovery
 
 private:
   // Member variables, accessible through getters
@@ -828,38 +995,126 @@ private:
 
   uint32_t m_pktSize;              //!< Size of the application packet
   uint32_t m_pktCount;             //!< Count of the application packet
-  Time     m_interPacketInterval;  //!< Time between sending application packet
-                                   //   down to tcp socket
+  Time     m_interPacketInterval;  //!< Time between sending application packet down to tcp socket
 
   Ptr<TcpSocketMsgBase> m_senderSocket;   //!< Pointer to sender socket
   Ptr<TcpSocketMsgBase> m_receiverSocket; //!< Pointer to receiver socket
 
 private:
   // De-multiplexing callbacks.
+
+  /**
+   * \brief Normal Close Callback.
+   * \param socket The socket.
+   */
   void NormalCloseCb  (Ptr<Socket> socket);
+  /**
+   * \brief Error Close Callback.
+   * \param socket The socket.
+   */
   void ErrorCloseCb   (Ptr<Socket> socket);
+  /**
+   * \brief Queue Drop Callback.
+   * \param context The context.
+   * \param p The packet.
+   */
   void QueueDropCb    (std::string context, Ptr<const Packet> p);
+  /**
+   * \brief Drop at Phy layer Callback.
+   * \param context The context.
+   * \param p The packet.
+   */
   void PhyDropCb      (std::string context, Ptr<const Packet> p);
+  /**
+   * \brief Receive ACK Callback.
+   * \param p The packet.
+   * \param h TCP header.
+   * \param tcp The TCP socket.
+   */
   void RcvAckCb       (Ptr<const Packet> p, const TcpHeader& h,
                        Ptr<const TcpSocketBase> tcp);
+  /**
+   * \brief ACK processed Callback.
+   * \param p The packet.
+   * \param h TCP header.
+   * \param tcp The TCP socket.
+   */
   void ProcessedAckCb (Ptr<const Packet> p, const TcpHeader& h,
                        Ptr<const TcpSocketBase> tcp);
+  /**
+   * \brief Tx packet Callback.
+   * \param p The packet.
+   * \param h TCP header.
+   * \param tcp The TCP socket.
+   */
   void TxPacketCb     (const Ptr<const Packet> p, const TcpHeader& h,
                        const Ptr<const TcpSocketBase> tcp);
+  /**
+   * \brief Rx packet Callback.
+   * \param p The packet.
+   * \param h TCP header.
+   * \param tcp The TCP socket.
+   */
   void RxPacketCb     (const Ptr<const Packet> p, const TcpHeader& h,
                        const Ptr<const TcpSocketBase> tcp);
+  /**
+   * \brief RTO expired Callback.
+   * \param tcb Transmission control block.
+   * \param tcp The TCP socket.
+   */
   void RtoExpiredCb   (const Ptr<const TcpSocketState> tcb,
                        const Ptr<const TcpSocketBase> tcp);
+  /**
+   * \brief Update RTT with new data.
+   * \param tcp The TCP socket.
+   * \param seq The sequence number.
+   * \param sz The segment size.
+   * \param isRetransmission True if packet is a retransmission.
+   */
   void UpdateRttHistoryCb (Ptr<const TcpSocketBase> tcp, const SequenceNumber32&seq,
                            uint32_t sz, bool isRetransmission);
+
+  /**
+   * \brief Invoked after a retransmit event.
+   * \param tcb Transmission control block.
+   * \param tcp The TCP socket.
+   */
+  void AfterRetransmitCb   (const Ptr<const TcpSocketState> tcb,
+                            const Ptr<const TcpSocketBase> tcp);
+
+  /**
+   * \brief Invoked before a retransmit event.
+   * \param tcb Transmission control block.
+   * \param tcp The TCP socket.
+   */
+  void BeforeRetransmitCb   (const Ptr<const TcpSocketState> tcb,
+                             const Ptr<const TcpSocketBase> tcp);
+
+  /**
+   * \brief Data sent Callback.
+   * \param socket The socket.
+   * \param size The data size.
+   */
   void DataSentCb     (Ptr<Socket> socket, uint32_t size);
+  /**
+   * \brief Fork Callback.
+   * \param tcp The TCP socket.
+   */
   void ForkCb         (Ptr<TcpSocketMsgBase> tcp);
+  /**
+   * \brief Handle an accept connection.
+   * \param socket The socket.
+   * \param from The sender.
+   */
   void HandleAccept (Ptr<Socket> socket, const Address& from);
 
-  InetSocketAddress m_remoteAddr;
+  InetSocketAddress m_remoteAddr; //!< Remote peer address.
 };
 
 /**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
  * \brief Convenience function to retrieve the ACK state from a TCB
  *
  * \param tcb Transmission control block

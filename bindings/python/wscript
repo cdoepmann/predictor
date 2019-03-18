@@ -14,8 +14,9 @@ from waflib.Errors import WafError
 # after = TaskGen.after
 
 # https://github.com/gjcarneiro/pybindgen
-REQUIRED_PYBINDGEN_VERSION = '0.17.0.post57+nga6376f2'
-REQUIRED_PYGCCXML_VERSION = (0, 9, 5)
+REQUIRED_PYBINDGEN_VERSION = '0.17.0.post58+ngcf00cc0'
+REQUIRED_PYGCCXML_VERSION = (1, 9, 0)
+REQUIRED_CASTXML_VERSION = '0.1'
 
 RUN_ME=-3
 
@@ -51,7 +52,7 @@ def options(opt):
                    dest='python_disable')
     opt.add_option('--apiscan',
                    help=("Rescan the API for the indicated module(s), for Python bindings.  "
-                         "Needs working GCCXML / pygccxml environment.  "
+                         "Needs working CastXML / pygccxml environment.  "
                          "The metamodule 'all' expands to all available ns-3 modules."),
                    default=None, dest='apiscan', metavar="MODULE[,MODULE...]")
     opt.add_option('--with-pybindgen',
@@ -61,10 +62,17 @@ def options(opt):
     opt.add_option('--with-python',
                    help=('Path to the Python interpreter to use.'),
                    default=None, dest='with_python', type="string")
-    opt.add_option('--no32bit-scan',
-                   help=("Don't scan for the 32-bit variant of the bindings on 64-bit platforms."),
-                   action="store_true", default=False,
-                   dest='no32bit_scan')
+
+
+def split_version(version):
+    if (re.search ('post', version)):
+        # Version format such as '0.17.0.post58+ngcf00cc0'
+        ver = re.split('[.+]', version)[:4]
+        return (int(ver[0]), int(ver[1]), int(ver[2]), int(ver[3].split('post')[1]))
+    else:
+        # Version format such as '0.18.0'
+        ver = re.split('[.]', version)[:3]
+        return (int(ver[0]), int(ver[1]), int(ver[2]), 0)
 
 
 def configure(conf):
@@ -183,7 +191,12 @@ def configure(conf):
                                 stdout=subprocess.PIPE).communicate()[0]
         pybindgen_version = maybe_decode(out.strip())
         conf.msg('Checking for pybindgen version', pybindgen_version)
-        if not (pybindgen_version == REQUIRED_PYBINDGEN_VERSION):
+        if not pybindgen_version:
+            Logs.warn("pybindgen_version is an empty string")
+            conf.report_optional_feature("python", "Python Bindings", False,
+                                         "PyBindGen version not found")
+            return
+        if not (split_version(pybindgen_version) >= split_version(REQUIRED_PYBINDGEN_VERSION)):
             Logs.warn("pybindgen (found %r), (need %r)" %
                       (pybindgen_version, REQUIRED_PYBINDGEN_VERSION))
             conf.report_optional_feature("python", "Python Bindings", False,
@@ -257,14 +270,19 @@ int main ()
     try:
         conf.check_python_module('pygccxml')
     except Errors.ConfigurationError:
-        conf.report_optional_feature("pygccxml", "Python API Scanning Support", False,
+        conf.report_optional_feature("castxml", "Python API Scanning Support", False,
                                      "Missing 'pygccxml' Python module")
         return
 
-    out = subprocess.Popen([conf.env['PYTHON'][0], "-c",
-                            "import pygccxml; print pygccxml.__version__"],
-                            stdout=subprocess.PIPE).communicate()[0]
-    pygccxml_version_str = out.strip()
+    try:
+        import pygccxml as pygccxml_imported
+        pygccxml_version_str = pygccxml_imported.__version__
+    except (ImportError, AttributeError):
+        Logs.warn("pygccxml version cannot be determined")
+        conf.report_optional_feature("castxml", "Python API Scanning Support", False,
+                                     "pygccxml Python module version is unknown")
+        return
+
     # Bug 2013:  pygccxml versions > 1.0.0 prepend a 'v' to version number
     pygccxml_version_str = pygccxml_version_str.lstrip('v')
     pygccxml_version = tuple([int(x) for x in pygccxml_version_str.split('.')])
@@ -274,40 +292,43 @@ int main ()
                 "automatic scanning of API definitions will not be possible" %
                 (pygccxml_version_str,
                  '.'.join([str(x) for x in REQUIRED_PYGCCXML_VERSION])))
-        conf.report_optional_feature("pygccxml", "Python API Scanning Support", False,
-                                     "pygccxml too old")
+        conf.report_optional_feature("castxml", "Python API Scanning Support", False,
+                                     "pygccxml Python module too old")
         return
 
 
-    ## Check gccxml version
+    ## Check castxml version
     try:
-        gccxml = conf.find_program('gccxml', var='GCCXML')
+        castxml = conf.find_program('castxml', var='CASTXML')
     except WafError:
-        gccxml = None
-    if not gccxml:
-        Logs.warn("gccxml missing; automatic scanning of API definitions will not be possible")
-        conf.report_optional_feature("pygccxml", "Python API Scanning Support", False,
-                                     "gccxml missing")
+        castxml = None
+    if not castxml:
+        Logs.warn("castxml missing; automatic scanning of API definitions will not be possible")
+        conf.report_optional_feature("castxml", "Python API Scanning Support", False,
+                                     "castxml missing")
         return
 
-    gccxml_version_line = os.popen(gccxml[0] + " --version").readline().strip()
-    m = re.match( "^GCC-XML version (\d\.\d(\.\d)?)$", gccxml_version_line)
+    out = subprocess.Popen([castxml[0], '--version'], 
+                            stdout=subprocess.PIPE).communicate()[0]
+    castxml_version_line = maybe_decode(out).split('\n', 1)[0].strip()
+    ## Expecting version string such as 'castxml version 0.1-gfab9c47'
+    m = re.match( "^castxml version (\d\.\d)(-)?(\w+)?", castxml_version_line)
     try:
-        gccxml_version = m.group(1)
-        gccxml_version_ok = ([int(s) for s in gccxml_version.split('.')] >= [0, 9])
+        castxml_version = m.group(1)
+        castxml_version_ok = castxml_version >= REQUIRED_CASTXML_VERSION
     except AttributeError:
-        gccxml_version = gccxml_version_line
-        gccxml_version_ok = False
-    conf.msg('Checking for gccxml version', gccxml_version)
-    if not gccxml_version_ok:
-        Logs.warn("gccxml version unknown or too old, need version >= 0.9; automatic scanning of API definitions will not be possible")
-        conf.report_optional_feature("pygccxml", "Python API Scanning Support", False,
-                                     "gccxml too old")
+        castxml_version = castxml_version_line
+        castxml_version_ok = False
+    conf.msg('Checking for castxml version', castxml_version)
+    if not castxml_version_ok:
+        Logs.warn("castxml version unknown or too old, need version >= %s; automatic scanning of API definitions will not be possible" % REQUIRED_CASTXML_VERSION)
+        conf.report_optional_feature("castxml", "Python API Scanning Support", False,
+                                     "castxml too old")
         return
 
     ## If we reached
     conf.env['ENABLE_PYTHON_SCANNING'] = True
-    conf.report_optional_feature("pygccxml", "Python API Scanning Support", True, None)
+    conf.report_optional_feature("castxml", "Python API Scanning Support", True, None)
 
 # ---------------------
 
@@ -331,7 +352,7 @@ def get_module_path(bld, module):
     return ns3headers.path.abspath()
 
 class apiscan_task(Task.Task):
-    """Uses gccxml to scan the file 'everything.h' and extract API definitions.
+    """Uses castxml to scan the file 'everything.h' and extract API definitions.
     """
     after = 'gen_ns3_module_header ns3header'
     before = 'cxx command'
@@ -383,6 +404,13 @@ class apiscan_task(Task.Task):
             ]
         scan = subprocess.Popen(argv, stdin=subprocess.PIPE)
         retval = scan.wait()
+
+        if retval >= 0 and "LP64" in self.target:
+            self.lp64_to_ilp32(
+                os.path.join(module_path, "bindings", 'modulegen__%s.py' % (self.target)),
+                os.path.join(module_path, "bindings", 'modulegen__%s.py' % "gcc_ILP32")
+                )
+
         return retval
 
     def runnable_status(self):
@@ -391,6 +419,15 @@ class apiscan_task(Task.Task):
         # invoked by the user, particularly since --apiscan=all will require
         # invoking this task many times, once per module.
         return RUN_ME
+
+    def lp64_to_ilp32(self, lp64path, ilp32path):
+        lp64file = open(lp64path, "r")
+        lp64bindings = lp64file.read()
+        lp64file.close()
+        ilp32file = open(ilp32path, "w")
+        ilp32bindings = re.sub("unsigned long(?!( long))", "unsigned long long", lp64bindings)
+        ilp32file.write(ilp32bindings)
+        ilp32file.close()
 
 def get_modules_and_headers(bld):
     """
@@ -456,8 +493,6 @@ def build(bld):
         else:
             import struct
             if struct.calcsize('I') == 4 and struct.calcsize('L') == 8 and struct.calcsize('P') == 8:
-                if not Options.options.no32bit_scan:
-                    scan_targets.append(('gcc_ILP32', '-m32'))
                 scan_targets.append(('gcc_LP64', '-m64'))
             elif struct.calcsize('I') == 4 and struct.calcsize('L') == 4 and struct.calcsize('P') == 4:
                 scan_targets.append(('gcc_ILP32', ''))

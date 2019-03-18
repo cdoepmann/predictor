@@ -18,14 +18,11 @@
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
 
+#include "ns3/log.h"
+#include "ns3/sequence-number.h"
+#include "ns3/packet.h"
 #include "mac-rx-middle.h"
 #include "wifi-mac-header.h"
-#include "ns3/assert.h"
-#include "ns3/log.h"
-#include "ns3/packet.h"
-#include "ns3/simulator.h"
-#include "ns3/sequence-number.h"
-#include <list>
 
 namespace ns3 {
 
@@ -47,9 +44,9 @@ private:
    */
   typedef std::list<Ptr<const Packet> >::const_iterator FragmentsCI;
 
-  bool m_defragmenting;
-  uint16_t m_lastSequenceControl;
-  Fragments m_fragments;
+  bool m_defragmenting; ///< flag to indicate whether we are defragmenting
+  uint16_t m_lastSequenceControl; ///< last sequence control
+  Fragments m_fragments; ///< fragments
 
 
 public:
@@ -69,7 +66,7 @@ public:
    * \return true if we are de-fragmenting packets,
    *         false otherwise
    */
-  bool IsDeFragmenting (void)
+  bool IsDeFragmenting (void) const
   {
     return m_defragmenting;
   }
@@ -128,7 +125,7 @@ public:
    * \return true if the sequence control is in order,
    *         false otherwise
    */
-  bool IsNextFragment (uint16_t sequenceControl)
+  bool IsNextFragment (uint16_t sequenceControl) const
   {
     if ((sequenceControl >> 4) == (m_lastSequenceControl >> 4)
         && (sequenceControl & 0x0f) == ((m_lastSequenceControl & 0x0f) + 1))
@@ -145,7 +142,7 @@ public:
    *
    * \return the last sequence control
    */
-  uint16_t GetLastSequenceControl (void)
+  uint16_t GetLastSequenceControl (void) const
   {
     return m_lastSequenceControl;
   }
@@ -303,9 +300,13 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 {
   NS_LOG_FUNCTION (packet << hdr);
   NS_ASSERT (hdr->IsData () || hdr->IsMgt ());
+  if (!m_pcfCallback.IsNull ())
+    {
+      m_pcfCallback ();
+    }
   OriginatorRxStatus *originator = Lookup (hdr);
   /**
-   * The check below is really uneeded because it can fail in a lot of
+   * The check below is really unneeded because it can fail in a lot of
    * normal cases. Specifically, it is possible for sequence numbers to
    * loop back to zero once they reach 0xfff0 and to go up to 0xf7f0 in
    * which case the check below will report the two sequence numbers to
@@ -326,8 +327,8 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
                     ", frag=" << hdr->GetFragmentNumber ());
       return;
     }
-  Ptr<Packet> agregate = HandleFragments (packet, hdr, originator);
-  if (agregate == 0)
+  Ptr<Packet> aggregate = HandleFragments (packet, hdr, originator);
+  if (aggregate == 0)
     {
       return;
     }
@@ -338,7 +339,13 @@ MacRxMiddle::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     {
       originator->SetSequenceControl (hdr->GetSequenceControl ());
     }
-  m_callback (agregate, hdr);
+  m_callback (aggregate, hdr);
+}
+
+void
+MacRxMiddle::SetPcfCallback (Callback<void> callback)
+{
+  m_pcfCallback = callback;
 }
 
 } //namespace ns3

@@ -22,13 +22,24 @@
 #include "ns3/node.h"
 #include "ns3/log.h"
 
-namespace ns3 {
+using namespace ns3;
+
 
 NS_LOG_COMPONENT_DEFINE ("TcpZeroWindowTestSuite");
 
+/**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
+ * \brief Testing the congestion avoidance increment on TCP ZeroWindow
+ */
 class TcpZeroWindowTest : public TcpGeneralTest
 {
 public:
+  /**
+   * \brief Constructor.
+   * \param desc Test description.
+   */
   TcpZeroWindowTest (const std::string &desc);
 
 protected:
@@ -45,15 +56,17 @@ protected:
   virtual void ConfigureEnvironment ();
   virtual void ConfigureProperties ();
 
+  /**
+   * \brief Increase the receiver buffer size.
+   */
   void IncreaseBufSize ();
 
 protected:
-  EventId m_receivePktEvent;
-  bool m_zeroWindowProbe;
-  bool m_windowUpdated;
-  bool m_senderFinished;
-  bool m_receiverFinished;
-  bool m_sentUpdate;
+  EventId m_receivePktEvent;  //!< Receive packet event.
+  bool m_zeroWindowProbe;     //!< ZeroWindow probe.
+  bool m_windowUpdated;       //!< Window updated.
+  bool m_senderFinished;      //!< Send finished.
+  bool m_receiverFinished;    //!< Receiver finished.
 };
 
 TcpZeroWindowTest::TcpZeroWindowTest (const std::string &desc)
@@ -61,8 +74,7 @@ TcpZeroWindowTest::TcpZeroWindowTest (const std::string &desc)
     m_zeroWindowProbe (false),
     m_windowUpdated (false),
     m_senderFinished (false),
-    m_receiverFinished (false),
-    m_sentUpdate (false)
+    m_receiverFinished (false)
 {
 }
 
@@ -156,11 +168,10 @@ TcpZeroWindowTest::Tx (const Ptr<const Packet> p, const TcpHeader &h, SocketWho 
         {
           NS_FATAL_ERROR ("No packets should be sent before the window update");
         }
-      else if (Simulator::Now ().GetSeconds () >= 10.0 && !m_sentUpdate)
+      else if (Simulator::Now ().GetSeconds () >= 10.0)
         {
           NS_TEST_ASSERT_MSG_EQ (h.GetWindowSize (), 2500,
                                  "Receiver window not updated");
-          m_sentUpdate = true;
         }
     }
 
@@ -183,7 +194,7 @@ TcpZeroWindowTest::Rx (const Ptr<const Packet> p, const TcpHeader &h, SocketWho 
                                  "RECEIVER window size is not 0 in the SYN-ACK");
         }
 
-      if (Simulator::Now ().GetSeconds () >= 10.0 && !m_windowUpdated)
+      if (Simulator::Now ().GetSeconds () >= 10.0)
         {
           NS_TEST_ASSERT_MSG_EQ (h.GetWindowSize (), 2500,
                                  "Receiver window not updated");
@@ -241,9 +252,14 @@ TcpZeroWindowTest::ProcessedAck (const Ptr<const TcpSocketState> tcb,
     }
 }
 
-//-----------------------------------------------------------------------------
 
-static class TcpZeroWindowTestSuite : public TestSuite
+/**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
+ * \brief TCP ZeroWindow TestSuite
+ */
+class TcpZeroWindowTestSuite : public TestSuite
 {
 public:
   TcpZeroWindowTestSuite () : TestSuite ("tcp-zero-window-test", UNIT)
@@ -251,6 +267,7 @@ public:
     AddTestCase (new TcpZeroWindowTest ("zero window test"),
                  TestCase::QUICK);
   }
-} g_tcpZeroWindowTestSuite;
+};
 
-} // namespace ns3
+static TcpZeroWindowTestSuite g_tcpZeroWindowTestSuite; //!< Static variable for test initialization
+

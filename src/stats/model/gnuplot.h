@@ -60,6 +60,10 @@ public:
   /**
    * \brief Change line title.
    * \param title the new title string to use for this dataset.
+   *
+   * \note If you want your title to contain a newline character,
+   *       escape it like this:  "First line\\nSecond line" so that
+   *       it is converted to "First line\nSecond line" in the plot file.
    */
   void SetTitle (const std::string& title);
 
@@ -434,7 +438,7 @@ public:
 
   /**
    * \param osControl the output stream on which the relevant gnuplot
-   * contol commands should be generated. Including output file and
+   * control commands should be generated. Including output file and
    * terminal headers.
    * \param osData the output stream on which the relevant gnuplot
    * data values should be generated.
@@ -516,7 +520,7 @@ public:
  
   /**
    * \param osControl the output stream on which the relevant gnuplot
-   * contol commands should be generated. Including output file and
+   * control commands should be generated. Including output file and
    * terminal headers.
    * \param osData the output stream on which the relevant gnuplot
    * data values should be generated.

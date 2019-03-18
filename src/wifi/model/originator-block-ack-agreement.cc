@@ -23,14 +23,6 @@
 
 namespace ns3 {
 
-OriginatorBlockAckAgreement::OriginatorBlockAckAgreement ()
-  : BlockAckAgreement (),
-    m_state (PENDING),
-    m_sentMpdus (0),
-    m_needBlockAckReq (false)
-{
-}
-
 OriginatorBlockAckAgreement::OriginatorBlockAckAgreement (Mac48Address recipient, uint8_t tid)
   : BlockAckAgreement (recipient, tid),
     m_state (PENDING),
@@ -44,7 +36,7 @@ OriginatorBlockAckAgreement::~OriginatorBlockAckAgreement ()
 }
 
 void
-OriginatorBlockAckAgreement::SetState (enum State state)
+OriginatorBlockAckAgreement::SetState (State state)
 {
   m_state = state;
   if (state == INACTIVE)

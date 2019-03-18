@@ -62,6 +62,9 @@ public:
 
   virtual ~PfifoFastQueueDisc();
 
+  // Reasons for dropping packets
+  static constexpr const char* LIMIT_EXCEEDED_DROP = "Queue disc limit exceeded";  //!< Packet dropped due to queue disc limit exceeded
+
 private:
   /**
    * Priority to band map. Values are taken from the prio2band array used by
@@ -71,11 +74,9 @@ private:
 
   virtual bool DoEnqueue (Ptr<QueueDiscItem> item);
   virtual Ptr<QueueDiscItem> DoDequeue (void);
-  virtual Ptr<const QueueDiscItem> DoPeek (void) const;
+  virtual Ptr<const QueueDiscItem> DoPeek (void);
   virtual bool CheckConfig (void);
   virtual void InitializeParams (void);
-
-  uint32_t m_limit;    //!< Maximum number of packets that can be stored
 };
 
 } // namespace ns3

@@ -250,7 +250,7 @@ NscTcpSocketImpl::Bind (const Address &address)
     }
   else if (ipv4 == Ipv4Address::GetAny () && port != 0)
     {
-      m_endPoint = m_tcp->Allocate (port);
+      m_endPoint = m_tcp->Allocate (GetBoundNetDevice (), port);
       NS_LOG_LOGIC ("NscTcpSocketImpl "<<this<<" got an endpoint: "<<m_endPoint);
     }
   else if (ipv4 != Ipv4Address::GetAny () && port == 0)
@@ -260,12 +260,25 @@ NscTcpSocketImpl::Bind (const Address &address)
     }
   else if (ipv4 != Ipv4Address::GetAny () && port != 0)
     {
-      m_endPoint = m_tcp->Allocate (ipv4, port);
+      m_endPoint = m_tcp->Allocate (GetBoundNetDevice (), ipv4, port);
       NS_LOG_LOGIC ("NscTcpSocketImpl "<<this<<" got an endpoint: "<<m_endPoint);
     }
 
   m_localPort = port;
   return FinishBind ();
+}
+
+/* Inherit from Socket class: Bind this socket to the specified NetDevice */
+void
+NscTcpSocketImpl::BindToNetDevice (Ptr<NetDevice> netdevice)
+{
+  NS_LOG_FUNCTION (this << netdevice);
+  Socket::BindToNetDevice (netdevice); // Includes sanity check
+  if (m_endPoint != 0)
+    {
+      m_endPoint->BindToNetDevice (netdevice);
+    }
+  return;
 }
 
 int 
@@ -411,6 +424,7 @@ NscTcpSocketImpl::Listen (void)
 void
 NscTcpSocketImpl::NSCWakeup ()
 {
+  NS_LOG_FUNCTION (this);
   switch (m_state) {
     case SYN_SENT:
       if (!m_nscTcpSocket->is_connected ())
@@ -420,7 +434,16 @@ NscTcpSocketImpl::NSCWakeup ()
     // fall through to schedule read/write events
     case ESTABLISHED:
       if (!m_txBuffer.empty ())
-        Simulator::ScheduleNow (&NscTcpSocketImpl::SendPendingData, this);
+        {
+          Simulator::ScheduleNow (&NscTcpSocketImpl::SendPendingData, this);
+        }
+      else
+        {
+          if (GetTxAvailable ())
+            {
+              NotifySend (GetTxAvailable ());
+            }
+        }
       Simulator::ScheduleNow (&NscTcpSocketImpl::ReadPendingData, this);
       break;
     case LISTEN:
@@ -441,27 +464,17 @@ NscTcpSocketImpl::Recv (uint32_t maxSize, uint32_t flags)
       m_errno = ERROR_AGAIN;
       return 0;
     }
-
-  Ptr<Packet> p = Create<Packet> (0);
-
-  while (p->GetSize () < maxSize && m_deliveryQueue.size() > 0)
+  Ptr<Packet> p = m_deliveryQueue.front ();
+  if (p->GetSize () <= maxSize)
     {
-      Ptr<Packet> tmp;
-      uint32_t diff = maxSize-p->GetSize ();
-      if (diff <  m_deliveryQueue.front ()->GetSize())
-        {
-          tmp = m_deliveryQueue.front ()->CreateFragment (0,diff);
-          m_deliveryQueue.front ()->RemoveAtStart (tmp->GetSize ());
-        }
-      else
-        {
-          tmp = m_deliveryQueue.front ();
-          m_deliveryQueue.pop ();
-        }
-      m_rxAvailable -= tmp->GetSize ();
-      p->AddAtEnd (tmp);
+      m_deliveryQueue.pop ();
+      m_rxAvailable -= p->GetSize ();
     }
-
+  else
+    {
+      m_errno = ERROR_AGAIN;
+      p = 0;
+    }
   return p;
 }
 
@@ -696,8 +709,13 @@ bool NscTcpSocketImpl::SendPendingData (void)
 
   if (written > 0)
     {
+      NS_LOG_DEBUG ("Notifying data sent, remaining txbuffer size: " << m_txBufferSize);
       Simulator::ScheduleNow (&NscTcpSocketImpl::NotifyDataSent, this, ret);
       return true;
+    }
+  else
+    {
+      NS_LOG_DEBUG ("Not notifying data sent, return value " << ret);
     }
   return false;
 }
@@ -879,7 +897,7 @@ NscTcpSocketImpl::GetNativeNs3Errno (int error) const
     {
     case NSC_EADDRINUSE:   // fallthrough
     case NSC_EADDRNOTAVAIL: return ERROR_AFNOSUPPORT;
-    case NSC_EINPROGRESS:   // Altough nsc sockets are nonblocking, we pretend they're not.
+    case NSC_EINPROGRESS:   // Although nsc sockets are nonblocking, we pretend they're not.
     case NSC_EAGAIN: return ERROR_AGAIN;
     case NSC_EISCONN:   // fallthrough
     case NSC_EALREADY: return ERROR_ISCONN;

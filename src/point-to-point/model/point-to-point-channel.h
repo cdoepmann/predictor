@@ -78,27 +78,27 @@ public:
    * \param txTime Transmit time to apply
    * \returns true if successful (currently always true)
    */
-  virtual bool TransmitStart (Ptr<Packet> p, Ptr<PointToPointNetDevice> src, Time txTime);
+  virtual bool TransmitStart (Ptr<const Packet> p, Ptr<PointToPointNetDevice> src, Time txTime);
 
   /**
    * \brief Get number of devices on this channel
    * \returns number of devices on this channel
    */
-  virtual uint32_t GetNDevices (void) const;
+  virtual std::size_t GetNDevices (void) const;
 
   /**
    * \brief Get PointToPointNetDevice corresponding to index i on this channel
    * \param i Index number of the device requested
    * \returns Ptr to PointToPointNetDevice requested
    */
-  Ptr<PointToPointNetDevice> GetPointToPointDevice (uint32_t i) const;
+  Ptr<PointToPointNetDevice> GetPointToPointDevice (std::size_t i) const;
 
   /**
    * \brief Get NetDevice corresponding to index i on this channel
    * \param i Index number of the device requested
    * \returns Ptr to NetDevice requested
    */
-  virtual Ptr<NetDevice> GetDevice (uint32_t i) const;
+  virtual Ptr<NetDevice> GetDevice (std::size_t i) const;
 
 protected:
   /**
@@ -147,10 +147,10 @@ protected:
                     
 private:
   /** Each point to point link has exactly two net devices. */
-  static const int N_DEVICES = 2;
+  static const std::size_t N_DEVICES = 2;
 
   Time          m_delay;    //!< Propagation delay
-  int32_t       m_nDevices; //!< Devices of this channel
+  std::size_t        m_nDevices; //!< Devices of this channel
 
   /**
    * The trace source for the packet transmission animation events that the 

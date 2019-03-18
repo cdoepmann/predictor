@@ -31,24 +31,31 @@
 // The user can choose whether UDP or TCP should be used and can configure
 // some 802.11n parameters (frequency, channel width and guard interval).
 
-#include "ns3/core-module.h"
-#include "ns3/network-module.h"
-#include "ns3/applications-module.h"
-#include "ns3/wifi-module.h"
-#include "ns3/mobility-module.h"
-#include "ns3/ipv4-global-routing-helper.h"
-#include "ns3/internet-module.h"
 #include "ns3/gnuplot.h"
-#include <fstream>
-#include <vector>
-#include <cmath>
+#include "ns3/command-line.h"
+#include "ns3/config.h"
+#include "ns3/uinteger.h"
+#include "ns3/boolean.h"
+#include "ns3/double.h"
+#include "ns3/string.h"
+#include "ns3/yans-wifi-helper.h"
+#include "ns3/ssid.h"
+#include "ns3/mobility-helper.h"
+#include "ns3/internet-stack-helper.h"
+#include "ns3/ipv4-address-helper.h"
+#include "ns3/udp-client-server-helper.h"
+#include "ns3/packet-sink-helper.h"
+#include "ns3/on-off-helper.h"
+#include "ns3/ipv4-global-routing-helper.h"
+#include "ns3/packet-sink.h"
+#include "ns3/yans-wifi-channel.h"
 
 using namespace ns3;
 
 int main (int argc, char *argv[])
 {
   std::ofstream file ("80211n-mimo-throughput.plt");
-  
+
   std::vector <std::string> modes;
   modes.push_back ("HtMcs0");
   modes.push_back ("HtMcs1");
@@ -82,7 +89,7 @@ int main (int argc, char *argv[])
   modes.push_back ("HtMcs29");
   modes.push_back ("HtMcs30");
   modes.push_back ("HtMcs31");
-  
+
   bool udp = true;
   double simulationTime = 5; //seconds
   double frequency = 5.0; //whether 2.4 or 5.0 GHz
@@ -92,6 +99,7 @@ int main (int argc, char *argv[])
 
   CommandLine cmd;
   cmd.AddValue ("step", "Granularity of the results to be plotted in meters", step);
+  cmd.AddValue ("simulationTime", "Simulation time per step (in seconds)", simulationTime);
   cmd.AddValue ("channelBonding", "Enable/disable channel bonding (channel width = 20 MHz if false, channel width = 40 MHz if true)", channelBonding);
   cmd.AddValue ("shortGuardInterval", "Enable/disable short guard interval", shortGuardInterval);
   cmd.AddValue ("frequency", "Whether working in the 2.4 or 5.0 GHz band (other values gets rejected)", frequency);
@@ -104,9 +112,9 @@ int main (int argc, char *argv[])
     {
       std::cout << modes[i] << std::endl;
       Gnuplot2dDataset dataset (modes[i]);
-      for (int d = 0; d <= 100; ) //distance
+      for (double d = 0; d <= 100; ) //distance
         {
-          std::cout << "Distance = " << d << "m: "<< std::endl;
+          std::cout << "Distance = " << d << "m: " << std::endl;
           uint32_t payloadSize; //1500 byte IP packet
           if (udp)
             {
@@ -117,7 +125,7 @@ int main (int argc, char *argv[])
               payloadSize = 1448; //bytes
               Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (payloadSize));
             }
-              
+
           uint8_t nStreams = 1 + (i / 8); //number of MIMO streams
 
           NodeContainer wifiStaNode;
@@ -132,8 +140,9 @@ int main (int argc, char *argv[])
           // Set guard interval
           phy.Set ("ShortGuardEnabled", BooleanValue (shortGuardInterval));
           // Set MIMO capabilities
-          phy.Set ("TxAntennas", UintegerValue (nStreams));
-          phy.Set ("RxAntennas", UintegerValue (nStreams));
+          phy.Set ("Antennas", UintegerValue (nStreams));
+          phy.Set ("MaxSupportedTxSpatialStreams", UintegerValue (nStreams));
+          phy.Set ("MaxSupportedRxSpatialStreams", UintegerValue (nStreams));
 
           WifiMacHelper mac;
           WifiHelper wifi;
@@ -148,13 +157,13 @@ int main (int argc, char *argv[])
             }
           else
             {
-              std::cout<<"Wrong frequency value!"<<std::endl;
+              std::cout << "Wrong frequency value!" << std::endl;
               return 0;
             }
 
           wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager","DataMode", StringValue (modes[i]),
                                         "ControlMode", StringValue (modes[i]));
-                
+
           Ssid ssid = Ssid ("ns3-80211n");
 
           mac.SetType ("ns3::StaWifiMac",
@@ -194,30 +203,29 @@ int main (int argc, char *argv[])
           stack.Install (wifiStaNode);
 
           Ipv4AddressHelper address;
-
           address.SetBase ("192.168.1.0", "255.255.255.0");
           Ipv4InterfaceContainer staNodeInterface;
           Ipv4InterfaceContainer apNodeInterface;
-          
+
           staNodeInterface = address.Assign (staDevice);
           apNodeInterface = address.Assign (apDevice);
 
           /* Setting applications */
-          ApplicationContainer serverApp, sinkApp;
+          ApplicationContainer serverApp;
           if (udp)
             {
               //UDP flow
-              UdpServerHelper myServer (9);
-              serverApp = myServer.Install (wifiStaNode.Get (0));
+              uint16_t port = 9;
+              UdpServerHelper server (port);
+              serverApp = server.Install (wifiStaNode.Get (0));
               serverApp.Start (Seconds (0.0));
               serverApp.Stop (Seconds (simulationTime + 1));
 
-              UdpClientHelper myClient (staNodeInterface.GetAddress (0), 9);
-              myClient.SetAttribute ("MaxPackets", UintegerValue (4294967295u));
-              myClient.SetAttribute ("Interval", TimeValue (Time ("0.00001"))); //packets/s
-              myClient.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-
-              ApplicationContainer clientApp = myClient.Install (wifiApNode.Get (0));
+              UdpClientHelper client (staNodeInterface.GetAddress (0), port);
+              client.SetAttribute ("MaxPackets", UintegerValue (4294967295u));
+              client.SetAttribute ("Interval", TimeValue (Time ("0.00001"))); //packets/s
+              client.SetAttribute ("PacketSize", UintegerValue (payloadSize));
+              ApplicationContainer clientApp = client.Install (wifiApNode.Get (0));
               clientApp.Start (Seconds (1.0));
               clientApp.Stop (Seconds (simulationTime + 1));
             }
@@ -225,49 +233,46 @@ int main (int argc, char *argv[])
             {
               //TCP flow
               uint16_t port = 50000;
-              Address apLocalAddress (InetSocketAddress (Ipv4Address::GetAny (), port));
-              PacketSinkHelper packetSinkHelper ("ns3::TcpSocketFactory", apLocalAddress);
-              sinkApp = packetSinkHelper.Install (wifiStaNode.Get (0));
-
-              sinkApp.Start (Seconds (0.0));
-              sinkApp.Stop (Seconds (simulationTime + 1));
+              Address localAddress (InetSocketAddress (Ipv4Address::GetAny (), port));
+              PacketSinkHelper packetSinkHelper ("ns3::TcpSocketFactory", localAddress);
+              serverApp = packetSinkHelper.Install (wifiStaNode.Get (0));
+              serverApp.Start (Seconds (0.0));
+              serverApp.Stop (Seconds (simulationTime + 1));
 
               OnOffHelper onoff ("ns3::TcpSocketFactory",Ipv4Address::GetAny ());
               onoff.SetAttribute ("OnTime",  StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
               onoff.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
               onoff.SetAttribute ("PacketSize", UintegerValue (payloadSize));
               onoff.SetAttribute ("DataRate", DataRateValue (1000000000)); //bit/s
-              ApplicationContainer apps;
-
               AddressValue remoteAddress (InetSocketAddress (staNodeInterface.GetAddress (0), port));
               onoff.SetAttribute ("Remote", remoteAddress);
-              apps.Add (onoff.Install (wifiApNode.Get (0)));
-              apps.Start (Seconds (1.0));
-              apps.Stop (Seconds (simulationTime + 1));
+              ApplicationContainer clientApp = onoff.Install (wifiApNode.Get (0));
+              clientApp.Start (Seconds (1.0));
+              clientApp.Stop (Seconds (simulationTime + 1));
             }
 
           Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
-          
+
           Simulator::Stop (Seconds (simulationTime + 1));
           Simulator::Run ();
-          Simulator::Destroy ();
 
           double throughput = 0;
           if (udp)
             {
               //UDP
-              uint32_t totalPacketsThrough = DynamicCast<UdpServer> (serverApp.Get (0))->GetReceived ();
+              uint64_t totalPacketsThrough = DynamicCast<UdpServer> (serverApp.Get (0))->GetReceived ();
               throughput = totalPacketsThrough * payloadSize * 8 / (simulationTime * 1000000.0); //Mbit/s
             }
           else
             {
               //TCP
-              uint32_t totalPacketsThrough = DynamicCast<PacketSink> (sinkApp.Get (0))->GetTotalRx ();
+              uint64_t totalPacketsThrough = DynamicCast<PacketSink> (serverApp.Get (0))->GetTotalRx ();
               throughput = totalPacketsThrough * 8 / (simulationTime * 1000000.0); //Mbit/s
             }
           dataset.Add (d, throughput);
-          std::cout << throughput << " Mbit/s" <<std::endl;
+          std::cout << throughput << " Mbit/s" << std::endl;
           d += step;
+          Simulator::Destroy ();
         }
       plot.AddDataset (dataset);
     }

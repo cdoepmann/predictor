@@ -25,6 +25,7 @@
 
 #include <ns3/object.h>
 #include <ns3/ipv4-address-helper.h>
+#include <ns3/ipv6-address-helper.h>
 #include <ns3/data-rate.h>
 #include <ns3/epc-tft.h>
 #include <ns3/eps-bearer.h>
@@ -73,7 +74,7 @@ public:
   /** 
    * Add an eNB to the EPC
    * 
-   * \param enbNode the previosuly created eNB node which is to be
+   * \param enbNode the previously created eNB node which is to be
    * added to the EPC
    * \param lteEnbNetDevice the LteEnbNetDevice of the eNB node
    * \param cellId ID of the eNB
@@ -81,7 +82,7 @@ public:
   virtual void AddEnb (Ptr<Node> enbNode, Ptr<NetDevice> lteEnbNetDevice, uint16_t cellId) = 0;
 
   /** 
-   * Notify the EPC of the existance of a new UE which might attach at a later time
+   * Notify the EPC of the existence of a new UE which might attach at a later time
    * 
    * \param ueLteDevice the UE device to be attached
    * \param imsi the unique identifier of the UE
@@ -106,6 +107,7 @@ public:
    * \param imsi the unique identifier of the UE
    * \param tft the Traffic Flow Template of the new bearer
    * \param bearer struct describing the characteristics of the EPS bearer to be activated
+   * \return bearer ID
    */
   virtual uint8_t ActivateEpsBearer (Ptr<NetDevice> ueLteDevice, uint64_t imsi, Ptr<EpcTft> tft, EpsBearer bearer) = 0;
 
@@ -129,12 +131,27 @@ public:
    */
   virtual Ipv4InterfaceContainer AssignUeIpv4Address (NetDeviceContainer ueDevices) = 0;
 
+  /**
+   * Assign IPv6 addresses to UE devices
+   *
+   * \param ueDevices the set of UE devices
+   *
+   * \return the interface container, \see Ipv6AddressHelper::Assign() which has similar semantics
+   */
+  virtual Ipv6InterfaceContainer AssignUeIpv6Address (NetDeviceContainer ueDevices) = 0;
+
 
   /** 
    * 
-   * \return the address of the Default Gateway to be used by UEs to reach the internet
+   * \return the IPv4 address of the Default Gateway to be used by UEs to reach the internet
    */
   virtual Ipv4Address GetUeDefaultGatewayAddress () = 0;
+
+  /**
+   *
+   * \return the IPv6 address of the Default Gateway to be used by UEs to reach the internet
+   */
+  virtual Ipv6Address GetUeDefaultGatewayAddress6 () = 0;
 
 
 };

@@ -267,12 +267,6 @@ public:
    */
   virtual void SetReceiveErrorCallback (RxErrCallback cb) = 0;
 
-  /**
-   * Set the receiver gain.
-   *
-   * \param gain Gain added at receiver, in dB.
-   */
-  virtual void SetRxGainDb (double gain) = 0;
 
   /**
    * Set the transmit power.
@@ -286,7 +280,7 @@ public:
    *
    * \deprecated See UanPhyPer.
    *
-   * \param thresh Threshold SINR for propper reception in dB re 1 uPa.
+   * \param thresh Threshold SINR for proper reception in dB re 1 uPa.
    */
   virtual void SetRxThresholdDb (double thresh) = 0;
 
@@ -297,12 +291,6 @@ public:
    */
   virtual void SetCcaThresholdDb (double thresh) = 0;
 
-  /**
-   * Get the receiver gain added to signal at receiver in dB.
-   *
-   * \return The gain.
-   */
-  virtual double GetRxGainDb (void) = 0;
 
   /**
    * Get the current transmit power, in dB.
@@ -375,7 +363,7 @@ public:
 
   /**
    * Called when a transmission is beginning
-   * on the attched transducer.
+   * on the attached transducer.
    *
    * \param packet Packet that is beginning transmission.
    * \param txPowerDb Transmit power of packet.
@@ -385,7 +373,7 @@ public:
 
   /**
    * Called when there has been a change in the
-   * ammount of interference this node is experiencing
+   * amount of interference this node is experiencing
    * from other transmissions.
    */
   virtual void NotifyIntChange (void) = 0;

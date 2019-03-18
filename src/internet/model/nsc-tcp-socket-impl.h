@@ -105,6 +105,7 @@ public:
   virtual int GetSockName (Address &address) const; 
   virtual bool SetAllowBroadcast (bool allowBroadcast);
   virtual bool GetAllowBroadcast () const;
+  virtual void BindToNetDevice (Ptr<NetDevice> netdevice); // NetDevice with my m_endPoint
 
 private:
   /**
@@ -113,6 +114,10 @@ private:
    * Actually performs the ForwardUp operations
    */
   void NSCWakeup (void);
+  /**
+   * \brief Tcp friend class.
+   * \relates Tcp
+   */
   friend class Tcp;
   // invoked by Tcp class
   /**

@@ -20,10 +20,9 @@
  *          Mirko Banchi <mk.banchi@gmail.com>
  */
 
-#include <sstream>
-#include "mgt-headers.h"
 #include "ns3/simulator.h"
-#include "ns3/assert.h"
+#include "ns3/address-utils.h"
+#include "mgt-headers.h"
 
 namespace ns3 {
 
@@ -50,9 +49,27 @@ MgtProbeRequestHeader::GetSsid (void) const
 }
 
 void
+MgtAssocResponseHeader::SetAssociationId (uint16_t aid)
+{
+  m_aid = aid;
+}
+
+void
 MgtProbeRequestHeader::SetSupportedRates (SupportedRates rates)
 {
   m_rates = rates;
+}
+
+void
+MgtProbeRequestHeader::SetExtendedCapabilities (ExtendedCapabilities extendedcapabilities)
+{
+  m_extendedCapability = extendedcapabilities;
+}
+
+ExtendedCapabilities
+MgtProbeRequestHeader::GetExtendedCapabilities (void) const
+{
+  return m_extendedCapability;
 }
 
 void
@@ -79,6 +96,18 @@ MgtProbeRequestHeader::GetVhtCapabilities (void) const
   return m_vhtCapability;
 }
 
+void
+MgtProbeRequestHeader::SetHeCapabilities (HeCapabilities hecapabilities)
+{
+  m_heCapability = hecapabilities;
+}
+
+HeCapabilities
+MgtProbeRequestHeader::GetHeCapabilities (void) const
+{
+  return m_heCapability;
+}
+
 SupportedRates
 MgtProbeRequestHeader::GetSupportedRates (void) const
 {
@@ -92,8 +121,10 @@ MgtProbeRequestHeader::GetSerializedSize (void) const
   size += m_ssid.GetSerializedSize ();
   size += m_rates.GetSerializedSize ();
   size += m_rates.extended.GetSerializedSize ();
+  size += m_extendedCapability.GetSerializedSize ();
   size += m_htCapability.GetSerializedSize ();
   size += m_vhtCapability.GetSerializedSize ();
+  size += m_heCapability.GetSerializedSize ();
   return size;
 }
 
@@ -119,8 +150,10 @@ MgtProbeRequestHeader::Print (std::ostream &os) const
 {
   os << "ssid=" << m_ssid << ", "
      << "rates=" << m_rates << ", "
+     << "Extended Capabilities=" << m_extendedCapability << " , "
      << "HT Capabilities=" << m_htCapability << " , "
-     << "VHT Capabilities= " << m_vhtCapability;
+     << "VHT Capabilities=" << m_vhtCapability << " , "
+     << "HE Capabilities=" << m_heCapability;
 }
 
 void
@@ -130,8 +163,10 @@ MgtProbeRequestHeader::Serialize (Buffer::Iterator start) const
   i = m_ssid.Serialize (i);
   i = m_rates.Serialize (i);
   i = m_rates.extended.Serialize (i);
+  i = m_extendedCapability.Serialize (i);
   i = m_htCapability.Serialize (i);
   i = m_vhtCapability.Serialize (i);
+  i = m_heCapability.Serialize (i);
 }
 
 uint32_t
@@ -141,8 +176,10 @@ MgtProbeRequestHeader::Deserialize (Buffer::Iterator start)
   i = m_ssid.Deserialize (i);
   i = m_rates.Deserialize (i);
   i = m_rates.extended.DeserializeIfPresent (i);
+  i = m_extendedCapability.DeserializeIfPresent (i);
   i = m_htCapability.DeserializeIfPresent (i);
   i = m_vhtCapability.DeserializeIfPresent (i);
+  i = m_heCapability.DeserializeIfPresent (i);
   return i.GetDistanceFrom (start);
 }
 
@@ -198,6 +235,18 @@ MgtProbeResponseHeader::GetCapabilities (void) const
 }
 
 void
+MgtProbeResponseHeader::SetExtendedCapabilities (ExtendedCapabilities extendedcapabilities)
+{
+  m_extendedCapability = extendedcapabilities;
+}
+
+ExtendedCapabilities
+MgtProbeResponseHeader::GetExtendedCapabilities (void) const
+{
+  return m_extendedCapability;
+}
+
+void
 MgtProbeResponseHeader::SetHtCapabilities (HtCapabilities htcapabilities)
 {
   m_htCapability = htcapabilities;
@@ -210,15 +259,15 @@ MgtProbeResponseHeader::GetHtCapabilities (void) const
 }
 
 void
-MgtProbeResponseHeader::SetHtOperations (HtOperations htoperations)
+MgtProbeResponseHeader::SetHtOperation (HtOperation htoperation)
 {
-  m_htOperations = htoperations;
+  m_htOperation = htoperation;
 }
 
-HtOperations
-MgtProbeResponseHeader::GetHtOperations (void) const
+HtOperation
+MgtProbeResponseHeader::GetHtOperation (void) const
 {
-  return m_htOperations;
+  return m_htOperation;
 }
 
 void
@@ -231,6 +280,54 @@ VhtCapabilities
 MgtProbeResponseHeader::GetVhtCapabilities (void) const
 {
   return m_vhtCapability;
+}
+
+void
+MgtProbeResponseHeader::SetVhtOperation (VhtOperation vhtoperation)
+{
+  m_vhtOperation = vhtoperation;
+}
+
+VhtOperation
+MgtProbeResponseHeader::GetVhtOperation (void) const
+{
+  return m_vhtOperation;
+}
+
+void
+MgtProbeResponseHeader::SetHeCapabilities (HeCapabilities hecapabilities)
+{
+  m_heCapability = hecapabilities;
+}
+
+HeCapabilities
+MgtProbeResponseHeader::GetHeCapabilities (void) const
+{
+  return m_heCapability;
+}
+
+void
+MgtProbeResponseHeader::SetHeOperation (HeOperation heoperation)
+{
+  m_heOperation = heoperation;
+}
+
+HeOperation
+MgtProbeResponseHeader::GetHeOperation (void) const
+{
+  return m_heOperation;
+}
+
+void
+MgtProbeResponseHeader::SetCfParameterSet (CfParameterSet cfparameterset)
+{
+  m_cfParameterSet = cfparameterset;
+}
+
+CfParameterSet
+MgtProbeResponseHeader::GetCfParameterSet (void) const
+{
+  return m_cfParameterSet;
 }
 
 void
@@ -313,13 +410,18 @@ MgtProbeResponseHeader::GetSerializedSize (void) const
   size += m_capability.GetSerializedSize ();
   size += m_ssid.GetSerializedSize ();
   size += m_rates.GetSerializedSize ();
+  size += m_cfParameterSet.GetSerializedSize ();
   size += m_dsssParameterSet.GetSerializedSize ();
   size += m_erpInformation.GetSerializedSize ();
   size += m_rates.extended.GetSerializedSize ();
   size += m_edcaParameterSet.GetSerializedSize ();
+  size += m_extendedCapability.GetSerializedSize ();
   size += m_htCapability.GetSerializedSize ();
-  size += m_htOperations.GetSerializedSize ();
+  size += m_htOperation.GetSerializedSize ();
   size += m_vhtCapability.GetSerializedSize ();
+  size += m_vhtOperation.GetSerializedSize ();
+  size += m_heCapability.GetSerializedSize ();
+  size += m_heOperation.GetSerializedSize ();
   return size;
 }
 
@@ -328,11 +430,14 @@ MgtProbeResponseHeader::Print (std::ostream &os) const
 {
   os << "ssid=" << m_ssid << ", "
      << "rates=" << m_rates << ", "
-     << "DSSS Parameter Set=" << m_dsssParameterSet << " , "
      << "ERP information=" << m_erpInformation << ", "
+     << "Extended Capabilities=" << m_extendedCapability << " , "
      << "HT Capabilities=" << m_htCapability << " , "
-     << "HT Operations=" << m_htOperations << " , "
-     << "VHT Capabilities= " << m_vhtCapability;
+     << "HT Operation=" << m_htOperation << " , "
+     << "VHT Capabilities=" << m_vhtCapability << " , "
+     << "VHT Operation=" << m_vhtOperation << " , "
+     << "HE Capabilities=" << m_heCapability << " , "
+     << "HE Operation=" << m_heOperation;
 }
 
 void
@@ -349,17 +454,22 @@ MgtProbeResponseHeader::Serialize (Buffer::Iterator start) const
   //ibss parameter set
   Buffer::Iterator i = start;
   i.WriteHtolsbU64 (Simulator::Now ().GetMicroSeconds ());
-  i.WriteHtolsbU16 (m_beaconInterval / 1024);
+  i.WriteHtolsbU16 (static_cast<uint16_t> (m_beaconInterval / 1024));
   i = m_capability.Serialize (i);
   i = m_ssid.Serialize (i);
   i = m_rates.Serialize (i);
+  i = m_cfParameterSet.Serialize (i);
   i = m_dsssParameterSet.Serialize (i);
   i = m_erpInformation.Serialize (i);
   i = m_rates.extended.Serialize (i);
   i = m_edcaParameterSet.Serialize (i);
+  i = m_extendedCapability.Serialize (i);
   i = m_htCapability.Serialize (i);
-  i = m_htOperations.Serialize (i);
+  i = m_htOperation.Serialize (i);
   i = m_vhtCapability.Serialize (i);
+  i = m_vhtOperation.Serialize (i);
+  i = m_heCapability.Serialize (i);
+  i = m_heOperation.Serialize (i);
 }
 
 uint32_t
@@ -372,13 +482,18 @@ MgtProbeResponseHeader::Deserialize (Buffer::Iterator start)
   i = m_capability.Deserialize (i);
   i = m_ssid.Deserialize (i);
   i = m_rates.Deserialize (i);
+  i = m_cfParameterSet.DeserializeIfPresent (i);
   i = m_dsssParameterSet.DeserializeIfPresent (i);
   i = m_erpInformation.DeserializeIfPresent (i);
   i = m_rates.extended.DeserializeIfPresent (i);
   i = m_edcaParameterSet.DeserializeIfPresent (i);
+  i = m_extendedCapability.DeserializeIfPresent (i);
   i = m_htCapability.DeserializeIfPresent (i);
-  i = m_htOperations.DeserializeIfPresent (i);
+  i = m_htOperation.DeserializeIfPresent (i);
   i = m_vhtCapability.DeserializeIfPresent (i);
+  i = m_vhtOperation.DeserializeIfPresent (i);
+  i = m_heCapability.DeserializeIfPresent (i);
+  i = m_heOperation.DeserializeIfPresent (i);
   return i.GetDistanceFrom (start);
 }
 
@@ -448,6 +563,18 @@ MgtAssocRequestHeader::GetCapabilities (void) const
 }
 
 void
+MgtAssocRequestHeader::SetExtendedCapabilities (ExtendedCapabilities extendedcapabilities)
+{
+  m_extendedCapability = extendedcapabilities;
+}
+
+ExtendedCapabilities
+MgtAssocRequestHeader::GetExtendedCapabilities (void) const
+{
+  return m_extendedCapability;
+}
+
+void
 MgtAssocRequestHeader::SetHtCapabilities (HtCapabilities htcapabilities)
 {
   m_htCapability = htcapabilities;
@@ -469,6 +596,18 @@ VhtCapabilities
 MgtAssocRequestHeader::GetVhtCapabilities (void) const
 {
   return m_vhtCapability;
+}
+
+void
+MgtAssocRequestHeader::SetHeCapabilities (HeCapabilities hecapabilities)
+{
+  m_heCapability = hecapabilities;
+}
+
+HeCapabilities
+MgtAssocRequestHeader::GetHeCapabilities (void) const
+{
+  return m_heCapability;
 }
 
 Ssid
@@ -515,8 +654,10 @@ MgtAssocRequestHeader::GetSerializedSize (void) const
   size += m_ssid.GetSerializedSize ();
   size += m_rates.GetSerializedSize ();
   size += m_rates.extended.GetSerializedSize ();
+  size += m_extendedCapability.GetSerializedSize ();
   size += m_htCapability.GetSerializedSize ();
   size += m_vhtCapability.GetSerializedSize ();
+  size += m_heCapability.GetSerializedSize ();
   return size;
 }
 
@@ -525,8 +666,10 @@ MgtAssocRequestHeader::Print (std::ostream &os) const
 {
   os << "ssid=" << m_ssid << ", "
      << "rates=" << m_rates << ", "
+     << "Extended Capabilities=" << m_extendedCapability << " , "
      << "HT Capabilities=" << m_htCapability << " , "
-     << "VHT Capabilities= " << m_vhtCapability;
+     << "VHT Capabilities=" << m_vhtCapability << " , "
+     << "HE Capabilities=" << m_heCapability;
 }
 
 void
@@ -538,8 +681,10 @@ MgtAssocRequestHeader::Serialize (Buffer::Iterator start) const
   i = m_ssid.Serialize (i);
   i = m_rates.Serialize (i);
   i = m_rates.extended.Serialize (i);
+  i = m_extendedCapability.Serialize (i);
   i = m_htCapability.Serialize (i);
   i = m_vhtCapability.Serialize (i);
+  i = m_heCapability.Serialize (i);
 }
 
 uint32_t
@@ -551,14 +696,213 @@ MgtAssocRequestHeader::Deserialize (Buffer::Iterator start)
   i = m_ssid.Deserialize (i);
   i = m_rates.Deserialize (i);
   i = m_rates.extended.DeserializeIfPresent (i);
+  i = m_extendedCapability.DeserializeIfPresent (i);
   i = m_htCapability.DeserializeIfPresent (i);
   i = m_vhtCapability.DeserializeIfPresent (i);
+  i = m_heCapability.DeserializeIfPresent (i);
   return i.GetDistanceFrom (start);
 }
 
 
 /***********************************************************
- *          Assoc Response
+ *          Ressoc Request
+ ***********************************************************/
+
+NS_OBJECT_ENSURE_REGISTERED (MgtReassocRequestHeader);
+
+MgtReassocRequestHeader::MgtReassocRequestHeader ()
+  : m_currentApAddr (Mac48Address ())
+{
+}
+
+MgtReassocRequestHeader::~MgtReassocRequestHeader ()
+{
+}
+
+void
+MgtReassocRequestHeader::SetSsid (Ssid ssid)
+{
+  m_ssid = ssid;
+}
+
+void
+MgtReassocRequestHeader::SetSupportedRates (SupportedRates rates)
+{
+  m_rates = rates;
+}
+
+void
+MgtReassocRequestHeader::SetListenInterval (uint16_t interval)
+{
+  m_listenInterval = interval;
+}
+
+void
+MgtReassocRequestHeader::SetCapabilities (CapabilityInformation capabilities)
+{
+  m_capability = capabilities;
+}
+
+CapabilityInformation
+MgtReassocRequestHeader::GetCapabilities (void) const
+{
+  return m_capability;
+}
+
+void
+MgtReassocRequestHeader::SetExtendedCapabilities (ExtendedCapabilities extendedcapabilities)
+{
+  m_extendedCapability = extendedcapabilities;
+}
+
+ExtendedCapabilities
+MgtReassocRequestHeader::GetExtendedCapabilities (void) const
+{
+  return m_extendedCapability;
+}
+
+void
+MgtReassocRequestHeader::SetHtCapabilities (HtCapabilities htcapabilities)
+{
+  m_htCapability = htcapabilities;
+}
+
+HtCapabilities
+MgtReassocRequestHeader::GetHtCapabilities (void) const
+{
+  return m_htCapability;
+}
+
+void
+MgtReassocRequestHeader::SetVhtCapabilities (VhtCapabilities vhtcapabilities)
+{
+  m_vhtCapability = vhtcapabilities;
+}
+
+VhtCapabilities
+MgtReassocRequestHeader::GetVhtCapabilities (void) const
+{
+  return m_vhtCapability;
+}
+
+void
+MgtReassocRequestHeader::SetHeCapabilities (HeCapabilities hecapabilities)
+{
+  m_heCapability = hecapabilities;
+}
+
+HeCapabilities
+MgtReassocRequestHeader::GetHeCapabilities (void) const
+{
+  return m_heCapability;
+}
+
+Ssid
+MgtReassocRequestHeader::GetSsid (void) const
+{
+  return m_ssid;
+}
+
+SupportedRates
+MgtReassocRequestHeader::GetSupportedRates (void) const
+{
+  return m_rates;
+}
+
+uint16_t
+MgtReassocRequestHeader::GetListenInterval (void) const
+{
+  return m_listenInterval;
+}
+
+void
+MgtReassocRequestHeader::SetCurrentApAddress (Mac48Address currentApAddr)
+{
+  m_currentApAddr = currentApAddr;
+}
+
+TypeId
+MgtReassocRequestHeader::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::MgtReassocRequestHeader")
+    .SetParent<Header> ()
+    .SetGroupName ("Wifi")
+    .AddConstructor<MgtReassocRequestHeader> ()
+  ;
+  return tid;
+}
+
+TypeId
+MgtReassocRequestHeader::GetInstanceTypeId (void) const
+{
+  return GetTypeId ();
+}
+
+uint32_t
+MgtReassocRequestHeader::GetSerializedSize (void) const
+{
+  uint32_t size = 0;
+  size += m_capability.GetSerializedSize ();
+  size += 2; //listen interval
+  size += 6; //current AP address
+  size += m_ssid.GetSerializedSize ();
+  size += m_rates.GetSerializedSize ();
+  size += m_rates.extended.GetSerializedSize ();
+  size += m_extendedCapability.GetSerializedSize ();
+  size += m_htCapability.GetSerializedSize ();
+  size += m_vhtCapability.GetSerializedSize ();
+  size += m_heCapability.GetSerializedSize ();
+  return size;
+}
+
+void
+MgtReassocRequestHeader::Print (std::ostream &os) const
+{
+  os << "current AP address=" << m_currentApAddr << ", "
+     << "ssid=" << m_ssid << ", "
+     << "rates=" << m_rates << ", "
+     << "Extended Capabilities=" << m_extendedCapability << " , "
+     << "HT Capabilities=" << m_htCapability << " , "
+     << "VHT Capabilities=" << m_vhtCapability << " , "
+     << "HE Capabilities=" << m_heCapability;
+}
+
+void
+MgtReassocRequestHeader::Serialize (Buffer::Iterator start) const
+{
+  Buffer::Iterator i = start;
+  i = m_capability.Serialize (i);
+  i.WriteHtolsbU16 (m_listenInterval);
+  WriteTo (i, m_currentApAddr);
+  i = m_ssid.Serialize (i);
+  i = m_rates.Serialize (i);
+  i = m_rates.extended.Serialize (i);
+  i = m_extendedCapability.Serialize (i);
+  i = m_htCapability.Serialize (i);
+  i = m_vhtCapability.Serialize (i);
+  i = m_heCapability.Serialize (i);
+}
+
+uint32_t
+MgtReassocRequestHeader::Deserialize (Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+  i = m_capability.Deserialize (i);
+  m_listenInterval = i.ReadLsbtohU16 ();
+  ReadFrom (i, m_currentApAddr);
+  i = m_ssid.Deserialize (i);
+  i = m_rates.Deserialize (i);
+  i = m_rates.extended.DeserializeIfPresent (i);
+  i = m_extendedCapability.DeserializeIfPresent (i);
+  i = m_htCapability.DeserializeIfPresent (i);
+  i = m_vhtCapability.DeserializeIfPresent (i);
+  i = m_heCapability.DeserializeIfPresent (i);
+  return i.GetDistanceFrom (start);
+}
+
+
+/***********************************************************
+ *          Assoc/Reassoc Response
  ***********************************************************/
 
 NS_OBJECT_ENSURE_REGISTERED (MgtAssocResponseHeader);
@@ -609,6 +953,18 @@ MgtAssocResponseHeader::GetCapabilities (void) const
 }
 
 void
+MgtAssocResponseHeader::SetExtendedCapabilities (ExtendedCapabilities extendedcapabilities)
+{
+  m_extendedCapability = extendedcapabilities;
+}
+
+ExtendedCapabilities
+MgtAssocResponseHeader::GetExtendedCapabilities (void) const
+{
+  return m_extendedCapability;
+}
+
+void
 MgtAssocResponseHeader::SetHtCapabilities (HtCapabilities htcapabilities)
 {
   m_htCapability = htcapabilities;
@@ -621,15 +977,15 @@ MgtAssocResponseHeader::GetHtCapabilities (void) const
 }
 
 void
-MgtAssocResponseHeader::SetHtOperations (HtOperations htoperations)
+MgtAssocResponseHeader::SetHtOperation (HtOperation htoperation)
 {
-  m_htOperations = htoperations;
+  m_htOperation = htoperation;
 }
 
-HtOperations
-MgtAssocResponseHeader::GetHtOperations (void) const
+HtOperation
+MgtAssocResponseHeader::GetHtOperation (void) const
 {
-  return m_htOperations;
+  return m_htOperation;
 }
 
 void
@@ -642,6 +998,42 @@ VhtCapabilities
 MgtAssocResponseHeader::GetVhtCapabilities (void) const
 {
   return m_vhtCapability;
+}
+
+void
+MgtAssocResponseHeader::SetVhtOperation (VhtOperation vhtoperation)
+{
+  m_vhtOperation = vhtoperation;
+}
+
+VhtOperation
+MgtAssocResponseHeader::GetVhtOperation (void) const
+{
+  return m_vhtOperation;
+}
+
+void
+MgtAssocResponseHeader::SetHeCapabilities (HeCapabilities hecapabilities)
+{
+  m_heCapability = hecapabilities;
+}
+
+HeCapabilities
+MgtAssocResponseHeader::GetHeCapabilities (void) const
+{
+  return m_heCapability;
+}
+
+void
+MgtAssocResponseHeader::SetHeOperation (HeOperation heoperation)
+{
+  m_heOperation = heoperation;
+}
+
+HeOperation
+MgtAssocResponseHeader::GetHeOperation (void) const
+{
+  return m_heOperation;
 }
 
 void
@@ -696,9 +1088,13 @@ MgtAssocResponseHeader::GetSerializedSize (void) const
   size += m_erpInformation.GetSerializedSize ();
   size += m_rates.extended.GetSerializedSize ();
   size += m_edcaParameterSet.GetSerializedSize ();
+  size += m_extendedCapability.GetSerializedSize ();
   size += m_htCapability.GetSerializedSize ();
-  size += m_htOperations.GetSerializedSize ();
+  size += m_htOperation.GetSerializedSize ();
   size += m_vhtCapability.GetSerializedSize ();
+  size += m_vhtOperation.GetSerializedSize ();
+  size += m_heCapability.GetSerializedSize ();
+  size += m_heOperation.GetSerializedSize ();
   return size;
 }
 
@@ -706,11 +1102,16 @@ void
 MgtAssocResponseHeader::Print (std::ostream &os) const
 {
   os << "status code=" << m_code << ", "
+     << "aid=" << m_aid << ", "
      << "rates=" << m_rates << ", "
      << "ERP information=" << m_erpInformation << ", "
+     << "Extended Capabilities=" << m_extendedCapability << " , "
      << "HT Capabilities=" << m_htCapability << " , "
-     << "HT Operations=" << m_htOperations << " , "
-     << "VHT Capabilities= " << m_vhtCapability;
+     << "HT Operation=" << m_htOperation << " , "
+     << "VHT Capabilities=" << m_vhtCapability << " , "
+     << "VHT Operation=" << m_vhtOperation << " , "
+     << "HE Capabilities=" << m_heCapability << " , "
+     << "HE Operation=" << m_heOperation;
 }
 
 void
@@ -724,9 +1125,13 @@ MgtAssocResponseHeader::Serialize (Buffer::Iterator start) const
   i = m_erpInformation.Serialize (i);
   i = m_rates.extended.Serialize (i);
   i = m_edcaParameterSet.Serialize (i);
+  i = m_extendedCapability.Serialize (i);
   i = m_htCapability.Serialize (i);
-  i = m_htOperations.Serialize (i);
+  i = m_htOperation.Serialize (i);
   i = m_vhtCapability.Serialize (i);
+  i = m_vhtOperation.Serialize (i);
+  i = m_heCapability.Serialize (i);
+  i = m_heOperation.Serialize (i);
 }
 
 uint32_t
@@ -740,9 +1145,13 @@ MgtAssocResponseHeader::Deserialize (Buffer::Iterator start)
   i = m_erpInformation.DeserializeIfPresent (i);
   i = m_rates.extended.DeserializeIfPresent (i);
   i = m_edcaParameterSet.DeserializeIfPresent (i);
+  i = m_extendedCapability.DeserializeIfPresent (i);
   i = m_htCapability.DeserializeIfPresent (i);
-  i = m_htOperations.DeserializeIfPresent (i);
+  i = m_htOperation.DeserializeIfPresent (i);
   i = m_vhtCapability.DeserializeIfPresent (i);
+  i = m_vhtOperation.DeserializeIfPresent (i);
+  i = m_heCapability.DeserializeIfPresent (i);
+  i = m_heOperation.DeserializeIfPresent (i);
   return i.GetDistanceFrom (start);
 }
 
@@ -762,27 +1171,27 @@ void
 WifiActionHeader::SetAction (WifiActionHeader::CategoryValue type,
                              WifiActionHeader::ActionValue action)
 {
-  m_category = type;
+  m_category = static_cast<uint8_t> (type);
   switch (type)
     {
     case BLOCK_ACK:
       {
-        m_actionValue = action.blockAck;
+        m_actionValue = static_cast<uint8_t> (action.blockAck);
         break;
       }
     case MESH:
       {
-        m_actionValue = action.meshAction;
+        m_actionValue = static_cast<uint8_t> (action.meshAction);
         break;
       }
     case MULTIHOP:
       {
-        m_actionValue = action.multihopAction;
+        m_actionValue = static_cast<uint8_t> (action.multihopAction);
         break;
       }
     case SELF_PROTECTED:
       {
-        m_actionValue = action.selfProtectedAction;
+        m_actionValue = static_cast<uint8_t> (action.selfProtectedAction);
         break;
       }
     case VENDOR_SPECIFIC_ACTION:

@@ -88,7 +88,7 @@ UplinkSchedulerMBQoS::GetChannelDescriptorsToUpdate (bool &updateDcd,
 {
   /* DCD and UCD shall actually be updated when channel or burst profile definitions
    change. burst profiles are updated based on number of SSs, network conditions and etc.
-   for now temporarily assuming DCD/UCD shall be updated everytime */
+   for now temporarily assuming DCD/UCD shall be updated every time */
 
   uint32_t randNr = rand ();
   if (randNr % 5 == 0 || GetBs ()->GetNrDcdSent () == 0)
@@ -225,7 +225,6 @@ UplinkSchedulerMBQoS::Schedule (void)
   uint32_t symbolsToAllocation = 0;
   uint32_t allocationSize = 0; // size in symbols
   uint32_t availableSymbols = GetBs ()->GetNrUlSymbols ();
-  uint32_t availableSymbolsAux = GetBs ()->GetNrUlSymbols ();
 
   AllocateInitialRangingInterval (symbolsToAllocation, availableSymbols);
 
@@ -357,7 +356,7 @@ UplinkSchedulerMBQoS::Schedule (void)
     }
   NS_LOG_DEBUG ("At " << Simulator::Now ().GetSeconds ()<< " high queue has " << m_uplinkJobs_high.size ()<< " jobs - after sched");
 
-  availableSymbolsAux = availableSymbols;
+  uint32_t availableSymbolsAux = availableSymbols;
   uint32_t symbolsUsed = 0;
 
   symbolsUsed += CountSymbolsQueue (m_uplinkJobs_high);
@@ -482,7 +481,7 @@ UplinkSchedulerMBQoS::Schedule (void)
     }
 
   OfdmUlMapIe ulMapIeEnd;
-  ulMapIeEnd.SetCid (*(new Cid (0)));
+  ulMapIeEnd.SetCid (Cid (0));
   ulMapIeEnd.SetStartTime (symbolsToAllocation);
   ulMapIeEnd.SetUiuc (OfdmUlBurstProfile::UIUC_END_OF_MAP);
   ulMapIeEnd.SetDuration (0);

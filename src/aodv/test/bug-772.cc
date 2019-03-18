@@ -19,7 +19,6 @@
  */
 
 #include "bug-772.h"
-
 #include "ns3/simulator.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/rng-seed-manager.h"
@@ -27,7 +26,6 @@
 #include "ns3/mobility-helper.h"
 #include "ns3/double.h"
 #include "ns3/uinteger.h"
-#include "ns3/string.h"
 #include "ns3/boolean.h"
 #include "ns3/yans-wifi-helper.h"
 #include "ns3/internet-stack-helper.h"
@@ -48,16 +46,16 @@ using namespace ns3;
 //-----------------------------------------------------------------------------
 // UdpChainTest
 //-----------------------------------------------------------------------------
-Bug772ChainTest::Bug772ChainTest (const char * const prefix, const char * const proto, Time t, uint32_t size) : 
-  TestCase ("Bug 772 UDP and TCP chain regression test"),
-  m_nodes (0),
-  m_prefix (prefix),
-  m_proto (proto),
-  m_time (t),
-  m_size (size),
-  m_step (120),
-  m_port (9),
-  m_receivedPackets (0)
+Bug772ChainTest::Bug772ChainTest (const char * const prefix, const char * const proto, Time t, uint32_t size)
+  : TestCase ("Bug 772 UDP and TCP chain regression test"),
+    m_nodes (0),
+    m_prefix (prefix),
+    m_proto (proto),
+    m_time (t),
+    m_size (size),
+    m_step (120),
+    m_port (9),
+    m_receivedPackets (0)
 {
 }
 
@@ -89,8 +87,8 @@ Bug772ChainTest::DoRun ()
   RngSeedManager::SetSeed (12345);
   RngSeedManager::SetRun (7);
 
-  // Default of 3 will cause packet loss 
-  Config::SetDefault ("ns3::ArpCache::PendingQueueSize", UintegerValue (10));  
+  // Default of 3 will cause packet loss
+  Config::SetDefault ("ns3::ArpCache::PendingQueueSize", UintegerValue (10));
 
   CreateNodes ();
   CreateDevices ();
@@ -134,16 +132,18 @@ Bug772ChainTest::CreateDevices ()
   YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default ();
   Ptr<YansWifiChannel> chan = wifiChannel.Create ();
   wifiPhy.SetChannel (chan);
+  wifiPhy.Set ("TxGain", DoubleValue (1.0)); //this configuration should go away in future revision to the test
+  wifiPhy.Set ("RxGain", DoubleValue (1.0)); //this configuration should go away in future revision to the test
   WifiHelper wifi;
-  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue ("OfdmRate6Mbps"), "RtsCtsThreshold", StringValue ("2200"));
-  NetDeviceContainer devices = wifi.Install (wifiPhy, wifiMac, *m_nodes); 
+  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue ("OfdmRate6Mbps"), "RtsCtsThreshold", StringValue ("2200"), "MaxSlrc", UintegerValue (7));
+  NetDeviceContainer devices = wifi.Install (wifiPhy, wifiMac, *m_nodes);
 
   // Assign fixed stream numbers to wifi and channel random variables
   streamsUsed += wifi.AssignStreams (devices, streamsUsed);
   // Assign 6 streams per device
   NS_TEST_ASSERT_MSG_EQ (streamsUsed, (devices.GetN () * 6), "Stream assignment mismatch");
   streamsUsed += wifiChannel.AssignStreams (chan, streamsUsed);
-  // Assign 0 streams per channel for this configuration 
+  // Assign 0 streams per channel for this configuration
   NS_TEST_ASSERT_MSG_EQ (streamsUsed, (devices.GetN () * 6), "Stream assignment mismatch");
 
   // 2. Setup TCP/IP & AODV
@@ -153,10 +153,10 @@ Bug772ChainTest::CreateDevices ()
   internetStack.Install (*m_nodes);
   streamsUsed += internetStack.AssignStreams (*m_nodes, streamsUsed);
   // Expect to use (3*m_size) more streams for internet stack random variables
-  NS_TEST_ASSERT_MSG_EQ (streamsUsed, ((devices.GetN () * 6) + (3*m_size)), "Stream assignment mismatch");
+  NS_TEST_ASSERT_MSG_EQ (streamsUsed, ((devices.GetN () * 6) + (3 * m_size)), "Stream assignment mismatch");
   streamsUsed += aodv.AssignStreams (*m_nodes, streamsUsed);
   // Expect to use m_size more streams for AODV
-  NS_TEST_ASSERT_MSG_EQ (streamsUsed, ((devices.GetN () * 6) + (3*m_size) + m_size), "Stream assignment mismatch");
+  NS_TEST_ASSERT_MSG_EQ (streamsUsed, ((devices.GetN () * 6) + (3 * m_size) + m_size), "Stream assignment mismatch");
   Ipv4AddressHelper address;
   address.SetBase ("10.1.1.0", "255.255.255.0");
   Ipv4InterfaceContainer interfaces = address.Assign (devices);
@@ -164,7 +164,7 @@ Bug772ChainTest::CreateDevices ()
   // 3. Setup UDP source and sink
   m_sendSocket = Socket::CreateSocket (m_nodes->Get (0), TypeId::LookupByName (m_proto));
   m_sendSocket->Bind ();
-  m_sendSocket->Connect (InetSocketAddress (interfaces.GetAddress (m_size-1), m_port));
+  m_sendSocket->Connect (InetSocketAddress (interfaces.GetAddress (m_size - 1), m_port));
   m_sendSocket->SetAllowBroadcast (true);
   Simulator::ScheduleWithContext (m_sendSocket->GetNode ()->GetId (), Seconds (1.0),
                                   &Bug772ChainTest::SendData, this, m_sendSocket);

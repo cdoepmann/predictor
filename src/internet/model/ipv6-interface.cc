@@ -24,6 +24,7 @@
 #include "ns3/net-device.h"
 #include "ns3/mac16-address.h"
 #include "ns3/mac64-address.h"
+#include "ns3/traffic-control-layer.h"
 
 #include "ipv6-interface.h"
 #include "ipv6-queue-disc-item.h"
@@ -109,6 +110,12 @@ void Ipv6Interface::DoSetup ()
       else if (Mac16Address::IsMatchingType (addr))
         {
           Ipv6InterfaceAddress ifaddr = Ipv6InterfaceAddress (Ipv6Address::MakeAutoconfiguredLinkLocalAddress (Mac16Address::ConvertFrom (addr)), Ipv6Prefix (64));
+          AddAddress (ifaddr);
+          m_linkLocalAddress = ifaddr;
+        }
+      else if (Mac8Address::IsMatchingType (addr))
+        {
+          Ipv6InterfaceAddress ifaddr = Ipv6InterfaceAddress (Ipv6Address::MakeAutoconfiguredLinkLocalAddress (Mac8Address::ConvertFrom (addr)), Ipv6Prefix (64));
           AddAddress (ifaddr);
           m_linkLocalAddress = ifaddr;
         }

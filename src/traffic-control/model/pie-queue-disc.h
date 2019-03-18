@@ -28,8 +28,6 @@
 #ifndef PIE_QUEUE_DISC_H
 #define PIE_QUEUE_DISC_H
 
-#include <queue>
-#include "ns3/packet.h"
 #include "ns3/queue-disc.h"
 #include "ns3/nstime.h"
 #include "ns3/boolean.h"
@@ -70,15 +68,6 @@ public:
   virtual ~PieQueueDisc ();
 
   /**
-   * \brief Stats
-   */
-  typedef struct
-  {
-    uint32_t unforcedDrop;      //!< Early probability drops: proactive
-    uint32_t forcedDrop;        //!< Drops due to queue limit: reactive
-  } Stats;
-
-  /**
    * \brief Burst types
    */
   enum BurstStateT
@@ -89,44 +78,11 @@ public:
   };
 
   /**
-   * \brief Set the operating mode of this queue.
+   * \brief Get queue delay.
    *
-   * \param mode The operating mode of this queue.
-   */
-  void SetMode (Queue::QueueMode mode);
-
-  /**
-   * \brief Get the encapsulation mode of this queue.
-   *
-   * \returns The encapsulation mode of this queue.
-   */
-  Queue::QueueMode GetMode (void);
-
-  /**
-   * \brief Get the current value of the queue in bytes or packets.
-   *
-   * \returns The queue size in bytes or packets.
-   */
-  uint32_t GetQueueSize (void);
-
-  /**
-   * \brief Set the limit of the queue in bytes or packets.
-   *
-   * \param lim The limit in bytes or packets.
-   */
-  void SetQueueLimit (uint32_t lim);
-
-  /**
-   * \brief Get queue delay
+   * \returns The current queue delay.
    */
   Time GetQueueDelay (void);
-
-  /**
-   * \brief Get PIE statistics after running.
-   *
-   * \returns The drop statistics.
-   */
-  Stats GetStats ();
 
   /**
    * Assign a fixed random variable stream number to the random variables
@@ -138,6 +94,10 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
+  // Reasons for dropping packets
+  static constexpr const char* UNFORCED_DROP = "Unforced drop";  //!< Early probability drops: proactive
+  static constexpr const char* FORCED_DROP = "Forced drop";      //!< Drops due to queue limit: reactive
+
 protected:
   /**
    * \brief Dispose of the object
@@ -147,7 +107,6 @@ protected:
 private:
   virtual bool DoEnqueue (Ptr<QueueDiscItem> item);
   virtual Ptr<QueueDiscItem> DoDequeue (void);
-  virtual Ptr<const QueueDiscItem> DoPeek (void) const;
   virtual bool CheckConfig (void);
 
   /**
@@ -170,11 +129,9 @@ private:
    */
   void CalculateP ();
 
-  Stats m_stats;                                //!< PIE statistics
+  static const uint64_t DQCOUNT_INVALID = std::numeric_limits<uint64_t>::max();  //!< Invalid dqCount value
 
   // ** Variables supplied by user
-  Queue::QueueMode m_mode;                      //!< Mode (bytes or packets)
-  uint32_t m_queueLimit;                        //!< Queue limit in bytes / packets
   Time m_sUpdate;                               //!< Start time of the update timer
   Time m_tUpdate;                               //!< Time period after which CalculateP () is called
   Time m_qDelayRef;                             //!< Desired queue delay
@@ -194,7 +151,7 @@ private:
   bool m_inMeasurement;                         //!< Indicates whether we are in a measurement cycle
   double m_avgDqRate;                           //!< Time averaged dequeue rate
   double m_dqStart;                             //!< Start timestamp of current measurement cycle
-  uint32_t m_dqCount;                           //!< Number of bytes departed since current measurement cycle starts
+  uint64_t m_dqCount;                           //!< Number of bytes departed since current measurement cycle starts
   EventId m_rtrsEvent;                          //!< Event used to decide the decision of interval of drop probability calculation
   Ptr<UniformRandomVariable> m_uv;              //!< Rng stream
 };

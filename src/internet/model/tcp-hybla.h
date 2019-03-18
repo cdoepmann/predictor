@@ -20,6 +20,7 @@
 #define TCPHYBLA_H
 
 #include "ns3/tcp-congestion-ops.h"
+#include "ns3/tcp-recovery-ops.h"
 #include "ns3/traced-value.h"
 
 namespace ns3 {
@@ -61,30 +62,29 @@ public:
    */
   TcpHybla (const TcpHybla& sock);
 
-  virtual ~TcpHybla (void);
+  virtual ~TcpHybla (void) override;
 
+  // Inherited
   virtual void PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked,
-                          const Time& rtt);
-
-  virtual std::string GetName () const;
-
-  virtual Ptr<TcpCongestionOps> Fork ();
+                          const Time& rtt) override;
+  virtual std::string GetName () const override;
+  virtual Ptr<TcpCongestionOps> Fork () override;
 
 protected:
-  virtual uint32_t SlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
-  virtual void CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
+  virtual uint32_t SlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked) override;
+  virtual void CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked) override;
 
 private:
   TracedValue<double> m_rho;         //!< Rho parameter
-  Time                m_minRtt;      //!< Minimum smoothed round trip time value seen
   Time                m_rRtt;        //!< Reference RTT
   double              m_cWndCnt;     //!< cWnd integer-to-float counter
 
 private:
   /**
-   * \brief Recalculate algorithm paramenters
+   * \brief Recalculate algorithm parameters
+   * \param tcb the socket state.
    */
-  void RecalcParam (Ptr<TcpSocketState> tcb, const Time& rtt);
+  void RecalcParam (const Ptr<TcpSocketState> &tcb);
 };
 
 } // namespace ns3

@@ -28,14 +28,14 @@
 /**
  * \file
  * \ingroup attribute_ObjectMap
- * ObjectMap attribute value declarations and template implementations.
+ * ns3::ObjectMap attribute value declarations and template implementations.
  */
 
 namespace ns3 {
 
 /**
  * \ingroup attribute_ObjectMap
- * ObjectVectorMap is an alias for ObjectPtrContainerValue
+ * ObjectMapValue is an alias for ObjectPtrContainerValue
  */
 typedef ObjectPtrContainerValue ObjectMapValue;
 
@@ -81,7 +81,7 @@ MakeObjectMapAccessor (U T::*memberVector)
 {
   struct MemberStdContainer : public ObjectPtrContainerAccessor
   {
-    virtual bool DoGetN (const ObjectBase *object, uint32_t *n) const {
+    virtual bool DoGetN (const ObjectBase *object, std::size_t *n) const {
       const T *obj = dynamic_cast<const T *> (object);
       if (obj == 0)
         {
@@ -90,7 +90,7 @@ MakeObjectMapAccessor (U T::*memberVector)
       *n = (obj->*m_memberVector).size ();
       return true;
     }
-    virtual Ptr<Object> DoGet (const ObjectBase *object, uint32_t i, uint32_t *index) const {
+    virtual Ptr<Object> DoGet(const ObjectBase *object, std::size_t i, std::size_t *index) const {
       const T *obj = static_cast<const T *> (object);
       typename U::const_iterator begin = (obj->*m_memberVector).begin ();
       typename U::const_iterator end = (obj->*m_memberVector).end ();

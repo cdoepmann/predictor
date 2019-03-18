@@ -21,15 +21,28 @@
 #include "tcp-general-test.h"
 #include "ns3/node.h"
 #include "ns3/log.h"
+#include "ns3/tcp-header.h"
+#include "ns3/tcp-tx-buffer.h"
+#include "ns3/tcp-rx-buffer.h"
 
-namespace ns3 {
+using namespace ns3;
+
 
 NS_LOG_COMPONENT_DEFINE ("WScalingTestSuite");
 
 // TODO: Check the buffer size and scaling option value
+/**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
+ * \brief TCP Window Scaling enabling Test.
+ */
 class WScalingTestCase : public TcpGeneralTest
 {
 public:
+  /**
+   * Window Scaling configuration.
+   */
   enum Configuration
   {
     DISABLED,
@@ -38,6 +51,13 @@ public:
     ENABLED
   };
 
+  /**
+   * \brief Constructor.
+   * \param conf Test configuration.
+   * \param maxRcvBufferSize Maximum receiver buffer size.
+   * \param maxSndBufferSize Maximum sender buffer size.
+   * \param name Test description.
+   */
   WScalingTestCase (WScalingTestCase::Configuration conf,
                     uint32_t maxRcvBufferSize,
                     uint32_t maxSndBufferSize, std::string name);
@@ -48,9 +68,9 @@ protected:
 
   virtual void Tx (const Ptr<const Packet> p, const TcpHeader&h, SocketWho who);
 
-  Configuration m_configuration;
-  uint32_t m_maxRcvBufferSize;
-  uint32_t m_maxSndBufferSize;
+  Configuration m_configuration;  //!< Test configuration.
+  uint32_t m_maxRcvBufferSize;    //!< Maximum receiver buffer size.
+  uint32_t m_maxSndBufferSize;    //!< Maximum sender buffer size.
 };
 
 WScalingTestCase::WScalingTestCase (WScalingTestCase::Configuration conf,
@@ -196,7 +216,13 @@ WScalingTestCase::Tx (const Ptr<const Packet> p, const TcpHeader &h, SocketWho w
     }
 }
 
-static class TcpWScalingTestSuite : public TestSuite
+/**
+ * \ingroup internet-test
+ * \ingroup tests
+ *
+ * \brief TCP Window Scaling TestSuite.
+ */
+class TcpWScalingTestSuite : public TestSuite
 {
 public:
   TcpWScalingTestSuite ()
@@ -215,7 +241,7 @@ public:
     AddTestCase (new WScalingTestCase (WScalingTestCase::ENABLED_SENDER, 4000, 4000, "WS small window, sender"), TestCase::QUICK);
   }
 
-} g_tcpWScalingTestSuite;
+};
 
-} // namespace ns3
+static TcpWScalingTestSuite g_tcpWScalingTestSuite; //!< Static variable for test initialization
 

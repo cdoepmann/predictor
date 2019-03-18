@@ -29,6 +29,7 @@
 #include "ns3/packet.h"
 #include "ns3/node.h"
 #include "ns3/pointer.h"
+#include "ns3/traffic-control-layer.h"
 
 
 namespace ns3 {
@@ -56,7 +57,7 @@ Ipv4Interface::GetTypeId (void)
 
 /** 
  * By default, Ipv4 interface are created in the "down" state
- *  with no IP addresses.  Before becoming useable, the user must 
+ *  with no IP addresses.  Before becoming usable, the user must 
  * invoke SetUp on them once an Ipv4 address and mask have been set.
  */
 Ipv4Interface::Ipv4Interface () 

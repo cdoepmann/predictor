@@ -36,7 +36,8 @@
 /**
  * \file
  * \ingroup highprec
- * Declaration of the cairo_x functions which implement high precision arithmetic.
+ * \c cairo_x function declarations, which provide the fallback
+ * high precision arithmetic implementation.
  */
 
 // Adapt to ns-3 environment
@@ -184,7 +185,7 @@ typedef int64_t     cairo_int64_t;
 #endif
 
 /*
- * 64-bit comparisions derived from lt or eq
+ * 64-bit comparisons derived from lt or eq
  */
 #define                 _cairo_uint64_le(a,b)       (!_cairo_uint64_gt (a,b))
 #define                 _cairo_uint64_ne(a,b)       (!_cairo_uint64_eq (a,b))

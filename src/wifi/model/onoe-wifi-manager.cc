@@ -18,16 +18,16 @@
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
 
-#include "onoe-wifi-manager.h"
-#include "ns3/simulator.h"
 #include "ns3/log.h"
-#include "ns3/uinteger.h"
+#include "ns3/simulator.h"
+#include "onoe-wifi-manager.h"
+#include "wifi-tx-vector.h"
 
 #define Min(a,b) ((a < b) ? a : b)
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("OnoeWifiRemoteStation");
+NS_LOG_COMPONENT_DEFINE ("OnoeWifiManager");
 
 /**
  * \brief hold per-remote-station state for ONOE Wifi manager.
@@ -37,14 +37,14 @@ NS_LOG_COMPONENT_DEFINE ("OnoeWifiRemoteStation");
  */
 struct OnoeWifiRemoteStation : public WifiRemoteStation
 {
-  Time m_nextModeUpdate;
-  uint32_t m_shortRetry;
-  uint32_t m_longRetry;
-  uint32_t m_tx_ok;
-  uint32_t m_tx_err;
-  uint32_t m_tx_retr;
-  uint32_t m_tx_upper;
-  uint32_t m_txrate;
+  Time m_nextModeUpdate; ///< next mode update
+  uint32_t m_shortRetry; ///< short retry
+  uint32_t m_longRetry; ///< long retry
+  uint32_t m_tx_ok; ///< transmit ok
+  uint32_t m_tx_err; ///< transmit error
+  uint32_t m_tx_retr; ///< transmit retr
+  uint32_t m_tx_upper; ///< transmit upper
+  uint8_t m_txrate; ///< transmit rate
 };
 
 NS_OBJECT_ENSURE_REGISTERED (OnoeWifiManager);
@@ -69,17 +69,30 @@ OnoeWifiManager::GetTypeId (void)
                    UintegerValue (10),
                    MakeUintegerAccessor (&OnoeWifiManager::m_addCreditThreshold),
                    MakeUintegerChecker<uint32_t> ())
+    .AddTraceSource ("Rate",
+                     "Traced value for rate changes (b/s)",
+                     MakeTraceSourceAccessor (&OnoeWifiManager::m_currentRate),
+                     "ns3::TracedValueCallback::Uint64")
   ;
   return tid;
 }
 
 OnoeWifiManager::OnoeWifiManager ()
+  : WifiRemoteStationManager (),
+    m_currentRate (0)
 {
+  NS_LOG_FUNCTION (this);
+}
+
+OnoeWifiManager::~OnoeWifiManager ()
+{
+  NS_LOG_FUNCTION (this);
 }
 
 WifiRemoteStation *
 OnoeWifiManager::DoCreateStation (void) const
 {
+  NS_LOG_FUNCTION (this);
   OnoeWifiRemoteStation *station = new OnoeWifiRemoteStation ();
   station->m_nextModeUpdate = Simulator::Now () + m_updatePeriod;
   station->m_shortRetry = 0;
@@ -93,14 +106,15 @@ OnoeWifiManager::DoCreateStation (void) const
 }
 
 void
-OnoeWifiManager::DoReportRxOk (WifiRemoteStation *station,
-                               double rxSnr, WifiMode txMode)
+OnoeWifiManager::DoReportRxOk (WifiRemoteStation *station, double rxSnr, WifiMode txMode)
 {
+  NS_LOG_FUNCTION (this << station << rxSnr << txMode);
 }
 
 void
 OnoeWifiManager::DoReportRtsFailed (WifiRemoteStation *st)
 {
+  NS_LOG_FUNCTION (this << st);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
   station->m_shortRetry++;
 }
@@ -108,20 +122,21 @@ OnoeWifiManager::DoReportRtsFailed (WifiRemoteStation *st)
 void
 OnoeWifiManager::DoReportDataFailed (WifiRemoteStation *st)
 {
+  NS_LOG_FUNCTION (this << st);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
   station->m_longRetry++;
 }
 
 void
-OnoeWifiManager::DoReportRtsOk (WifiRemoteStation *station,
-                                double ctsSnr, WifiMode ctsMode, double rtsSnr)
+OnoeWifiManager::DoReportRtsOk (WifiRemoteStation *station, double ctsSnr, WifiMode ctsMode, double rtsSnr)
 {
+  NS_LOG_FUNCTION (this << station << ctsSnr << ctsMode << rtsSnr);
 }
 
 void
-OnoeWifiManager::DoReportDataOk (WifiRemoteStation *st,
-                                 double ackSnr, WifiMode ackMode, double dataSnr)
+OnoeWifiManager::DoReportDataOk (WifiRemoteStation *st, double ackSnr, WifiMode ackMode, double dataSnr)
 {
+  NS_LOG_FUNCTION (this << st << ackSnr << ackMode << dataSnr);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
   UpdateRetry (station);
   station->m_tx_ok++;
@@ -130,6 +145,7 @@ OnoeWifiManager::DoReportDataOk (WifiRemoteStation *st,
 void
 OnoeWifiManager::DoReportFinalRtsFailed (WifiRemoteStation *st)
 {
+  NS_LOG_FUNCTION (this << st);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
   UpdateRetry (station);
   station->m_tx_err++;
@@ -138,6 +154,7 @@ OnoeWifiManager::DoReportFinalRtsFailed (WifiRemoteStation *st)
 void
 OnoeWifiManager::DoReportFinalDataFailed (WifiRemoteStation *st)
 {
+  NS_LOG_FUNCTION (this << st);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
   UpdateRetry (station);
   station->m_tx_err++;
@@ -146,6 +163,7 @@ OnoeWifiManager::DoReportFinalDataFailed (WifiRemoteStation *st)
 void
 OnoeWifiManager::UpdateRetry (OnoeWifiRemoteStation *station)
 {
+  NS_LOG_FUNCTION (this << station);
   station->m_tx_retr += station->m_shortRetry + station->m_longRetry;
   station->m_shortRetry = 0;
   station->m_longRetry = 0;
@@ -154,6 +172,7 @@ OnoeWifiManager::UpdateRetry (OnoeWifiRemoteStation *station)
 void
 OnoeWifiManager::UpdateMode (OnoeWifiRemoteStation *station)
 {
+  NS_LOG_FUNCTION (this << station);
   if (Simulator::Now () < station->m_nextModeUpdate)
     {
       return;
@@ -165,7 +184,7 @@ OnoeWifiManager::UpdateMode (OnoeWifiRemoteStation *station)
    */
 
   int dir = 0, enough;
-  uint32_t nrate;
+  uint8_t nrate;
   enough = (station->m_tx_ok + station->m_tx_err >= 10);
 
   /* no packet reached -> down */
@@ -236,10 +255,11 @@ OnoeWifiManager::UpdateMode (OnoeWifiRemoteStation *station)
 WifiTxVector
 OnoeWifiManager::DoGetDataTxVector (WifiRemoteStation *st)
 {
+  NS_LOG_FUNCTION (this << st);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
   UpdateMode (station);
   NS_ASSERT (station->m_txrate < GetNSupported (station));
-  uint32_t rateIndex;
+  uint8_t rateIndex;
   if (station->m_longRetry < 4)
     {
       rateIndex = station->m_txrate;
@@ -277,20 +297,27 @@ OnoeWifiManager::DoGetDataTxVector (WifiRemoteStation *st)
           rateIndex = station->m_txrate;
         }
     }
-  uint32_t channelWidth = GetChannelWidth (station);
+  uint16_t channelWidth = GetChannelWidth (station);
   if (channelWidth > 20 && channelWidth != 22)
     {
       //avoid to use legacy rate adaptation algorithms for IEEE 802.11n/ac
       channelWidth = 20;
     }
-  return WifiTxVector (GetSupported (station, rateIndex), GetDefaultTxPowerLevel (), GetLongRetryCount (station), false, 1, 0, channelWidth, GetAggregation (station), false);
+  WifiMode mode = GetSupported (station, rateIndex);
+  if (m_currentRate != mode.GetDataRate (channelWidth))
+    {
+      NS_LOG_DEBUG ("New datarate: " << mode.GetDataRate (channelWidth));
+      m_currentRate = mode.GetDataRate (channelWidth);
+    }
+  return WifiTxVector (mode, GetDefaultTxPowerLevel (), GetPreambleForTransmission (mode, GetAddress (st)), 800, 1, 1, 0, channelWidth, GetAggregation (station), false);
 }
 
 WifiTxVector
 OnoeWifiManager::DoGetRtsTxVector (WifiRemoteStation *st)
 {
+  NS_LOG_FUNCTION (this << st);
   OnoeWifiRemoteStation *station = (OnoeWifiRemoteStation *)st;
-  uint32_t channelWidth = GetChannelWidth (station);
+  uint16_t channelWidth = GetChannelWidth (station);
   if (channelWidth > 20 && channelWidth != 22)
     {
       //avoid to use legacy rate adaptation algorithms for IEEE 802.11n/ac
@@ -298,14 +325,16 @@ OnoeWifiManager::DoGetRtsTxVector (WifiRemoteStation *st)
     }
   UpdateMode (station);
   WifiTxVector rtsTxVector;
+  WifiMode mode;
   if (GetUseNonErpProtection () == false)
     {
-      rtsTxVector = WifiTxVector (GetSupported (station, 0), GetDefaultTxPowerLevel (), GetShortRetryCount (station), false, 1, 0, channelWidth, GetAggregation (station), false);
+      mode = GetSupported (station, 0);
     }
   else
     {
-      rtsTxVector = WifiTxVector (GetNonErpSupported (station, 0), GetDefaultTxPowerLevel (), GetShortRetryCount (station), false, 1, 0, channelWidth, GetAggregation (station), false);
+      mode = GetNonErpSupported (station, 0);
     }
+  rtsTxVector = WifiTxVector (mode, GetDefaultTxPowerLevel (), GetPreambleForTransmission (mode, GetAddress (st)), 800, 1, 1, 0, channelWidth, GetAggregation (station), false);
   return rtsTxVector;
 }
 
@@ -332,6 +361,16 @@ OnoeWifiManager::SetVhtSupported (bool enable)
   if (enable)
     {
       NS_FATAL_ERROR ("WifiRemoteStationManager selected does not support VHT rates");
+    }
+}
+
+void
+OnoeWifiManager::SetHeSupported (bool enable)
+{
+  //HE is not supported by this algorithm.
+  if (enable)
+    {
+      NS_FATAL_ERROR ("WifiRemoteStationManager selected does not support HE rates");
     }
 }
 

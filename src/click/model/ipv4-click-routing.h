@@ -205,7 +205,7 @@ private:
   struct timeval GetTimevalFromNow () const;
 
   /**
-   * \brief This method has to be scheduled everytime Click calls SIMCLICK_SCHEDULE
+   * \brief This method has to be scheduled every time Click calls SIMCLICK_SCHEDULE
    */
   void RunClickEvent ();
 
@@ -255,7 +255,7 @@ public:
   virtual bool RouteInput  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,
                             UnicastForwardCallback ucb, MulticastForwardCallback mcb,
                             LocalDeliverCallback lcb, ErrorCallback ecb);
-  virtual void PrintRoutingTable (Ptr<OutputStreamWrapper> stream) const;
+  virtual void PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit unit = Time::S) const;
   virtual void NotifyInterfaceUp (uint32_t interface);
   virtual void NotifyInterfaceDown (uint32_t interface);
   virtual void NotifyAddAddress (uint32_t interface, Ipv4InterfaceAddress address);

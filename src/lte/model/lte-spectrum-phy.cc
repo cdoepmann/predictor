@@ -44,14 +44,15 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("LteSpectrumPhy");
 
 
-// duration of SRS portion of UL subframe  
-// = 1 symbol for SRS -1ns as margin to avoid overlapping simulator events
+/// duration of SRS portion of UL subframe  
+/// = 1 symbol for SRS -1ns as margin to avoid overlapping simulator events
 static const Time UL_SRS_DURATION = NanoSeconds (71429 -1);  
 
-// duration of the control portion of a subframe
-// = 0.001 / 14 * 3 (ctrl fixed to 3 symbols) -1ns as margin to avoid overlapping simulator events
+/// duration of the control portion of a subframe
+/// = 0.001 / 14 * 3 (ctrl fixed to 3 symbols) -1ns as margin to avoid overlapping simulator events
 static const Time DL_CTRL_DURATION = NanoSeconds (214286 -1);
 
+/// Effective coding rate
 static const double EffectiveCodingRate[29] = {
   0.08,
   0.1,
@@ -97,12 +98,26 @@ TbId_t::TbId_t (const uint16_t a, const uint8_t b)
 {
 }
 
+/**
+ * Equality operator
+ *
+ * \param a lhs
+ * \param b rhs
+ * \returns true if rnti and layer are equal
+ */
 bool
 operator == (const TbId_t &a, const TbId_t &b)
 {
   return ( (a.m_rnti == b.m_rnti) && (a.m_layer == b.m_layer) );
 }
 
+/**
+ * Less than operator
+ *
+ * \param a lhs
+ * \param b rhs
+ * \returns true if rnti less than ro rnti equal and layer less than
+ */
 bool
 operator < (const TbId_t& a, const TbId_t& b)
 {
@@ -114,8 +129,9 @@ NS_OBJECT_ENSURE_REGISTERED (LteSpectrumPhy);
 LteSpectrumPhy::LteSpectrumPhy ()
   : m_state (IDLE),
     m_cellId (0),
-  m_transmissionMode (0),
-  m_layersNum (1)
+    m_componentCarrierId (0),
+    m_transmissionMode (0),
+    m_layersNum (1)
 {
   NS_LOG_FUNCTION (this);
   m_random = CreateObject<UniformRandomVariable> ();
@@ -158,6 +174,13 @@ void LteSpectrumPhy::DoDispose ()
   SpectrumPhy::DoDispose ();
 } 
 
+/**
+ * Output stream output operator
+ *
+ * \param os output stream
+ * \param s state
+ * \returns output stream
+ */
 std::ostream& operator<< (std::ostream& os, LteSpectrumPhy::State s)
 {
   switch (s)
@@ -198,7 +221,7 @@ LteSpectrumPhy::GetTypeId (void)
                      MakeTraceSourceAccessor (&LteSpectrumPhy::m_phyTxStartTrace),
                      "ns3::PacketBurst::TracedCallback")
     .AddTraceSource ("TxEnd",
-                     "Trace fired when a previosuly started transmission is finished",
+                     "Trace fired when a previously started transmission is finished",
                      MakeTraceSourceAccessor (&LteSpectrumPhy::m_phyTxEndTrace),
                      "ns3::PacketBurst::TracedCallback")
     .AddTraceSource ("RxStart",
@@ -206,11 +229,11 @@ LteSpectrumPhy::GetTypeId (void)
                      MakeTraceSourceAccessor (&LteSpectrumPhy::m_phyRxStartTrace),
                      "ns3::PacketBurst::TracedCallback")
     .AddTraceSource ("RxEndOk",
-                     "Trace fired when a previosuly started RX terminates successfully",
+                     "Trace fired when a previously started RX terminates successfully",
                      MakeTraceSourceAccessor (&LteSpectrumPhy::m_phyRxEndOkTrace),
                      "ns3::Packet::TracedCallback")
     .AddTraceSource ("RxEndError",
-                     "Trace fired when a previosuly started RX terminates with an error",
+                     "Trace fired when a previously started RX terminates with an error",
                      MakeTraceSourceAccessor (&LteSpectrumPhy::m_phyRxEndErrorTrace),
                      "ns3::Packet::TracedCallback")
     .AddAttribute ("DataErrorModelEnabled",
@@ -432,7 +455,7 @@ LteSpectrumPhy::StartTxDataFrame (Ptr<PacketBurst> pb, std::list<Ptr<LteControlM
     case RX_DATA:
     case RX_DL_CTRL:
     case RX_UL_SRS:
-      NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel acces, the physical layer for transmission cannot be used for reception");
+      NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel access, the physical layer for transmission cannot be used for reception");
       break;
 
     case TX_DATA:
@@ -444,7 +467,7 @@ LteSpectrumPhy::StartTxDataFrame (Ptr<PacketBurst> pb, std::list<Ptr<LteControlM
     case IDLE:
     {
       /*
-      m_txPsd must be setted by the device, according to
+      m_txPsd must be set by the device, according to
       (i) the available subchannel for transmission
       (ii) the power transmission
       */
@@ -489,7 +512,7 @@ LteSpectrumPhy::StartTxDlCtrlFrame (std::list<Ptr<LteControlMessage> > ctrlMsgLi
     case RX_DATA:
     case RX_DL_CTRL:
     case RX_UL_SRS:
-      NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel acces, the physical layer for transmission cannot be used for reception");
+      NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel access, the physical layer for transmission cannot be used for reception");
       break;
       
     case TX_DATA:
@@ -501,7 +524,7 @@ LteSpectrumPhy::StartTxDlCtrlFrame (std::list<Ptr<LteControlMessage> > ctrlMsgLi
     case IDLE:
     {
       /*
-      m_txPsd must be setted by the device, according to
+      m_txPsd must be set by the device, according to
       (i) the available subchannel for transmission
       (ii) the power transmission
       */
@@ -547,7 +570,7 @@ LteSpectrumPhy::StartTxUlSrsFrame ()
     case RX_DATA:
     case RX_DL_CTRL:
     case RX_UL_SRS:
-      NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel acces, the physical layer for transmission cannot be used for reception");
+      NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel access, the physical layer for transmission cannot be used for reception");
       break;
       
     case TX_DL_CTRL:
@@ -559,7 +582,7 @@ LteSpectrumPhy::StartTxUlSrsFrame ()
     case IDLE:
     {
       /*
-      m_txPsd must be setted by the device, according to
+      m_txPsd must be set by the device, according to
       (i) the available subchannel for transmission
       (ii) the power transmission
       */
@@ -984,6 +1007,7 @@ LteSpectrumPhy::EndRxData ()
           params.m_rv = (*itTb).second.rv;
           params.m_ndi = (*itTb).second.ndi;
           params.m_correctness = (uint8_t)!(*itTb).second.corrupt;
+          params.m_ccId = m_componentCarrierId;
           if ((*itTb).second.downlink)
             {
               // DL
@@ -1062,7 +1086,7 @@ LteSpectrumPhy::EndRxData ()
                         if (itHarq==harqDlInfoMap.end ())
                           {
                             DlInfoListElement_s harqDlInfo;
-                            harqDlInfo.m_harqStatus.resize (m_layersNum, DlInfoListElement_s::NACK);
+                            harqDlInfo.m_harqStatus.resize (m_layersNum, DlInfoListElement_s::ACK);
                             harqDlInfo.m_rnti = tbId.m_rnti;
                             harqDlInfo.m_harqProcessId = (*itTb).second.harqProcessId;
                             if ((*itTb).second.corrupt)
@@ -1189,6 +1213,11 @@ LteSpectrumPhy::SetCellId (uint16_t cellId)
   m_cellId = cellId;
 }
 
+void
+LteSpectrumPhy::SetComponentCarrierId (uint8_t componentCarrierId)
+{
+  m_componentCarrierId = componentCarrierId;
+}
 
 void
 LteSpectrumPhy::AddRsPowerChunkProcessor (Ptr<LteChunkProcessor> p)

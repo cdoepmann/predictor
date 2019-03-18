@@ -22,12 +22,10 @@
 #ifndef AMPDU_TAG_H
 #define AMPDU_TAG_H
 
-#include "ns3/packet.h"
 #include "ns3/nstime.h"
+#include "ns3/tag.h"
 
 namespace ns3 {
-
-class Tag;
 
 /**
  * \ingroup wifi
@@ -38,17 +36,17 @@ class Tag;
 class AmpduTag : public Tag
 {
 public:
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
   static TypeId GetTypeId (void);
-  virtual TypeId GetInstanceTypeId (void) const;
+  TypeId GetInstanceTypeId (void) const;
 
   /**
    * Create a AmpduTag with the default =0 no Ampdu
    */
   AmpduTag ();
-  /**
-   * Set m_ampdu to 1.
-   */
-  void SetAmpdu (bool supported);
   /**
    * \param nbofmpdus the remaining number of MPDUs
    *
@@ -62,18 +60,11 @@ public:
    */
   void SetRemainingAmpduDuration (Time duration);
 
-  virtual void Serialize (TagBuffer i) const;
-  virtual void Deserialize (TagBuffer i);
-  virtual uint32_t GetSerializedSize () const;
-  virtual void Print (std::ostream &os) const;
+  void Serialize (TagBuffer i) const;
+  void Deserialize (TagBuffer i);
+  uint32_t GetSerializedSize () const;
+  void Print (std::ostream &os) const;
 
-  /**
-   * \return true if it is an A-MPDU,
-   *         false otherwise.
-   *
-   * Returns m_ampdu
-   */
-  bool GetAmpdu (void) const;
   /**
    * \return the remaining number of MPDUs in an A-MPDU
    *
@@ -87,8 +78,8 @@ public:
    */
   Time GetRemainingAmpduDuration (void) const;
 
+
 private:
-  uint8_t m_ampdu;     //!< Flag whether it is an A-MPDU
   uint8_t m_nbOfMpdus; //!< Remaining number of MPDUs in the A-MPDU
   Time m_duration;     //!< Remaining duration of the A-MPDU in nanoseconds
 };
@@ -96,4 +87,3 @@ private:
 } //namespace ns3
 
 #endif /* AMPDU_TAG_H */
-

@@ -1036,11 +1036,8 @@ RandomVariableStreamParetoTestCase::ChiSquaredTest (Ptr<ParetoRandomVariable> p)
 
   double expected[N_BINS];
 
-  // Note that this assumes that p has mean equal to 1 and shape equal
-  // to 2, which are their default values for this distribution.
-  double mean = 1.0;
   double shape = 2.0;
-  double scale = mean * (shape - 1.0) / shape;
+  double scale = 1.0;
 
   for (uint32_t i = 0; i < N_BINS; ++i)
     {
@@ -1094,15 +1091,14 @@ RandomVariableStreamParetoTestCase::DoRun (void)
 
   NS_TEST_ASSERT_MSG_LT (sum, maxStatistic, "Chi-squared statistic out of range");
 
-  double mean = 5.0;
   double shape = 2.0;
-  double scale = mean * (shape - 1.0) / shape;
+  double scale = 1.0;
   double value;
 
   // Create the RNG with the specified range.
   Ptr<ParetoRandomVariable> x = CreateObject<ParetoRandomVariable> ();
-  x->SetAttribute ("Mean", DoubleValue (mean));
   x->SetAttribute ("Shape", DoubleValue (shape));
+  x->SetAttribute ("Scale", DoubleValue (scale));
 
   // Calculate the mean of these values.
   sum = 0.0;
@@ -1170,11 +1166,8 @@ RandomVariableStreamParetoAntitheticTestCase::ChiSquaredTest (Ptr<ParetoRandomVa
 
   double expected[N_BINS];
 
-  // Note that this assumes that p has mean equal to 1 and shape equal
-  // to 2, which are their default values for this distribution.
-  double mean = 1.0;
   double shape = 2.0;
-  double scale = mean * (shape - 1.0) / shape;
+  double scale = 1.0;
 
   for (uint32_t i = 0; i < N_BINS; ++i)
     {
@@ -1232,15 +1225,14 @@ RandomVariableStreamParetoAntitheticTestCase::DoRun (void)
 
   NS_TEST_ASSERT_MSG_LT (sum, maxStatistic, "Chi-squared statistic out of range");
 
-  double mean = 5.0;
   double shape = 2.0;
-  double scale = mean * (shape - 1.0) / shape;
+  double scale = 1.0;
   double value;
 
   // Create the RNG with the specified range.
   Ptr<ParetoRandomVariable> x = CreateObject<ParetoRandomVariable> ();
-  x->SetAttribute ("Mean", DoubleValue (mean));
   x->SetAttribute ("Shape", DoubleValue (shape));
+  x->SetAttribute ("Scale", DoubleValue (scale));
 
   // Make this generate antithetic values.
   x->SetAttribute ("Antithetic", BooleanValue (true));
@@ -1701,7 +1693,7 @@ RandomVariableStreamLogNormalTestCase::DoRun (void)
   /// \todo This test fails sometimes if the required tolerance is less
   /// than 3%, which may be because there is a bug in the
   /// implementation or that the mean of this distribution is more
-  /// senstive to its parameters than the others are.
+  /// sensitive to its parameters than the others are.
   double TOLERANCE = expectedMean * 3e-2;
   NS_TEST_ASSERT_MSG_EQ_TOL (valueMean, expectedMean, TOLERANCE, "Wrong mean value."); 
 }
@@ -1844,7 +1836,7 @@ RandomVariableStreamLogNormalAntitheticTestCase::DoRun (void)
   /// \todo This test fails sometimes if the required tolerance is less
   /// than 3%, which may be because there is a bug in the
   /// implementation or that the mean of this distribution is more
-  /// senstive to its parameters than the others are.
+  /// sensitive to its parameters than the others are.
   double TOLERANCE = expectedMean * 3e-2;
   NS_TEST_ASSERT_MSG_EQ_TOL (valueMean, expectedMean, TOLERANCE, "Wrong mean value."); 
 }
@@ -2611,7 +2603,9 @@ RandomVariableStreamZetaTestCase::DoRun (void)
   // There are no simple analytic forms for the Riemann zeta function,
   // which is why the gsl library is used in this test to calculate
   // the known mean of the values.
-  double expectedMean = gsl_sf_zeta_int (alpha - 1) / gsl_sf_zeta_int (alpha);
+  double expectedMean = 
+    gsl_sf_zeta_int (static_cast<int> (alpha - 1)) / 
+    gsl_sf_zeta_int (static_cast<int> (alpha)       );
 
   // Test that values have approximately the right mean value.
   double TOLERANCE = expectedMean * 1e-2;
@@ -2678,7 +2672,9 @@ RandomVariableStreamZetaAntitheticTestCase::DoRun (void)
   // There are no simple analytic forms for the Riemann zeta function,
   // which is why the gsl library is used in this test to calculate
   // the known mean of the values.
-  double expectedMean = gsl_sf_zeta_int (alpha - 1) / gsl_sf_zeta_int (alpha);
+  double expectedMean = 
+    gsl_sf_zeta_int (static_cast<int> (alpha) - 1) / 
+    gsl_sf_zeta_int (static_cast<int> (alpha)       );
 
   // Test that values have approximately the right mean value.
   double TOLERANCE = expectedMean * 1e-2;
@@ -2723,7 +2719,7 @@ RandomVariableStreamDeterministicTestCase::DoRun (void)
   //    4, 4, 7, 7, 10, 10 .
   //
   double array1 [] = { 4, 4, 7, 7, 10, 10};
-  uint64_t count1 = 6;
+  std::size_t count1 = 6;
   s->SetValueArray (array1, count1);
 
   double value;
@@ -2747,7 +2743,7 @@ RandomVariableStreamDeterministicTestCase::DoRun (void)
   //    1000, 2000, 7, 7 .
   //
   double array2 [] = { 1000, 2000, 3000, 4000};
-  uint64_t count2 = 4;
+  std::size_t count2 = 4;
   s->SetValueArray (array2, count2);
 
   // Test that the second sequence is correct.

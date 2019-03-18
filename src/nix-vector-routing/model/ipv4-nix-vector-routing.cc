@@ -268,7 +268,7 @@ Ipv4NixVectorRouting::BuildNixVector (const std::vector< Ptr<Node> > & parentVec
           continue;
         }
 
-      // this function takes in the local net dev, and channnel, and
+      // this function takes in the local net dev, and channel, and
       // writes to the netDeviceContainer the adjacent net devs
       NetDeviceContainer netDeviceContainer;
       GetAdjacentNetDevices (localNetDevice, channel, netDeviceContainer);
@@ -307,7 +307,7 @@ Ipv4NixVectorRouting::GetAdjacentNetDevices (Ptr<NetDevice> netDevice, Ptr<Chann
 {
   NS_LOG_FUNCTION_NOARGS ();
 
-  for (uint32_t i = 0; i < channel->GetNDevices (); i++)
+  for (std::size_t i = 0; i < channel->GetNDevices (); i++)
     {
       Ptr<NetDevice> remoteDevice = channel->GetDevice (i);
       if (remoteDevice != netDevice)
@@ -390,7 +390,7 @@ Ipv4NixVectorRouting::FindTotalNeighbors (void)
           continue;
         }
 
-      // this function takes in the local net dev, and channnel, and
+      // this function takes in the local net dev, and channel, and
       // writes to the netDeviceContainer the adjacent net devs
       NetDeviceContainer netDeviceContainer;
       GetAdjacentNetDevices (localNetDevice, channel, netDeviceContainer);
@@ -462,7 +462,7 @@ Ipv4NixVectorRouting::FindNetDeviceForNixIndex (uint32_t nodeIndex, Ipv4Address 
           continue;
         }
 
-      // this function takes in the local net dev, and channnel, and
+      // this function takes in the local net dev, and channel, and
       // writes to the netDeviceContainer the adjacent net devs
       NetDeviceContainer netDeviceContainer;
       GetAdjacentNetDevices (localNetDevice, channel, netDeviceContainer);
@@ -696,7 +696,7 @@ Ipv4NixVectorRouting::RouteInput (Ptr<const Packet> p, const Ipv4Header &header,
 }
 
 void
-Ipv4NixVectorRouting::PrintRoutingTable (Ptr<OutputStreamWrapper> stream) const
+Ipv4NixVectorRouting::PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit unit) const
 {
 
   CheckCacheStateAndFlush ();
@@ -704,8 +704,8 @@ Ipv4NixVectorRouting::PrintRoutingTable (Ptr<OutputStreamWrapper> stream) const
   std::ostream* os = stream->GetStream ();
 
   *os << "Node: " << m_ipv4->GetObject<Node> ()->GetId ()
-      << ", Time: " << Now().As (Time::S)
-      << ", Local time: " << GetObject<Node> ()->GetLocalTime ().As (Time::S)
+      << ", Time: " << Now().As (unit)
+      << ", Local time: " << GetObject<Node> ()->GetLocalTime ().As (unit)
       << ", Nix Routing" << std::endl;
 
   *os << "NixCache:" << std::endl;
@@ -827,7 +827,7 @@ Ipv4NixVectorRouting::BFS (uint32_t numberOfNodes, Ptr<Node> source,
               return false;
             }
 
-          // this function takes in the local net dev, and channnel, and
+          // this function takes in the local net dev, and channel, and
           // writes to the netDeviceContainer the adjacent net devs
           NetDeviceContainer netDeviceContainer;
           GetAdjacentNetDevices (oif, channel, netDeviceContainer);
@@ -883,7 +883,7 @@ Ipv4NixVectorRouting::BFS (uint32_t numberOfNodes, Ptr<Node> source,
                   continue;
                 }
 
-              // this function takes in the local net dev, and channnel, and
+              // this function takes in the local net dev, and channel, and
               // writes to the netDeviceContainer the adjacent net devs
               NetDeviceContainer netDeviceContainer;
               GetAdjacentNetDevices (localNetDevice, channel, netDeviceContainer);

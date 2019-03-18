@@ -25,58 +25,17 @@
 #include "ns3/packet.h"
 #include "ns3/socket.h"
 #include "ns3/unused.h"
+#include "ns3/simulator.h"
 #include "queue-disc.h"
+#include <ns3/drop-tail-queue.h>
+#include "ns3/net-device-queue-interface.h"
 
 namespace ns3 {
 
+NS_OBJECT_TEMPLATE_CLASS_DEFINE (Queue,QueueDiscItem);
+NS_OBJECT_TEMPLATE_CLASS_DEFINE (DropTailQueue,QueueDiscItem);
+
 NS_LOG_COMPONENT_DEFINE ("QueueDisc");
-
-QueueDiscItem::QueueDiscItem (Ptr<Packet> p, const Address& addr, uint16_t protocol)
-  : QueueItem (p),
-    m_address (addr),
-    m_protocol (protocol),
-    m_txq (0)
-{
-}
-
-QueueDiscItem::~QueueDiscItem()
-{
-  NS_LOG_FUNCTION (this);
-}
-
-Address
-QueueDiscItem::GetAddress (void) const
-{
-  return m_address;
-}
-
-uint16_t
-QueueDiscItem::GetProtocol (void) const
-{
-  return m_protocol;
-}
-
-uint8_t
-QueueDiscItem::GetTxQueueIndex (void) const
-{
-  return m_txq;
-}
-
-void
-QueueDiscItem::SetTxQueueIndex (uint8_t txq)
-{
-  m_txq = txq;
-}
-
-void
-QueueDiscItem::Print (std::ostream& os) const
-{
-  os << GetPacket () << " "
-     << "Dst addr " << m_address << " "
-     << "proto " << (uint16_t) m_protocol << " "
-     << "txq " << (uint8_t) m_txq
-  ;
-}
 
 
 NS_OBJECT_ENSURE_REGISTERED (QueueDiscClass);
@@ -95,7 +54,12 @@ TypeId QueueDiscClass::GetTypeId (void)
   return tid;
 }
 
-QueueDiscClass::QueueDiscClass()
+QueueDiscClass::QueueDiscClass ()
+{
+  NS_LOG_FUNCTION (this);
+}
+
+QueueDiscClass::~QueueDiscClass ()
 {
   NS_LOG_FUNCTION (this);
 }
@@ -123,6 +87,179 @@ QueueDiscClass::SetQueueDisc (Ptr<QueueDisc> qd)
   m_queueDisc = qd;
 }
 
+QueueDisc::Stats::Stats ()
+  : nTotalReceivedPackets (0),
+    nTotalReceivedBytes (0),
+    nTotalSentPackets (0),
+    nTotalSentBytes (0),
+    nTotalEnqueuedPackets (0),
+    nTotalEnqueuedBytes (0),
+    nTotalDequeuedPackets (0),
+    nTotalDequeuedBytes (0),
+    nTotalDroppedPackets (0),
+    nTotalDroppedPacketsBeforeEnqueue (0),
+    nTotalDroppedPacketsAfterDequeue (0),
+    nTotalDroppedBytes (0),
+    nTotalDroppedBytesBeforeEnqueue (0),
+    nTotalDroppedBytesAfterDequeue (0),
+    nTotalRequeuedPackets (0),
+    nTotalRequeuedBytes (0),
+    nTotalMarkedPackets (0),
+    nTotalMarkedBytes (0)
+{
+}
+
+uint32_t
+QueueDisc::Stats::GetNDroppedPackets (std::string reason) const
+{
+  uint32_t count = 0;
+  auto it = nDroppedPacketsBeforeEnqueue.find (reason);
+
+  if (it != nDroppedPacketsBeforeEnqueue.end ())
+    {
+      count += it->second;
+    }
+
+  it = nDroppedPacketsAfterDequeue.find (reason);
+
+  if (it != nDroppedPacketsAfterDequeue.end ())
+    {
+      count += it->second;
+    }
+
+  return count;
+}
+
+uint64_t
+QueueDisc::Stats::GetNDroppedBytes (std::string reason) const
+{
+  uint64_t count = 0;
+  auto it = nDroppedBytesBeforeEnqueue.find (reason);
+
+  if (it != nDroppedBytesBeforeEnqueue.end ())
+    {
+      count += it->second;
+    }
+
+  it = nDroppedBytesAfterDequeue.find (reason);
+
+  if (it != nDroppedBytesAfterDequeue.end ())
+    {
+      count += it->second;
+    }
+
+  return count;
+}
+
+uint32_t
+QueueDisc::Stats::GetNMarkedPackets (std::string reason) const
+{
+  auto it = nMarkedPackets.find (reason);
+
+  if (it != nMarkedPackets.end ())
+    {
+      return it->second;
+    }
+
+  return 0;
+}
+
+uint64_t
+QueueDisc::Stats::GetNMarkedBytes (std::string reason) const
+{
+  auto it = nMarkedBytes.find (reason);
+
+  if (it != nMarkedBytes.end ())
+    {
+      return it->second;
+    }
+
+  return 0;
+}
+
+void
+QueueDisc::Stats::Print (std::ostream &os) const
+{
+  std::map<std::string, uint32_t>::const_iterator itp;
+  std::map<std::string, uint64_t>::const_iterator itb;
+
+  os << std::endl << "Packets/Bytes received: "
+                  << nTotalReceivedPackets << " / "
+                  << nTotalReceivedBytes
+     << std::endl << "Packets/Bytes enqueued: "
+                  << nTotalEnqueuedPackets << " / "
+                  << nTotalEnqueuedBytes
+     << std::endl << "Packets/Bytes dequeued: "
+                  << nTotalDequeuedPackets << " / "
+                  << nTotalDequeuedBytes
+     << std::endl << "Packets/Bytes requeued: "
+                  << nTotalRequeuedPackets << " / "
+                  << nTotalRequeuedBytes
+     << std::endl << "Packets/Bytes dropped: "
+                  << nTotalDroppedPackets << " / "
+                  << nTotalDroppedBytes
+     << std::endl << "Packets/Bytes dropped before enqueue: "
+                  << nTotalDroppedPacketsBeforeEnqueue << " / "
+                  << nTotalDroppedBytesBeforeEnqueue;
+
+  itp = nDroppedPacketsBeforeEnqueue.begin ();
+  itb = nDroppedBytesBeforeEnqueue.begin ();
+
+  while (itp != nDroppedPacketsBeforeEnqueue.end () &&
+         itb != nDroppedBytesBeforeEnqueue.end ())
+    {
+      NS_ASSERT (itp->first.compare (itb->first) == 0);
+      os << std::endl << "  " << itp->first << ": "
+         << itp->second << " / " << itb->second;
+      itp++;
+      itb++;
+    }
+
+  os << std::endl << "Packets/Bytes dropped after dequeue: "
+                  << nTotalDroppedPacketsAfterDequeue << " / "
+                  << nTotalDroppedBytesAfterDequeue;
+
+  itp = nDroppedPacketsAfterDequeue.begin ();
+  itb = nDroppedBytesAfterDequeue.begin ();
+
+  while (itp != nDroppedPacketsAfterDequeue.end () &&
+         itb != nDroppedBytesAfterDequeue.end ())
+    {
+      NS_ASSERT (itp->first.compare (itb->first) == 0);
+      os << std::endl << "  " << itp->first << ": "
+         << itp->second << " / " << itb->second;
+      itp++;
+      itb++;
+    }
+
+  os << std::endl << "Packets/Bytes sent: "
+                  << nTotalSentPackets << " / "
+                  << nTotalSentBytes
+     << std::endl << "Packets/Bytes marked: "
+                  << nTotalMarkedPackets << " / "
+                  << nTotalMarkedBytes;
+
+  itp = nMarkedPackets.begin ();
+  itb = nMarkedBytes.begin ();
+
+  while (itp != nMarkedPackets.end () &&
+         itb != nMarkedBytes.end ())
+    {
+      NS_ASSERT (itp->first.compare (itb->first) == 0);
+      os << std::endl << "  " << itp->first << ": "
+         << itp->second << " / " << itb->second;
+      itp++;
+      itb++;
+    }
+
+  os << std::endl;
+}
+
+std::ostream & operator << (std::ostream &os, const QueueDisc::Stats &stats)
+{
+  stats.Print (os);
+  return os;
+}
 
 NS_OBJECT_ENSURE_REGISTERED (QueueDisc);
 
@@ -139,7 +276,7 @@ TypeId QueueDisc::GetTypeId (void)
     .AddAttribute ("InternalQueueList", "The list of internal queues.",
                    ObjectVectorValue (),
                    MakeObjectVectorAccessor (&QueueDisc::m_queues),
-                   MakeObjectVectorChecker<Queue> ())
+                   MakeObjectVectorChecker<InternalQueue> ())
     .AddAttribute ("PacketFilterList", "The list of packet filters.",
                    ObjectVectorValue (),
                    MakeObjectVectorAccessor (&QueueDisc::m_filters),
@@ -150,16 +287,25 @@ TypeId QueueDisc::GetTypeId (void)
                    MakeObjectVectorChecker<QueueDiscClass> ())
     .AddTraceSource ("Enqueue", "Enqueue a packet in the queue disc",
                      MakeTraceSourceAccessor (&QueueDisc::m_traceEnqueue),
-                     "ns3::QueueItem::TracedCallback")
+                     "ns3::QueueDiscItem::TracedCallback")
     .AddTraceSource ("Dequeue", "Dequeue a packet from the queue disc",
                      MakeTraceSourceAccessor (&QueueDisc::m_traceDequeue),
-                     "ns3::QueueItem::TracedCallback")
+                     "ns3::QueueDiscItem::TracedCallback")
     .AddTraceSource ("Requeue", "Requeue a packet in the queue disc",
                      MakeTraceSourceAccessor (&QueueDisc::m_traceRequeue),
-                     "ns3::QueueItem::TracedCallback")
+                     "ns3::QueueDiscItem::TracedCallback")
     .AddTraceSource ("Drop", "Drop a packet stored in the queue disc",
                      MakeTraceSourceAccessor (&QueueDisc::m_traceDrop),
-                     "ns3::QueueItem::TracedCallback")
+                     "ns3::QueueDiscItem::TracedCallback")
+    .AddTraceSource ("DropBeforeEnqueue", "Drop a packet before enqueue",
+                     MakeTraceSourceAccessor (&QueueDisc::m_traceDropBeforeEnqueue),
+                     "ns3::QueueDiscItem::TracedCallback")
+    .AddTraceSource ("DropAfterDequeue", "Drop a packet after dequeue",
+                     MakeTraceSourceAccessor (&QueueDisc::m_traceDropAfterDequeue),
+                     "ns3::QueueDiscItem::TracedCallback")
+    .AddTraceSource ("Mark", "Mark a packet stored in the queue disc",
+                     MakeTraceSourceAccessor (&QueueDisc::m_traceMark),
+                     "ns3::QueueDiscItem::TracedCallback")
     .AddTraceSource ("PacketsInQueue",
                      "Number of packets currently stored in the queue disc",
                      MakeTraceSourceAccessor (&QueueDisc::m_nPackets),
@@ -168,20 +314,65 @@ TypeId QueueDisc::GetTypeId (void)
                      "Number of bytes currently stored in the queue disc",
                      MakeTraceSourceAccessor (&QueueDisc::m_nBytes),
                      "ns3::TracedValueCallback::Uint32")
+    .AddTraceSource ("SojournTime",
+                     "Sojourn time of the last packet dequeued from the queue disc",
+                     MakeTraceSourceAccessor (&QueueDisc::m_sojourn),
+                     "ns3::Time::TracedCallback")
   ;
   return tid;
 }
 
-QueueDisc::QueueDisc ()
+QueueDisc::QueueDisc (QueueDiscSizePolicy policy)
   :  m_nPackets (0),
      m_nBytes (0),
-     m_nTotalReceivedPackets (0),
-     m_nTotalReceivedBytes (0),
-     m_nTotalDroppedPackets (0),
-     m_nTotalDroppedBytes (0),
-     m_nTotalRequeuedPackets (0),
-     m_nTotalRequeuedBytes (0),
-     m_running (false)
+     m_maxSize (QueueSize ("1p")),         // to avoid that setting the mode at construction time is ignored
+     m_running (false),
+     m_peeked (false),
+     m_sizePolicy (policy),
+     m_prohibitChangeMode (false)
+{
+  NS_LOG_FUNCTION (this << (uint16_t)policy);
+
+  // These lambdas call the DropBeforeEnqueue or DropAfterDequeue methods of this
+  // QueueDisc object. Given that a callback to the operator() of these lambdas
+  // is connected to the DropBeforeEnqueue and DropAfterDequeue traces of the
+  // internal queues, the INTERNAL_QUEUE_DROP constant is passed as the reason
+  // why the packet is dropped.
+  m_internalQueueDbeFunctor = [this] (Ptr<const QueueDiscItem> item)
+    {
+      return DropBeforeEnqueue (item, INTERNAL_QUEUE_DROP);
+    };
+  m_internalQueueDadFunctor = [this] (Ptr<const QueueDiscItem> item)
+    {
+      return DropAfterDequeue (item, INTERNAL_QUEUE_DROP);
+    };
+
+  // These lambdas call the DropBeforeEnqueue or DropAfterDequeue methods of this
+  // QueueDisc object. Given that a callback to the operator() of these lambdas
+  // is connected to the DropBeforeEnqueue and DropAfterDequeue traces of the
+  // child queue discs, the concatenation of the CHILD_QUEUE_DISC_DROP constant
+  // and the second argument provided by such traces is passed as the reason why
+  // the packet is dropped.
+  m_childQueueDiscDbeFunctor = [this] (Ptr<const QueueDiscItem> item, const char* r)
+    {
+      return DropBeforeEnqueue (item,
+                                m_childQueueDiscDropMsg.assign (CHILD_QUEUE_DISC_DROP).append (r).data ());
+    };
+  m_childQueueDiscDadFunctor = [this] (Ptr<const QueueDiscItem> item, const char* r)
+    {
+      return DropAfterDequeue (item,
+                               m_childQueueDiscDropMsg.assign (CHILD_QUEUE_DISC_DROP).append (r).data ());
+    };
+}
+
+QueueDisc::QueueDisc (QueueDiscSizePolicy policy, QueueSizeUnit unit)
+  : QueueDisc (policy)
+{
+  m_maxSize = QueueSize (unit, 0);
+  m_prohibitChangeMode = true;
+}
+
+QueueDisc::~QueueDisc ()
 {
   NS_LOG_FUNCTION (this);
 }
@@ -226,6 +417,25 @@ QueueDisc::DoInitialize (void)
   Object::DoInitialize ();
 }
 
+const QueueDisc::Stats&
+QueueDisc::GetStats (void)
+{
+  NS_ASSERT (m_stats.nTotalDroppedPackets == m_stats.nTotalDroppedPacketsBeforeEnqueue
+             + m_stats.nTotalDroppedPacketsAfterDequeue);
+  NS_ASSERT (m_stats.nTotalDroppedBytes == m_stats.nTotalDroppedBytesBeforeEnqueue
+             + m_stats.nTotalDroppedBytesAfterDequeue);
+
+  // the total number of sent packets is only updated here to avoid to increase it
+  // after a dequeue and then having to decrease it if the packet is dropped after
+  // dequeue or requeued
+  m_stats.nTotalSentPackets = m_stats.nTotalDequeuedPackets - (m_requeued ? 1 : 0)
+                              - m_stats.nTotalDroppedPacketsAfterDequeue;
+  m_stats.nTotalSentBytes = m_stats.nTotalDequeuedBytes - (m_requeued ? m_requeued->GetSize () : 0)
+                            - m_stats.nTotalDroppedBytesAfterDequeue;
+
+  return m_stats;
+}
+
 uint32_t
 QueueDisc::GetNPackets () const
 {
@@ -240,46 +450,89 @@ QueueDisc::GetNBytes (void) const
   return m_nBytes;
 }
 
-uint32_t
-QueueDisc::GetTotalReceivedPackets (void) const
+QueueSize
+QueueDisc::GetMaxSize (void) const
 {
   NS_LOG_FUNCTION (this);
-  return m_nTotalReceivedPackets;
+
+  switch (m_sizePolicy)
+    {
+    case QueueDiscSizePolicy::NO_LIMITS:
+      NS_FATAL_ERROR ("The size of this queue disc is not limited");
+
+    case QueueDiscSizePolicy::SINGLE_INTERNAL_QUEUE:
+      if (GetNInternalQueues ())
+        {
+          return GetInternalQueue (0)->GetMaxSize ();
+        }
+
+    case QueueDiscSizePolicy::SINGLE_CHILD_QUEUE_DISC:
+      if (GetNQueueDiscClasses ())
+        {
+          return GetQueueDiscClass (0)->GetQueueDisc ()->GetMaxSize ();
+        }
+
+    case QueueDiscSizePolicy::MULTIPLE_QUEUES:
+    default:
+      return m_maxSize;
+    }
 }
 
-uint32_t
-QueueDisc::GetTotalReceivedBytes (void) const
+bool
+QueueDisc::SetMaxSize (QueueSize size)
 {
-  NS_LOG_FUNCTION (this);
-  return m_nTotalReceivedBytes;
+  NS_LOG_FUNCTION (this << size);
+
+  // do nothing if the limit is null
+  if (!size.GetValue ())
+    {
+      return false;
+    }
+
+  if (m_prohibitChangeMode && size.GetUnit () != m_maxSize.GetUnit ())
+    {
+      NS_LOG_DEBUG ("Changing the mode of this queue disc is prohibited");
+      return false;
+    }
+
+  switch (m_sizePolicy)
+    {
+    case QueueDiscSizePolicy::NO_LIMITS:
+      NS_FATAL_ERROR ("The size of this queue disc is not limited");
+
+    case QueueDiscSizePolicy::SINGLE_INTERNAL_QUEUE:
+      if (GetNInternalQueues ())
+        {
+          GetInternalQueue (0)->SetMaxSize (size);
+        }
+
+    case QueueDiscSizePolicy::SINGLE_CHILD_QUEUE_DISC:
+      if (GetNQueueDiscClasses ())
+        {
+          GetQueueDiscClass (0)->GetQueueDisc ()->SetMaxSize (size);
+        }
+
+    case QueueDiscSizePolicy::MULTIPLE_QUEUES:
+    default:
+      m_maxSize = size;
+    }
+  return true;
 }
 
-uint32_t
-QueueDisc::GetTotalDroppedPackets (void) const
+QueueSize
+QueueDisc::GetCurrentSize (void)
 {
   NS_LOG_FUNCTION (this);
-  return m_nTotalDroppedPackets;
-}
 
-uint32_t
-QueueDisc:: GetTotalDroppedBytes (void) const
-{
-  NS_LOG_FUNCTION (this);
-  return m_nTotalDroppedBytes;
-}
-
-uint32_t
-QueueDisc::GetTotalRequeuedPackets (void) const
-{
-  NS_LOG_FUNCTION (this);
-  return m_nTotalRequeuedPackets;
-}
-
-uint32_t
-QueueDisc:: GetTotalRequeuedBytes (void) const
-{
-  NS_LOG_FUNCTION (this);
-  return m_nTotalRequeuedBytes;
+  if (GetMaxSize ().GetUnit () == QueueSizeUnit::PACKETS)
+    {
+      return QueueSize (QueueSizeUnit::PACKETS, m_nPackets);
+    }
+  if (GetMaxSize ().GetUnit () == QueueSizeUnit::BYTES)
+    {
+      return QueueSize (QueueSizeUnit::BYTES, m_nBytes);
+    }
+  NS_ABORT_MSG ("Unknown queue size unit");
 }
 
 void
@@ -311,23 +564,33 @@ QueueDisc::GetQuota (void) const
 }
 
 void
-QueueDisc::AddInternalQueue (Ptr<Queue> queue)
+QueueDisc::AddInternalQueue (Ptr<InternalQueue> queue)
 {
   NS_LOG_FUNCTION (this);
-  // set the drop callback on the internal queue, so that the queue disc is
-  // notified of packets dropped by the internal queue
-  queue->SetDropCallback (MakeCallback (&QueueDisc::Drop, this));
+
+  // set various callbacks on the internal queue, so that the queue disc is
+  // notified of packets enqueued, dequeued or dropped by the internal queue
+  queue->TraceConnectWithoutContext ("Enqueue",
+                                     MakeCallback (&QueueDisc::PacketEnqueued, this));
+  queue->TraceConnectWithoutContext ("Dequeue",
+                                     MakeCallback (&QueueDisc::PacketDequeued, this));
+  queue->TraceConnectWithoutContext ("DropBeforeEnqueue",
+                                     MakeCallback (&InternalQueueDropFunctor::operator(),
+                                                   &m_internalQueueDbeFunctor));
+  queue->TraceConnectWithoutContext ("DropAfterDequeue",
+                                     MakeCallback (&InternalQueueDropFunctor::operator(),
+                                                   &m_internalQueueDadFunctor));
   m_queues.push_back (queue);
 }
 
-Ptr<Queue>
-QueueDisc::GetInternalQueue (uint32_t i) const
+Ptr<QueueDisc::InternalQueue>
+QueueDisc::GetInternalQueue (std::size_t i) const
 {
   NS_ASSERT (i < m_queues.size ());
   return m_queues[i];
 }
 
-uint32_t
+std::size_t
 QueueDisc::GetNInternalQueues (void) const
 {
   return m_queues.size ();
@@ -341,13 +604,13 @@ QueueDisc::AddPacketFilter (Ptr<PacketFilter> filter)
 }
 
 Ptr<PacketFilter>
-QueueDisc::GetPacketFilter (uint32_t i) const
+QueueDisc::GetPacketFilter (std::size_t i) const
 {
   NS_ASSERT (i < m_filters.size ());
   return m_filters[i];
 }
 
-uint32_t
+std::size_t
 QueueDisc::GetNPacketFilters (void) const
 {
   return m_filters.size ();
@@ -362,20 +625,30 @@ QueueDisc::AddQueueDiscClass (Ptr<QueueDiscClass> qdClass)
   // such queue discs do not implement the enqueue/dequeue methods
   NS_ABORT_MSG_IF (qdClass->GetQueueDisc ()->GetWakeMode () == WAKE_CHILD,
                    "A queue disc with WAKE_CHILD as wake mode can only be a root queue disc");
-  // set the parent drop callback on the child queue disc, so that it can notify
-  // packet drops to the parent queue disc
-  qdClass->GetQueueDisc ()->SetParentDropCallback (MakeCallback (&QueueDisc::Drop, this));
+
+  // set the parent callbacks on the child queue disc, so that it can notify
+  // the parent queue disc of packets enqueued, dequeued or dropped
+  qdClass->GetQueueDisc ()->TraceConnectWithoutContext ("Enqueue",
+                                     MakeCallback (&QueueDisc::PacketEnqueued, this));
+  qdClass->GetQueueDisc ()->TraceConnectWithoutContext ("Dequeue",
+                                     MakeCallback (&QueueDisc::PacketDequeued, this));
+  qdClass->GetQueueDisc ()->TraceConnectWithoutContext ("DropBeforeEnqueue",
+                                     MakeCallback (&ChildQueueDiscDropFunctor::operator(),
+                                                   &m_childQueueDiscDbeFunctor));
+  qdClass->GetQueueDisc ()->TraceConnectWithoutContext ("DropAfterDequeue",
+                                     MakeCallback (&ChildQueueDiscDropFunctor::operator(),
+                                                   &m_childQueueDiscDadFunctor));
   m_classes.push_back (qdClass);
 }
 
 Ptr<QueueDiscClass>
-QueueDisc::GetQueueDiscClass (uint32_t i) const
+QueueDisc::GetQueueDiscClass (std::size_t i) const
 {
   NS_ASSERT (i < m_classes.size ());
   return m_classes[i];
 }
 
-uint32_t
+std::size_t
 QueueDisc::GetNQueueDiscClasses (void) const
 {
   return m_classes.size ();
@@ -396,55 +669,175 @@ QueueDisc::Classify (Ptr<QueueDiscItem> item)
 }
 
 QueueDisc::WakeMode
-QueueDisc::GetWakeMode (void)
+QueueDisc::GetWakeMode (void) const
 {
   return WAKE_ROOT;
 }
 
 void
-QueueDisc::SetParentDropCallback (ParentDropCallback cb)
+QueueDisc::PacketEnqueued (Ptr<const QueueDiscItem> item)
 {
-  m_parentDropCallback = cb;
+  m_nPackets++;
+  m_nBytes += item->GetSize ();
+  m_stats.nTotalEnqueuedPackets++;
+  m_stats.nTotalEnqueuedBytes += item->GetSize ();
+
+  NS_LOG_LOGIC ("m_traceEnqueue (p)");
+  m_traceEnqueue (item);
 }
 
 void
-QueueDisc::Drop (Ptr<QueueItem> item)
+QueueDisc::PacketDequeued (Ptr<const QueueDiscItem> item)
 {
-  NS_LOG_FUNCTION (this << item);
-
-  // if the wake mode of this queue disc is WAKE_CHILD, packets are directly
-  // enqueued/dequeued from the child queue discs, thus this queue disc does not
-  // keep valid packets/bytes counters and no actions need to be performed.
-  if (this->GetWakeMode () == WAKE_CHILD)
+  // If the queue disc asked the internal queue or the child queue disc to
+  // dequeue a packet because a peek operation was requested, the packet is
+  // still held by the queue disc, hence we do not need to update statistics
+  // and fire the dequeue trace. This function will be explicitly called when
+  // the packet will be actually dequeued.
+  if (!m_peeked)
     {
-      return;
+      m_nPackets--;
+      m_nBytes -= item->GetSize ();
+      m_stats.nTotalDequeuedPackets++;
+      m_stats.nTotalDequeuedBytes += item->GetSize ();
+
+      m_sojourn (Simulator::Now () - item->GetTimeStamp ());
+
+      NS_LOG_LOGIC ("m_traceDequeue (p)");
+      m_traceDequeue (item);
+    }
+}
+
+void
+QueueDisc::DropBeforeEnqueue (Ptr<const QueueDiscItem> item, const char* reason)
+{
+  NS_LOG_FUNCTION (this << item << reason);
+
+  m_stats.nTotalDroppedPackets++;
+  m_stats.nTotalDroppedBytes += item->GetSize ();
+  m_stats.nTotalDroppedPacketsBeforeEnqueue++;
+  m_stats.nTotalDroppedBytesBeforeEnqueue += item->GetSize ();
+
+  // update the number of packets dropped for the given reason
+  std::map<std::string, uint32_t>::iterator itp = m_stats.nDroppedPacketsBeforeEnqueue.find (reason);
+  if (itp != m_stats.nDroppedPacketsBeforeEnqueue.end ())
+    {
+      itp->second++;
+    }
+  else
+    {
+      m_stats.nDroppedPacketsBeforeEnqueue[reason] = 1;
+    }
+  // update the amount of bytes dropped for the given reason
+  std::map<std::string, uint64_t>::iterator itb = m_stats.nDroppedBytesBeforeEnqueue.find (reason);
+  if (itb != m_stats.nDroppedBytesBeforeEnqueue.end ())
+    {
+      itb->second += item->GetSize ();
+    }
+  else
+    {
+      m_stats.nDroppedBytesBeforeEnqueue[reason] = item->GetSize ();
     }
 
-  NS_ASSERT_MSG (m_nPackets >= 1u, "No packet in the queue disc, cannot drop");
-  NS_ASSERT_MSG (m_nBytes >= item->GetPacketSize (), "The size of the packet that"
-                 << " is reported to be dropped is greater than the amount of bytes"
-                 << "stored in the queue disc");
-
-  m_nPackets--;
-  m_nBytes -= item->GetPacketSize ();
-  m_nTotalDroppedPackets++;
-  m_nTotalDroppedBytes += item->GetPacketSize ();
-
-  NS_LOG_LOGIC ("m_traceDrop (p)");
+  NS_LOG_DEBUG ("Total packets/bytes dropped before enqueue: "
+                << m_stats.nTotalDroppedPacketsBeforeEnqueue << " / "
+                << m_stats.nTotalDroppedBytesBeforeEnqueue);
+  NS_LOG_LOGIC ("m_traceDropBeforeEnqueue (p)");
   m_traceDrop (item);
-
-  NotifyParentDrop (item);
+  m_traceDropBeforeEnqueue (item, reason);
 }
 
 void
-QueueDisc::NotifyParentDrop (Ptr<QueueItem> item)
+QueueDisc::DropAfterDequeue (Ptr<const QueueDiscItem> item, const char* reason)
 {
-  NS_LOG_FUNCTION (this << item);
-  // the parent drop callback is clearly null on root queue discs
-  if (!m_parentDropCallback.IsNull ())
+  NS_LOG_FUNCTION (this << item << reason);
+
+  m_stats.nTotalDroppedPackets++;
+  m_stats.nTotalDroppedBytes += item->GetSize ();
+  m_stats.nTotalDroppedPacketsAfterDequeue++;
+  m_stats.nTotalDroppedBytesAfterDequeue += item->GetSize ();
+
+  // update the number of packets dropped for the given reason
+  std::map<std::string, uint32_t>::iterator itp = m_stats.nDroppedPacketsAfterDequeue.find (reason);
+  if (itp != m_stats.nDroppedPacketsAfterDequeue.end ())
     {
-      m_parentDropCallback (item);
+      itp->second++;
     }
+  else
+    {
+      m_stats.nDroppedPacketsAfterDequeue[reason] = 1;
+    }
+  // update the amount of bytes dropped for the given reason
+  std::map<std::string, uint64_t>::iterator itb = m_stats.nDroppedBytesAfterDequeue.find (reason);
+  if (itb != m_stats.nDroppedBytesAfterDequeue.end ())
+    {
+      itb->second += item->GetSize ();
+    }
+  else
+    {
+      m_stats.nDroppedBytesAfterDequeue[reason] = item->GetSize ();
+    }
+
+  // if in the context of a peek request a dequeued packet is dropped, we need
+  // to update the statistics and fire the dequeue trace before firing the drop
+  // after dequeue trace
+  if (m_peeked)
+    {
+      // temporarily set m_peeked to false, otherwise PacketDequeued does nothing
+      m_peeked = false;
+      PacketDequeued (item);
+      m_peeked = true;
+    }
+
+  NS_LOG_DEBUG ("Total packets/bytes dropped after dequeue: "
+                << m_stats.nTotalDroppedPacketsAfterDequeue << " / "
+                << m_stats.nTotalDroppedBytesAfterDequeue);
+  NS_LOG_LOGIC ("m_traceDropAfterDequeue (p)");
+  m_traceDrop (item);
+  m_traceDropAfterDequeue (item, reason);
+}
+
+bool
+QueueDisc::Mark (Ptr<QueueDiscItem> item, const char* reason)
+{
+  NS_LOG_FUNCTION (this << item << reason);
+
+  bool retval = item->Mark ();
+
+  if (!retval)
+    {
+      return false;
+    }
+
+  m_stats.nTotalMarkedPackets++;
+  m_stats.nTotalMarkedBytes += item->GetSize ();
+
+  // update the number of packets marked for the given reason
+  std::map<std::string, uint32_t>::iterator itp = m_stats.nMarkedPackets.find (reason);
+  if (itp != m_stats.nMarkedPackets.end ())
+    {
+      itp->second++;
+    }
+  else
+    {
+      m_stats.nMarkedPackets[reason] = 1;
+    }
+  // update the amount of bytes marked for the given reason
+  std::map<std::string, uint64_t>::iterator itb = m_stats.nMarkedBytes.find (reason);
+  if (itb != m_stats.nMarkedBytes.end ())
+    {
+      itb->second += item->GetSize ();
+    }
+  else
+    {
+      m_stats.nMarkedBytes[reason] = item->GetSize ();
+    }
+
+  NS_LOG_DEBUG ("Total packets/bytes marked: "
+                << m_stats.nTotalMarkedPackets << " / "
+                << m_stats.nTotalMarkedBytes);
+  m_traceMark (item, reason);
+  return true;
 }
 
 bool
@@ -452,15 +845,34 @@ QueueDisc::Enqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
-  m_nPackets++;
-  m_nBytes += item->GetPacketSize ();
-  m_nTotalReceivedPackets++;
-  m_nTotalReceivedBytes += item->GetPacketSize ();
+  m_stats.nTotalReceivedPackets++;
+  m_stats.nTotalReceivedBytes += item->GetSize ();
 
-  NS_LOG_LOGIC ("m_traceEnqueue (p)");
-  m_traceEnqueue (item);
+  bool retval = DoEnqueue (item);
 
-  return DoEnqueue (item);
+  if (retval)
+    {
+      item->SetTimeStamp (Simulator::Now ());
+    }
+
+  // DoEnqueue may return false because:
+  // 1) the internal queue is full
+  //    -> the DropBeforeEnqueue method of this queue disc is automatically called
+  //       because QueueDisc::AddInternalQueue sets the trace callback
+  // 2) the child queue disc dropped the packet
+  //    -> the DropBeforeEnqueue method of this queue disc is automatically called
+  //       because QueueDisc::AddQueueDiscClass sets the trace callback
+  // 3) it dropped the packet
+  //    -> DoEnqueue has to explicitly call DropBeforeEnqueue
+  // Thus, we do not have to call DropBeforeEnqueue here.
+
+  // check that the received packet was either enqueued or dropped
+  NS_ASSERT (m_stats.nTotalReceivedPackets == m_stats.nTotalDroppedPacketsBeforeEnqueue +
+             m_stats.nTotalEnqueuedPackets);
+  NS_ASSERT (m_stats.nTotalReceivedBytes == m_stats.nTotalDroppedBytesBeforeEnqueue +
+             m_stats.nTotalEnqueuedBytes);
+
+  return retval;
 }
 
 Ptr<QueueDiscItem>
@@ -468,26 +880,58 @@ QueueDisc::Dequeue (void)
 {
   NS_LOG_FUNCTION (this);
 
-  Ptr<QueueDiscItem> item;
-  item = DoDequeue ();
+  // The QueueDisc::DoPeek method dequeues a packet and keeps it as a requeued
+  // packet. Thus, first check whether a peeked packet exists. Otherwise, call
+  // the private DoDequeue method.
+  Ptr<QueueDiscItem> item = m_requeued;
 
-  if (item != 0)
+  if (item)
     {
-      m_nPackets--;
-      m_nBytes -= item->GetPacketSize ();
-
-      NS_LOG_LOGIC ("m_traceDequeue (p)");
-      m_traceDequeue (item);
+      m_requeued = 0;
+      if (m_peeked)
+        {
+          // If the packet was requeued because a peek operation was requested
+          // (which is the case here because DequeuePacket calls Dequeue only
+          // when m_requeued is null), we need to explicitly call PacketDequeued
+          // to update statistics about dequeued packets and fire the dequeue trace.
+          m_peeked = false;
+          PacketDequeued (item);
+        }
     }
+  else
+    {
+      item = DoDequeue ();
+    }
+
+  NS_ASSERT (m_nPackets == m_stats.nTotalEnqueuedPackets - m_stats.nTotalDequeuedPackets);
+  NS_ASSERT (m_nBytes == m_stats.nTotalEnqueuedBytes - m_stats.nTotalDequeuedBytes);
 
   return item;
 }
 
 Ptr<const QueueDiscItem>
-QueueDisc::Peek (void) const
+QueueDisc::Peek (void)
 {
   NS_LOG_FUNCTION (this);
   return DoPeek ();
+}
+
+Ptr<const QueueDiscItem>
+QueueDisc::DoPeek (void)
+{
+  NS_LOG_FUNCTION (this);
+
+  if (!m_requeued)
+    {
+      m_peeked = true;
+      m_requeued = Dequeue ();
+      // if no packet is returned, reset the m_peeked flag
+      if (!m_requeued)
+        {
+          m_peeked = false;
+        }
+    }
+  return m_requeued;
 }
 
 void
@@ -562,12 +1006,14 @@ QueueDisc::DequeuePacket ()
           {
             item = m_requeued;
             m_requeued = 0;
-
-            m_nPackets--;
-            m_nBytes -= item->GetPacketSize ();
-
-            NS_LOG_LOGIC ("m_traceDequeue (p)");
-            m_traceDequeue (item);
+            if (m_peeked)
+              {
+                // If the packet was requeued because a peek operation was requested
+                // we need to explicitly call PacketDequeued to update statistics
+                // about dequeued packets and fire the dequeue trace.
+                m_peeked = false;
+                PacketDequeued (item);
+              }
           }
     }
   else
@@ -598,10 +1044,8 @@ QueueDisc::Requeue (Ptr<QueueDiscItem> item)
   m_requeued = item;
   /// \todo netif_schedule (q);
 
-  m_nPackets++;       // it's still part of the queue
-  m_nBytes += item->GetPacketSize ();
-  m_nTotalRequeuedPackets++;
-  m_nTotalRequeuedBytes += item->GetPacketSize ();
+  m_stats.nTotalRequeuedPackets++;
+  m_stats.nTotalRequeuedBytes += item->GetSize ();
 
   NS_LOG_LOGIC ("m_traceRequeue (p)");
   m_traceRequeue (item);

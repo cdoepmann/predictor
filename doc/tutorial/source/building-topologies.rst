@@ -785,7 +785,7 @@ topology helpers in this section.  The appearance and operation of these
 helpers should look quite familiar to you.
 
 We provide an example script in our ``examples/tutorial`` directory.  This script
-builds on the ``second.cc`` script and adds a Wifi network.  Go ahead and
+builds on the ``second.cc`` script and adds a Wi-Fi network.  Go ahead and
 open ``examples/tutorial/third.cc`` in your favorite editor.  You will have already
 seen enough |ns3| code to understand most of what is going on in 
 this example, but there are a few new things, so we will go over the entire 
@@ -808,7 +808,7 @@ network.  By default there are three "extra" CSMA nodes and three wireless
 
 The code begins by loading module include files just as was done in the
 ``second.cc`` example.  There are a couple of new includes corresponding
-to the Wifi module and the mobility module which we will discuss below.
+to the wifi module and the mobility module which we will discuss below.
 
 ::
 
@@ -925,7 +925,7 @@ selected nodes.
   NetDeviceContainer csmaDevices;
   csmaDevices = csma.Install (csmaNodes);
 
-Next, we are going to create the nodes that will be part of the Wifi network.
+Next, we are going to create the nodes that will be part of the Wi-Fi network.
 We are going to create a number of "station" nodes as specified by the 
 command line argument, and we are going to use the "leftmost" node of the 
 point-to-point link as the node for the access point.
@@ -959,14 +959,14 @@ wireless medium and can communication and interfere:
   phy.SetChannel (channel.Create ());
 
 Once the PHY helper is configured, we can focus on the MAC layer. Here we choose to
-work with non-Qos MACs so we use a NqosWifiMacHelper object to set MAC parameters. 
+work with non-Qos MACs. WifiMacHelper object is used to set MAC parameters. 
 
 ::
 
-  WifiHelper wifi = WifiHelper::Default ();
+  WifiHelper wifi;
   wifi.SetRemoteStationManager ("ns3::AarfWifiManager");
 
-  NqosWifiMacHelper mac = NqosWifiMacHelper::Default ();
+  WifiMacHelper mac;
 
 The ``SetRemoteStationManager`` method tells the helper the type of 
 rate control algorithm to use.  Here, it is asking the helper to use the AARF
@@ -986,9 +986,8 @@ This code first creates an 802.11 service set identifier (SSID) object
 that will be used to set the value of the "Ssid" ``Attribute`` of
 the MAC layer implementation.  The particular kind of MAC layer that
 will be created by the helper is specified by ``Attribute`` as
-being of the "ns3::StaWifiMac" type.  The use of
-``NqosWifiMacHelper`` will ensure that the "QosSupported"
-``Attribute`` for created MAC objects is set false. The combination
+being of the "ns3::StaWifiMac" type.  "QosSupported" ``Attribute`` is
+set to false by default for ``WifiMacHelper`` objects. The combination
 of these two configurations means that the MAC instance next created
 will be a non-QoS non-AP station (STA) in an infrastructure BSS (i.e.,
 a BSS with an AP).  Finally, the "ActiveProbing" ``Attribute`` is
@@ -997,16 +996,16 @@ created by this helper.
 
 Once all the station-specific parameters are fully configured, both at the
 MAC and PHY layers, we can invoke our now-familiar ``Install`` method to 
-create the wifi devices of these stations:
+create the Wi-Fi devices of these stations:
 
 ::
 
   NetDeviceContainer staDevices;
   staDevices = wifi.Install (phy, mac, wifiStaNodes);
 
-We have configured Wifi for all of our STA nodes, and now we need to 
+We have configured Wi-Fi for all of our STA nodes, and now we need to 
 configure the AP (access point) node.  We begin this process by changing
-the default ``Attributes`` of the ``NqosWifiMacHelper`` to reflect the 
+the default ``Attributes`` of the ``WifiMacHelper`` to reflect the 
 requirements of the AP.
 
 ::
@@ -1014,10 +1013,10 @@ requirements of the AP.
   mac.SetType ("ns3::ApWifiMac",
                "Ssid", SsidValue (ssid));
 
-In this case, the ``NqosWifiMacHelper`` is going to create MAC
+In this case, the ``WifiMacHelper`` is going to create MAC
 layers of the "ns3::ApWifiMac", the latter specifying that a MAC
-instance configured as an AP should be created, with the helper type
-implying that the "QosSupported" ``Attribute`` should be set to
+instance configured as an AP should be created. We do not change
+the default setting of "QosSupported" ``Attribute``, so it remains
 false - disabling 802.11e/WMM-style QoS support at created APs.  
 
 The next lines create the single AP which shares the same set of PHY-level
@@ -1077,7 +1076,7 @@ We accomplish this by setting the mobility model for this node to be the
   mobility.Install (wifiApNode);
 
 We now have our nodes, devices and channels created, and mobility models 
-chosen for the Wifi nodes, but we have no protocol stacks present.  Just as 
+chosen for the Wi-Fi nodes, but we have no protocol stacks present.  Just as 
 we have done previously many times, we will use the ``InternetStackHelper``
 to install these stacks.
 
@@ -1167,7 +1166,7 @@ We create just enough tracing to cover all three networks:
 
 These three lines of code will start pcap tracing on both of the point-to-point
 nodes that serves as our backbone, will start a promiscuous (monitor) mode 
-trace on the Wifi network, and will start a promiscuous trace on the CSMA 
+trace on the Wi-Fi network, and will start a promiscuous trace on the CSMA 
 network.  This will let us see all of the traffic with a minimum number of 
 trace files.
 
@@ -1223,11 +1222,11 @@ The file "third-0-0.pcap" corresponds to the point-to-point device on node
 zero -- the left side of the "backbone".  The file "third-1-0.pcap" 
 corresponds to the point-to-point device on node one -- the right side of the
 "backbone".  The file "third-0-1.pcap" will be the promiscuous (monitor
-mode) trace from the Wifi network and the file "third-1-1.pcap" will be the
+mode) trace from the Wi-Fi network and the file "third-1-1.pcap" will be the
 promiscuous trace from the CSMA network.  Can you verify this by inspecting
 the code?
 
-Since the echo client is on the Wifi network, let's start there.  Let's take
+Since the echo client is on the Wi-Fi network, let's start there.  Let's take
 a look at the promiscuous (monitor mode) trace we captured on that network.
 
 .. sourcecode:: bash
@@ -1275,7 +1274,7 @@ Again, you should see some familiar looking contents:
   2.008151 IP 10.1.3.3.49153 > 10.1.2.4.9: UDP, length 1024
   2.026758 IP 10.1.2.4.9 > 10.1.3.3.49153: UDP, length 1024
 
-This is the echo packet going from left to right (from Wifi to CSMA) and back
+This is the echo packet going from left to right (from Wi-Fi to CSMA) and back
 again across the point-to-point link.
 
 Now, look at the pcap file of the right side of the point-to-point link,
@@ -1292,7 +1291,7 @@ Again, you should see some familiar looking contents:
   2.011837 IP 10.1.3.3.49153 > 10.1.2.4.9: UDP, length 1024
   2.023072 IP 10.1.2.4.9 > 10.1.3.3.49153: UDP, length 1024
 
-This is also the echo packet going from left to right (from Wifi to CSMA) and 
+This is also the echo packet going from left to right (from Wi-Fi to CSMA) and 
 back again across the point-to-point link with slightly different timings
 as you might expect.
 
@@ -1424,4 +1423,129 @@ they happen.
   /NodeList/7/$ns3::MobilityModel/CourseChange x = 7.66805, y = 7.14466
   /NodeList/7/$ns3::MobilityModel/CourseChange x = 6.71414, y = 6.84456
   /NodeList/7/$ns3::MobilityModel/CourseChange x = 6.42489, y = 7.80181
+
+
+Queues in ns-3
+**************
+
+The selection of queueing disciplines in |ns3| can have a large impact
+on performance, and it is important for users to understand what is installed
+by default and how to change the defaults and observe the performance.
+
+Architecturally, |ns3| separates the device layer from the IP layers 
+or traffic control layers of an Internet host.  Since recent releases
+of |ns3|, outgoing packets traverse two queueing layers before reaching
+the channel object.  The first queueing layer encountered is what is
+called the 'traffic control layer' in |ns3|; here, active queue management
+(RFC7567) and prioritization due to quality-of-service (QoS) takes place
+in a device-independent manner through the use of queueing disciplines.
+The second queueing layer is typically found in the NetDevice objects.
+Different devices (e.g. LTE, Wi-Fi) have different implementations of these queues.
+This two-layer approach mirrors what is found in practice, (software queues
+providing prioritization, and hardware queues specific to a link type).
+In practice, it may be even more complex than this.  For instance, address
+resolution protocols have a small queue.  Wi-Fi in Linux has four layers
+of queueing (https://lwn.net/Articles/705884/).
+
+The traffic control layer is effective only if it is notified by the
+NetDevice when the device queue is full, so that the traffic control layer
+can stop sending packets to the NetDevice. Otherwise, the backlog of the
+queueing disciplines is always null and they are ineffective. Currently,
+flow control, i.e., the ability of notifying the traffic control layer,
+is supported by the following NetDevices, which use Queue objects (or objects
+of Queue subclasses) to store their packets:
+
+* Point-To-Point
+* Csma
+* Wi-Fi
+* SimpleNetDevice
+
+The performance of queueing disciplines is highly impacted by the size
+of the queues used by the NetDevices. Currently, queues by default in |ns3|
+are not autotuned for the configured link properties (bandwidth, delay), and
+are typically the simplest variants (e.g. FIFO scheduling with drop-tail behavior).
+However, the size of the queues can be dynamically adjusted by enabling BQL
+(Byte Queue Limits), the algorithm implemented in the Linux kernel to adjust
+the size of the device queues to fight bufferbloat while avoiding starvation.
+Currently, BQL is supported by the NetDevices that support flow control.
+An analysis of the impact of the size of the device queues on the effectiveness
+of the queueing disciplines conducted by means of |ns3| simulations and real
+experiments is reported in:
+
+P. Imputato and S. Avallone. An analysis of the impact of network device buffers
+on packet schedulers through experiments and simulations. Simulation Modelling
+Practice and Theory, 80(Supplement C):1--18, January 2018.
+DOI: 10.1016/j.simpat.2017.09.008
+
+Available queueing models in |ns3|
+++++++++++++++++++++++++++++++++++
+
+At the traffic-control layer, these are the options:
+
+* PFifoFastQueueDisc: The default maximum size is 1000 packets
+* FifoQueueDisc: The default maximum size is 1000 packets
+* RedQueueDisc: The default maximum size is 25 packets
+* CoDelQueueDisc: The default maximum size is 1500 kilobytes
+* FqCoDelQueueDisc: The default maximum size is 10024 packets
+* PieQueueDisc: The default maximum size is 25 packets
+* MqQueueDisc: This queue disc has no limits on its capacity
+* TbfQueueDisc: The default maximum size is 1000 packets
+
+By default, a pfifo_fast queueing discipline is installed on a NetDevice when
+an IPv4 or IPv6 address is assigned to an interface associated with the NetDevice,
+unless a queueing discipline has been already installed on the NetDevice.
+
+At the device layer, there are device specific queues:
+
+* PointToPointNetDevice: The default configuration (as set by the helper) is to install
+  a DropTail queue of default size (100 packets)
+* CsmaNetDevice: The default configuration (as set by the helper) is to install
+  a DropTail queue of default size (100 packets)
+* WiFiNetDevice: The default configuration is to install a DropTail queue of default size
+  (100 packets) for non-QoS stations and four DropTail queues of default size (100
+  packets) for QoS stations
+* SimpleNetDevice: The default configuration is to install a DropTail queue of default
+  size (100 packets)
+* LTENetDevice: Queueing occurs at the RLC layer (RLC UM default buffer is 10 * 1024 bytes, RLC AM does not have a buffer limit).
+* UanNetDevice: There is a default 10 packet queue at the MAC layer
+
+
+Changing from the defaults
+++++++++++++++++++++++++++
+
+* The type of queue used by a NetDevice can be usually modified through the device helper:
+
+.. sourcecode:: cpp
+
+  NodeContainer nodes;
+  nodes.Create (2);
+
+  PointToPointHelper p2p;
+  p2p.SetQueue ("ns3::DropTailQueue", "MaxSize", StringValue ("50p"));
+
+  NetDeviceContainer devices = p2p.Install (nodes);
+
+* The type of queue disc installed on a NetDevice can be modified through the
+  traffic control helper
+
+.. sourcecode:: cpp
+
+  InternetStackHelper stack;
+  stack.Install (nodes);
+
+  TrafficControlHelper tch;
+  tch.SetRootQueueDisc ("ns3::CoDelQueueDisc", "MaxSize", StringValue ("1000p"));
+  tch.Install (devices);
+
+* BQL can be enabled on a device that supports it through the traffic control helper
+
+.. sourcecode:: cpp
+
+  InternetStackHelper stack;
+  stack.Install (nodes);
+
+  TrafficControlHelper tch;
+  tch.SetRootQueueDisc ("ns3::CoDelQueueDisc", "MaxSize", StringValue ("1000p"));
+  tch.SetQueueLimits ("ns3::DynamicQueueLimits", "HoldTime", StringValue ("4ms"));
+  tch.Install (devices);
 

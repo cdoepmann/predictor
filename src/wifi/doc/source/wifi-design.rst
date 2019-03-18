@@ -20,7 +20,7 @@ on the IEEE 802.11 standard [ieee80211]_. We will go into more detail below but 
 |ns3| provides models for these aspects of 802.11:
 
 * basic 802.11 DCF with **infrastructure** and **adhoc** modes
-* **802.11a**, **802.11b**, **802.11g**, **802.11n** (both 2.4 and 5 GHz bands) and **802.11ac** physical layers
+* **802.11a**, **802.11b**, **802.11g**, **802.11n** (both 2.4 and 5 GHz bands), **802.11ac** and **802.11ax** Draft 1.0 (both 2.4 and 5 GHz bands) physical layers
 * **MSDU aggregation** and **MPDU aggregation** extensions of 802.11n, and both can be combined together (two-level aggregation)
 * QoS-based EDCA and queueing extensions of **802.11e**
 * the ability to use different propagation loss models and propagation delay models,
@@ -33,7 +33,7 @@ on the IEEE 802.11 standard [ieee80211]_. We will go into more detail below but 
 The set of 802.11 models provided in |ns3| attempts to provide an accurate
 MAC-level implementation of the 802.11 specification and to provide a
 packet-level abstraction of the PHY-level for different PHYs, corresponding to 
-802.11a/b/e/g/n/ac specifications.
+802.11a/b/e/g/n/ac/ax specifications.
 
 In |ns3|, nodes can have multiple WifiNetDevices on separate channels, and the
 WifiNetDevice can coexist with other device types.
@@ -90,8 +90,9 @@ These three MAC high models share a common parent in
 configuration, an attribute ``QosSupported`` that allows
 configuration of 802.11e/WMM-style QoS support, an attribute
 ``HtSupported`` that allows configuration of 802.11n High Throughput
-style support an attribute ``VhtSupported`` that allows configuration
-of 802.11ac Very High Throughput style support.
+style support, an attribute ``VhtSupported`` that allows configuration
+of 802.11ac Very High Throughput style support and an attribute ``HeSupported``
+that allows configuration of 802.11ax High Efficiency style support.
 
 There are also several **rate control algorithms** that can be used by the
 MAC low layer.  A complete list of available rate control algorithms is 
@@ -102,16 +103,17 @@ MAC low layer
 
 The **MAC low layer** is split into three main components:
 
-#. ``ns3::MacLow`` which takes care of RTS/CTS/DATA/ACK transactions.
-#. ``ns3::DcfManager`` and ``ns3::DcfState`` which implements the DCF and EDCAF
+#. ``ns3::MacLow`` which takes care of RTS/CTS/DATA/ACK transactions and also
+   performs MPDU aggregation.
+#. ``ns3::ChannelAccessManager`` and ``ns3::DcfState`` which implements the DCF and EDCAF
    functions.
-#. ``ns3::DcaTxop`` and ``ns3::EdcaTxopN`` which handle the packet queue,
+#. ``ns3::Txop`` and ``ns3::QosTxop`` which handle the packet queue,
    packet fragmentation, and packet retransmissions if they are needed.
-   The ``ns3::DcaTxop`` object is used high MACs that are not QoS-enabled,
+   The ``ns3::Txop`` object is used by high MACs that are not QoS-enabled,
    and for transmission of frames (e.g., of type Management)
    that the standard says should access the medium using the DCF. 
-   ``ns3::EdcaTxopN`` is is used by QoS-enabled high MACs and also
-   performs 802.11n-style MSDU aggregation.
+   ``ns3::QosTxop`` is is used by QoS-enabled high MACs and also
+   performs MSDU aggregation.
 
 PHY layer models
 ================
@@ -154,7 +156,7 @@ found in practice.
 The physical layer and channel models operate on a per-packet basis, with
 no frequency-selective propagation or interference effects when using
 the default YansWifiPhy model.  Directional antennas are also not
-supported at this time.  For additive white gaussian noise (AWGN)
+supported at this time.  For additive white Gaussian noise (AWGN)
 scenarios, or wideband interference scenarios, performance is governed
 by the application of analytical models (based on modulation and factors
 such as channel width) to the received signal-to-noise ratio, where noise
@@ -162,25 +164,32 @@ combines the effect of thermal noise and of interference from other Wi-Fi
 packets.  Moreover, interference from other technologies is not modeled.
 The following details pertain to the physical layer and channel models:
 
-* 802.11n/ac MIMO currently uses the same 802.11n/ac SISO Yans and Nist error rate models
-* 802.11ac MU-MIMO is not supported
-* Antenna diversity is not supported
-* 802.11n/ac beamforming is not supported
+* 802.11ax is still in draft phase, not all functionalities are implemented yet
+* 802.11ax does not contain any of the high-density improvement
+* 802.11ax MU-OFDMA is not supported
+* 802.11ax can only be used with Constant rate control algorithm
+* 802.11ax only supports SU PPDU format
+* 802.11ac/ax MU-MIMO is not supported, and no more than 4 antennas can be configured
+* 802.11n/ac/ax beamforming is not supported
+* 802.11 HCF/HCCA are not implemented
+* 802.11 PCF implementation currently assumes a DTIM interval equal to the beacon interval
+* Authentication and encryption are missing
+* Processing delays are not modeled
 * PLCP preamble reception is not modeled
 * PHY_RXSTART is not supported
+* The current implementation assumes that secondary channels are always higher than primary channels
+* Cases where RTS/CTS and ACK are transmitted using HT/VHT/HE formats are not supported
+* Energy consumption model does not consider MIMO
 
 At the MAC layer, most of the main functions found in deployed Wi-Fi
-equipment for 802.11a/b/e/g are implemented, but there are scattered instances
-where some limitations in the models exist.  Most notably, 802.11n/ac 
-configurations are not supported by adaptive rate controls; only the
-so-called ``ConstantRateWifiManager`` can be used by those standards at
-this time.  Support for 802.11n and ac is evolving.  Some additional details
-are as follows:
+equipment for 802.11a/b/e/g/n/ac/ax are implemented, but there are scattered instances
+where some limitations in the models exist. Support for 802.11n and ac is evolving.
 
-* 802.11e TXOP is not supported
+Some implementation choices that are not imposed by the standard are listed below:
+
 * BSSBasicRateSet for 802.11b has been assumed to be 1-2 Mbit/s
 * BSSBasicRateSet for 802.11a/g has been assumed to be 6-12-24 Mbit/s
-* cases where RTS/CTS and ACK are transmitted using HT formats are not supported
+* The wifi manager always selects the lowest basic rate for management frames.
 
 Design Details
 **************
@@ -202,27 +211,12 @@ mixed technologies on the same channel, or frequency dependent effects,
 the SpectrumWifiPhy is more appropriate.  The two frameworks are very
 similarly configured.
 
-The YansWifiPhy framework uses the ``WifiChannel`` and ``YansWifiChannel``
-frameworks.  The SpectrumWifiPhy framework uses the ``Spectrum`` channel
+The SpectrumWifiPhy framework uses the ``Spectrum`` channel
 framework, which is not documented herein but in the Spectrum module
 documentation.
 
-WifiChannel
-===========
-
-``ns3::WifiChannel`` is an abstract base class that allows different channel
-implementations to be connected.  At present, there is only one such channel
-(the ``ns3::YansWifiChannel``) since the SpectrumWifiPhy uses the
-base class ``ns3::SpectrumChannel``.  The class works in tandem with the 
-``ns3::WifiPhy`` class.
-
-The WifiChannel model exists to interconnect WifiPhy objects so that packets
-sent by one Phy are received by some or all other Phys on the channel.
-
-YansWifiChannel
-###############
-
-This is the only channel model presently in the |ns3| wifi module.  The 
+The YansWifiChannel is the only concrete channel model class in 
+the |ns3| wifi module.  The 
 ``ns3::YansWifiChannel`` implementation uses the propagation loss and 
 delay models provided within the |ns3| :ref:`Propagation` module.
 In particular, a number of propagation models can be added (chained together,
@@ -460,18 +454,12 @@ To support the Spectrum channel, the ``YansWifiPhy`` transmit and receive method
 were adapted to use the Spectrum channel API.  This required developing
 a few ``SpectrumModel``-related classes.  The class
 ``WifiSpectrumValueHelper`` is used to create Wi-Fi signals with the
-spectrum framework and spread their energy across the bands.  The 
-spectrum is sub-divided into 312.5 KHz sub-bands (the width of an OFDM
-subcarrier).  The power allocated to a particular channel
+spectrum framework and spread their energy across the bands. The
+spectrum is sub-divided into sub-bands (the width of an OFDM
+subcarrier, which depends on the technology). The power allocated to a particular channel
 is spread across the sub-bands roughly according to how power would 
-be allocated to sub-carriers using an even distribution of power and
-assuming perfect transmit filters.  This could be extended in the 
-future to place power outside of the
-channel according to the real spectral mask.  This should be
-done for future adjacent channel models but is not presently implemented.
-Similarly, on the receive side, a receiver filter mask can be defined; 
-for this initial implementation, we implemented a perfect brick wall 
-filter that is centered on the channel center frequency.
+be allocated to sub-carriers. Adjacent channels are models by the use of
+OFDM transmit spectrum masks as defined in the standards.
 
 To support an easier user configuration experience, the existing
 YansWifi helper classes (in ``src/wifi/helper``) were copied and
@@ -484,6 +472,46 @@ Spectrum channel.
 
 The MAC model
 =============
+
+Infrastructure association
+##########################
+
+Association in infrastructure (IBSS) mode is a high-level MAC function.
+Either active probing or passive scanning is used (default is passive scan).
+At the start of the simulation, Wi-Fi network devices configured as
+STA will attempt to scan the channel. Depends on whether passive or active
+scanning is selected, STA will attempt to gather beacons, or send a probe
+request and gather probe responses until the respective timeout occurs. The
+end result will be a list of candidate AP to associate to. STA will then try
+to associate to the best AP (i.e., best SNR).
+
+If association is rejected by the AP for some reason, the STA will try to
+associate to the next best AP until the candidate list is exhausted which
+then sends STA to 'REFUSED' state. If this occurs, the simulation user will
+need to force reassociation retry in some way, perhaps by changing
+configuration (i.e. the STA will not persistently try to associate upon a
+refusal).
+
+When associated, if the configuration is changed by the simulation user,
+the STA will try to reassociate with the existing AP.
+
+If the number of missed beacons exceeds the threshold, the STA will notify
+the rest of the device that the link is down (association is lost) and
+restart the scanning process. Note that this can also happen when an
+association request fails without explicit refusal (i.e., the AP fails to
+respond to association request).
+
+Roaming
+#######
+
+Roaming at layer-2 (i.e. a STA migrates its association from one AP to
+another) is not presently supported. Because of that, the Min/Max channel
+dwelling time implementation as described by the IEEE 802.11 standard
+[ieee80211]_ is also omitted, since it is only meaningful on the context
+of channel roaming.
+
+Channel access
+##############
 
 The 802.11 Distributed Coordination Function is used to calculate when to grant
 access to the transmission medium. While implementing the DCF would have been
@@ -638,13 +666,13 @@ Depending on your goal, the common tasks are (in no particular order):
   ``MacLow::ReceiveOk``.
 * MAC high modification. For example, handling new management frames (think beacon/probe), 
   beacon/probe generation.  Users usually make changes to ``regular-wifi-mac.*``, 
-  ``sta-wifi-mac.*``, ``ap-wifi-mac.*``, or ``adhoc-wifi-mac.*`` to accomplish this.
-* Wi-Fi queue management.  The files ``dca-txop.*`` and ``edca-txop-n.*`` are of interested for this task.
-* Channel access management.  Users should modify the files ``dcf-manager.*``, which grant access to
-  ``DcaTxop`` and ``EdcaTxopN``.
+  ``infrastructure-wifi-mac.*``,``sta-wifi-mac.*``, ``ap-wifi-mac.*``, or ``adhoc-wifi-mac.*`` to accomplish this.
+* Wi-Fi queue management.  The files ``txop.*`` and ``qos-txop.*`` are of interested for this task.
+* Channel access management.  Users should modify the files ``channel-access-manager.*``, which grant access to
+  ``Txop`` and ``QosTxop``.
 * Fragmentation and RTS threholds are handled by Wi-Fi remote station manager.  Note that Wi-Fi remote
   station manager simply indicates if fragmentation and RTS are needed.  Fragmentation is handled by
-  ``DcaTxop`` or ``EdcaTxopN`` while RTS/CTS transaction is hanled by ``MacLow``.
+  ``Txop`` or ``QosTxop`` while RTS/CTS transaction is handled by ``MacLow``.
 * Modifying or creating new rate control algorithms can be done by creating a new child class of Wi-Fi remote
   station manager or modifying the existing ones.
 

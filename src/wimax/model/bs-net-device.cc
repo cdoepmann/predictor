@@ -23,7 +23,6 @@
 #include <cmath>
 
 #include "ns3/simulator.h"
-#include "ns3/drop-tail-queue.h"
 #include "ns3/node.h"
 #include "bs-uplink-scheduler.h"
 #include "bs-net-device.h"
@@ -687,7 +686,7 @@ BaseStationNetDevice::DoReceive (Ptr<Packet> packet)
   LlcSnapHeader llc;
   Ptr<WimaxConnection> connection = 0;
   FragmentationSubheader fragSubhdr;
-  bool fragmentation = false;  // it becames true when there is a fragmentation subheader
+  bool fragmentation = false;  // it becomes true when there is a fragmentation subheader
 
   packet->RemoveHeader (gnrcMacHdr);
   if (gnrcMacHdr.GetHt () == MacHeaderType::HEADER_TYPE_GENERIC)
