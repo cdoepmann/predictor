@@ -194,6 +194,8 @@ public:
   int m_windowStart;
   int m_windowIncrement;
 
+  // Remember which connection is the next to read from (or write to).
+  // Previous operations did not continue because the token bucket ran empty.
   Ptr<Connection> m_scheduleReadHead;
   Ptr<Connection> m_scheduleWriteHead;
 

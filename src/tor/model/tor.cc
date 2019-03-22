@@ -79,6 +79,8 @@ TorApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_ip, 
   // allocate and init new circuit
   Ptr<Connection> p_conn = AddConnection (p_ip, p_conntype);
   Ptr<Connection> n_conn = AddConnection (n_ip, n_conntype);
+
+  // set client socket of the predecessor connection, if one was given (default is 0)
   p_conn->SetSocket (clientSocket);
   m_triggerNewSocket(this, INBOUND, clientSocket);
 
@@ -198,6 +200,9 @@ TorApp::StartApplication (void)
           if (conn->GetType () == PROXYEDGE)
             {
               Ptr<Socket> socket = conn->GetSocket ();
+              // Create a default pseudo client if none was previously provided via AddCircuit().
+              // Normally, this should not happen (a specific pseudo socket should always be
+              // provided for a proxy connection).
               if (!socket)
                 {
                   socket = CreateObject<PseudoClientSocket> ();
@@ -252,6 +257,11 @@ TorApp::GetCircuit (uint16_t circid)
 void
 TorApp::ConnReadCallback (Ptr<Socket> socket)
 {
+  // At one of the connections, data is ready to be read. This does not mean
+  // the data has been read already, but it has arrived in the RX buffer. We
+  // decide whether we want to read it or not (depending on whether the
+  // connection is blocked).
+
   NS_ASSERT (socket);
   Ptr<Connection> conn = LookupConn (socket);
   NS_ASSERT (conn);
@@ -269,9 +279,10 @@ TorApp::ConnReadCallback (Ptr<Socket> socket)
   max_read = min (max_read, socket->GetRxAvailable ());
   NS_LOG_LOGIC ("[" << GetNodeName() << ": Connection " << conn->GetRemoteName () << "] Reading " << max_read << "/" << socket->GetRxAvailable () << " bytes");
 
-  if (m_readbucket.GetSize() <= 0 && m_scheduleReadHead == 0) {
-    m_scheduleReadHead = conn;
-  }
+  if (m_readbucket.GetSize() <= 0 && m_scheduleReadHead == 0)
+    {
+      m_scheduleReadHead = conn;
+    }
 
   if (max_read <= 0)
     {
