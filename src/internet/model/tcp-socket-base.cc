@@ -842,6 +842,12 @@ TcpSocketBase::Recv (uint32_t maxSize, uint32_t flags)
       return Create<Packet> (); // Send EOF on connection close
     }
   Ptr<Packet> outPacket = m_rxBuffer->Extract (maxSize);
+
+  // see tcp_cleanup_rbuf() in Linux Kernel
+  if (m_rxBuffer->MaxRxSequence () - m_rxBuffer->NextRxSequence () > m_advWnd + 0.2*m_rxBuffer->MaxBufferSize ())
+  {
+    SendEmptyPacket (TcpHeader::ACK);
+  }
   return outPacket;
 }
 
