@@ -18,14 +18,6 @@ TorPredApp::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::TorPredApp")
     .SetParent<TorBaseApp> ()
     .AddConstructor<TorPredApp> ()
-    .AddAttribute ("WindowStart", "End-to-end sliding window size (in cells).",
-                   IntegerValue (1000),
-                   MakeIntegerAccessor (&TorPredApp::m_windowStart),
-                   MakeIntegerChecker<int> ())
-    .AddAttribute ("WindowIncrement", "End-to-end sliding window increment (in cells).",
-                   IntegerValue (100),
-                   MakeIntegerAccessor (&TorPredApp::m_windowIncrement),
-                   MakeIntegerChecker<int> ())
     .AddTraceSource ("NewSocket",
                      "Trace indicating that a new socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewSocket),
@@ -291,7 +283,8 @@ TorPredApp::ConnReadCallback (Ptr<Socket> socket)
 
   if (!conn->SpeaksCells ())
     {
-      max_read = min (conn->GetActiveCircuits ()->GetPackageWindow () * base,max_read);
+      // TODO: how to model reading from edge?
+      // max_read = min (conn->GetActiveCircuits ()->GetPackageWindow () * base,max_read);
     }
 
   vector<Ptr<Packet> > packet_list;
@@ -341,14 +334,8 @@ TorPredApp::PackageRelayCell (Ptr<PredConnection> conn, Ptr<Packet> cell)
   CellDirection direction = circ->GetOppositeDirection (conn);
   AppendCellToCircuitQueue (circ, cell, direction);
   NS_LOG_LOGIC ("[" << GetNodeName() << ": circuit " << circ->GetId () << "] Appended newly packaged cell to circ queue.");
-  if (circ->GetPackageWindow () <= 0)
-    {
-      NS_LOG_LOGIC ("[" << GetNodeName() << ": circuit " << circ->GetId () << "] Package window empty now. Block reading from " << conn->GetRemote());
-      conn->SetBlocked (true);
-      // TODO blocking the whole connection if SENDME window for one of its
-      //      circuits is empty
-      //  ==> server only!!
-    }
+
+  // TODO: how to model reading from edge?
 }
 
 void
@@ -600,11 +587,6 @@ PredCircuit::PredCircuit (uint16_t circ_id, Ptr<PredConnection> n_conn, Ptr<Pred
   this->p_cellQ = new queue<Ptr<Packet> >;
   this->n_cellQ = new queue<Ptr<Packet> >;
 
-  m_windowStart = windowStart;
-  m_windowIncrement = windowIncrement;
-  this->deliver_window = m_windowStart;
-  this->package_window = m_windowStart;
-
   this->p_conn = p_conn;
   this->n_conn = n_conn;
 
@@ -659,27 +641,8 @@ PredCircuit::PopCell (CellDirection direction)
 
   if (cell)
     {
-      if (!IsSendme (cell))
-        {
-          IncrementStats (direction, 0, CELL_PAYLOAD_SIZE);
-        }
-
-      /* handle sending sendme cells here (instead of in PushCell) because
-       * otherwise short circuits could have more than a window-ful of cells
-       * in-flight. Regular circuits will not be affected by this. */
-      Ptr<PredConnection> conn = GetConnection (direction);
-      if (!conn->SpeaksCells ())
-        {
-          deliver_window--;
-          if (deliver_window <= m_windowStart - m_windowIncrement)
-            {
-              IncDeliverWindow ();
-              NS_LOG_LOGIC ("[" << conn->GetTorApp()->GetNodeName() << ": circuit " << GetId () << "] Send SENDME cell ");
-              Ptr<Packet> sendme_cell = CreateSendme ();
-              GetQueue (BaseCircuit::GetOppositeDirection (direction))->push (sendme_cell);
-              GetOppositeConnection (direction)->ScheduleWrite ();
-            }
-        }
+      // TODO: only if not a special cell?
+      IncrementStats (direction, 0, CELL_PAYLOAD_SIZE);
     }
 
   return cell;
@@ -694,34 +657,9 @@ PredCircuit::PushCell (Ptr<Packet> cell, CellDirection direction)
       Ptr<PredConnection> conn = GetConnection (direction);
       Ptr<PredConnection> opp_conn = GetOppositeConnection (direction);
 
-      if (!opp_conn->SpeaksCells ())
-        {
-          // new packaged cell
-          package_window--;
-          if (package_window <= 0)
-            {
-              //block connection
-              opp_conn->SetBlocked (true);
-            }
-        }
-
       if (!conn->SpeaksCells ())
         {
           // delivery
-          if (IsSendme (cell))
-            {
-              // update package window
-              IncPackageWindow ();
-              NS_LOG_LOGIC ("[" << conn->GetTorApp()->GetNodeName() << ": circuit " << GetId () << "] Received SENDME cell. Package window now " << package_window);
-              if (conn->IsBlocked ())
-                {
-                  conn->SetBlocked (false);
-                  conn->ScheduleRead ();
-                }
-
-              // no stats and no cell push on sendme cells
-              return;
-            }
 
           CellHeader h;
           cell->RemoveHeader (h);
@@ -836,38 +774,6 @@ PredCircuit::SetNextCirc (Ptr<PredConnection> conn, Ptr<PredCircuit> circ)
 }
 
 
-bool
-PredCircuit::IsSendme (Ptr<Packet> cell)
-{
-  if (!cell)
-    {
-      return false;
-    }
-  CellHeader h;
-  cell->PeekHeader (h);
-  if (h.GetCmd () == RELAY_SENDME)
-    {
-      return true;
-    }
-  return false;
-}
-
-Ptr<Packet>
-PredCircuit::CreateSendme ()
-{
-  CellHeader h;
-  h.SetCircId (GetId ());
-  h.SetType (RELAY);
-  h.SetStreamId (42);
-  h.SetCmd (RELAY_SENDME);
-  h.SetLength (0);
-  Ptr<Packet> cell = Create<Packet> (CELL_PAYLOAD_SIZE);
-  cell->AddHeader (h);
-
-  return cell;
-}
-
-
 queue<Ptr<Packet> >*
 PredCircuit::GetQueue (CellDirection direction)
 {
@@ -892,38 +798,6 @@ PredCircuit::GetQueueSize (CellDirection direction)
   else
     {
       return this->p_cellQ->size ();
-    }
-}
-
-uint32_t
-PredCircuit::GetPackageWindow ()
-{
-  return package_window;
-}
-
-void
-PredCircuit::IncPackageWindow ()
-{
-  package_window += m_windowIncrement;
-  if (package_window > m_windowStart)
-    {
-      package_window = m_windowStart;
-    }
-}
-
-uint32_t
-PredCircuit::GetDeliverWindow ()
-{
-  return deliver_window;
-}
-
-void
-PredCircuit::IncDeliverWindow ()
-{
-  deliver_window += m_windowIncrement;
-  if (deliver_window > m_windowStart)
-    {
-      deliver_window = m_windowStart;
     }
 }
 

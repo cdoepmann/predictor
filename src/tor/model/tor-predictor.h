@@ -10,15 +10,11 @@
 
 namespace ns3 {
 
-#define CIRCWINDOW_START 1000
-#define CIRCWINDOW_INCREMENT 100
-#define STREAMWINDOW_START 500
-#define STREAMWINDOW_INCREMENT 50
-
+// TODO: do not define here
 #define CELL_PAYLOAD_SIZE 498
 #define CELL_NETWORK_SIZE 512
 
-struct buf_t
+struct pred_buf_t
 {
   uint32_t size; // How many bytes is this buffer holding right now?
   uint8_t data[CELL_NETWORK_SIZE]; //Left-over chunk, or NULL for none.
@@ -50,33 +46,18 @@ public:
 
   Ptr<PredCircuit> GetNextCirc (Ptr<PredConnection>);
   void SetNextCirc (Ptr<PredConnection>, Ptr<PredCircuit>);
-
-  uint32_t GetPackageWindow ();
-  void IncPackageWindow ();
-  uint32_t GetDeliverWindow ();
-  void IncDeliverWindow ();
    
   static TypeId
   GetTypeId (void)
   {
     static TypeId tid = TypeId ("PredCircuit")
       .SetParent (BaseCircuit::GetTypeId())
-      .AddTraceSource ("PackageWindow",
-                       "The vanilla Tor package window.",
-                       MakeTraceSourceAccessor(&PredCircuit::package_window),
-                       "ns3::TracedValueCallback::int32")
-      .AddTraceSource ("DeliverWindow",
-                       "The vanilla Tor deliver window.",
-                       MakeTraceSourceAccessor(&PredCircuit::deliver_window),
-                       "ns3::TracedValueCallback::int32")
       ;
     return tid;
   }
 
 protected:
   Ptr<Packet> PopQueue (queue<Ptr<Packet> >*);
-  bool IsSendme (Ptr<Packet>);
-  Ptr<Packet> CreateSendme ();
 
   queue<Ptr<Packet> > *p_cellQ;
   queue<Ptr<Packet> > *n_cellQ;
@@ -87,23 +68,7 @@ protected:
 
   Ptr<PredConnection> p_conn;   /* The OR connection that is previous in this circuit. */
   Ptr<PredConnection> n_conn;   /* The OR connection that is next in this circuit. */
-
-  /** How many relay data cells can we package (read from edge streams)
-   * on this circuit before we receive a circuit-level sendme cell asking
-   * for more? */
-  TracedValue<int32_t> package_window;
-  /** How many relay data cells will we deliver (write to edge streams)
-   * on this circuit? When deliver_window gets low, we send some
-   * circuit-level sendme cells to indicate that we're willing to accept
-   * more. */
-  TracedValue<int32_t> deliver_window;
-
-  int m_windowStart;
-  int m_windowIncrement;
 };
-
-
-
 
 class PredConnection : public SimpleRefCount<PredConnection>
 {
@@ -136,8 +101,8 @@ private:
   Ipv4Address remote;
   Ptr<Socket> m_socket;
 
-  buf_t inbuf; /**< Buffer holding left over data read over this connection. */
-  buf_t outbuf; /**< Buffer holding left over data to write over this connection. */
+  pred_buf_t inbuf; /**< Buffer holding left over data read over this connection. */
+  pred_buf_t outbuf; /**< Buffer holding left over data to write over this connection. */
 
   uint8_t m_conntype;
   bool reading_blocked;
