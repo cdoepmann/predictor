@@ -268,12 +268,6 @@ TorPredApp::ConnReadCallback (Ptr<Socket> socket)
   Ptr<PredConnection> conn = LookupConn (socket);
   NS_ASSERT (conn);
 
-  if (conn->IsBlocked ())
-    {
-      NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] Reading blocked, return");
-      return;
-    }
-
   uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t max_read = RoundRobin (base, m_readbucket.GetSize ());
 
@@ -823,7 +817,6 @@ PredConnection::PredConnection (TorPredApp* torapp, Ipv4Address ip, int conntype
   this->remote = ip;
   this->inbuf.size = 0;
   this->outbuf.size = 0;
-  this->reading_blocked = 0;
   this->active_circuits = 0;
 
   m_socket = 0;
@@ -859,18 +852,6 @@ bool
 PredConnection::SpeaksCells ()
 {
   return m_conntype == RELAYEDGE;
-}
-
-bool
-PredConnection::IsBlocked ()
-{
-  return reading_blocked;
-}
-
-void
-PredConnection::SetBlocked (bool b)
-{
-  reading_blocked = b;
 }
 
 
@@ -979,12 +960,6 @@ PredConnection::GetRemoteName ()
 uint32_t
 PredConnection::Read (vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 {
-  if (reading_blocked)
-    {
-      NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Reading nothing: blocked");
-      return 0;
-    }
-
   uint8_t raw_data[max_read + this->inbuf.size];
   memcpy (raw_data, this->inbuf.data, this->inbuf.size);
   uint32_t tmp_available = m_socket->GetRxAvailable ();

@@ -85,8 +85,6 @@ public:
   uint32_t Write (uint32_t);
   void ScheduleWrite (Time = Seconds (0));
   void ScheduleRead (Time = Seconds (0));
-  bool IsBlocked ();
-  void SetBlocked (bool);
   Ptr<Socket> GetSocket ();
   void SetSocket (Ptr<Socket>);
   Ipv4Address GetRemote ();
@@ -128,7 +126,6 @@ private:
   pred_buf_t outbuf; /**< Buffer holding left over data to write over this connection. */
 
   uint8_t m_conntype;
-  bool reading_blocked;
 
   // Linked ring of circuits
   Ptr<PredCircuit> active_circuits;
