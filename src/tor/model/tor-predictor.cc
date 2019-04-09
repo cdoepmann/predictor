@@ -810,25 +810,6 @@ PredCircuit::GetQueueSize (CellDirection direction)
     }
 }
 
-uint32_t
-PredCircuit::SendCell (CellDirection direction)
-{
-  queue<Ptr<Packet> >* cellQ = GetQueue (direction);
-  if (cellQ->size () <= 0)
-    {
-      return 0;
-    }
-
-  Ptr<PredConnection> conn = GetConnection (direction);
-  if (conn->IsBlocked () || conn->GetSocket ()->GetTxAvailable () < CELL_NETWORK_SIZE)
-    {
-      return 0;
-    }
-
-  Ptr<Packet> cell = PopCell (direction);
-  return conn->GetSocket ()->Send (cell);
-}
-
 
 
 
