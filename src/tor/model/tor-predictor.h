@@ -3,6 +3,7 @@
 
 #include "tor-base.h"
 #include "cell-header.h"
+#include "pytalk.h"
 
 #include "ns3/uinteger.h"
 #include "ns3/traced-value.h"
@@ -23,6 +24,7 @@ struct pred_buf_t
 class PredCircuit;
 class PredConnection;
 class TorPredApp;
+class PredController;
 
 
 class PredCircuit : public BaseCircuit
@@ -96,10 +98,32 @@ public:
   string GetRemoteName ();
   TorPredApp * GetTorApp() { return torapp; }
 
+  // Get the current RTT estimate or 0 if there is none
+  Time EstimateRtt ();
+
+  // Get the number of bytes currently in transit. This differs from "BytesInFlight"
+  // in that we do not want to count retransmissions etc., but focus on the
+  // high-level progress of the "reliable byte stream" service.
+  uint32_t GetBytesInTransit ();
+
 private:
   TorPredApp* torapp;
   Ipv4Address remote;
   Ptr<Socket> m_socket;
+
+  // make the RTT estimation accessible
+  Ptr<RttEstimator> rtt_estimator;
+
+  // Highest sequence number sent by the socket, used for calculating the
+  // sequence number range that is currently in transit. We do this in order to
+  // avoid counting retransmissions etc. of the TCP logic.
+  SequenceNumber32 max_sent_seq;
+
+  // callback to update the maximum seq number sent so far
+  void UpdateMaxSentSeq (SequenceNumber32 old_value, SequenceNumber32 new_value);
+
+  // Get the highest sequence number that was transmitted over the underlying socket
+  SequenceNumber32 GetHighestTxSeq () { return max_sent_seq; }
 
   pred_buf_t inbuf; /**< Buffer holding left over data read over this connection. */
   pred_buf_t outbuf; /**< Buffer holding left over data to write over this connection. */
@@ -178,9 +202,60 @@ public:
                  > m_triggerNewPseudoServerSocket;
   typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBaseApp>, int, Ptr<PseudoServerSocket>);
 
+  // The controller used for our optimization-based scheduling
+  Ptr<PredController> controller;
+
 protected:
   virtual void DoDispose (void);
 
+};
+
+
+// The interface to our model-predictive controller
+class PredController : public Object {
+public:
+  PredController (Ptr<TorPredApp> app) : 
+    app{app},
+    pyscript{"python3 /home/christoph/nstor/src/tor/model/solver.py"}
+  {};
+  // virtual ~PredController ();
+  
+  static TypeId
+  GetTypeId (void)
+  {
+    static TypeId tid = TypeId ("PredController")
+      .SetParent (Object::GetTypeId());
+    return tid;
+  }
+
+  // Remember a connection that we receive data from
+  void AddInputConnection(Ptr<PredConnection>);
+
+  // Remember a connection that we send data to
+  void AddOutputConnection(Ptr<PredConnection>);
+
+  // Setup the optimizer. This requires that all connections/circuits have
+  // been added before.
+  void Setup();
+
+  // Carry out the regular optimization step, based on current local information
+  // as well as information provided by our neighboring relays.
+  void Optimize();
+
+protected:
+  // The application this controller belongs to
+  Ptr<TorPredApp> app;
+
+  // The connections that are used for receiving and sending data
+  set<Ptr<PredConnection>> in_conns;
+  set<Ptr<PredConnection>> out_conns;
+
+  // Interface for talking to the python component
+  PyScript pyscript;
+
+  // Convert between DataRate and packets/s
+  static double to_packets_sec(DataRate rate);
+  static DataRate to_datarate(double pps);
 };
 
 

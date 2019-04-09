@@ -1,8 +1,10 @@
 
 #include "ns3/log.h"
 #include "ns3/random-variable-stream.h"
+#include "ns3/point-to-point-net-device.h"
 
 #include "tor-predictor.h"
+#include "pytalk.hpp"
 
 using namespace std;
 
@@ -34,6 +36,7 @@ TorPredApp::TorPredApp (void)
   listen_socket = 0;
   m_scheduleReadHead = 0;
   m_scheduleWriteHead = 0;
+  controller = CreateObject<PredController> (this);
 }
 
 TorPredApp::~TorPredApp (void)
@@ -75,6 +78,10 @@ TorPredApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_
   // set client socket of the predecessor connection, if one was given (default is 0)
   p_conn->SetSocket (clientSocket);
   m_triggerNewSocket(this, INBOUND, clientSocket);
+
+  // inform controller about the connections (we only handle the incoming traffic)
+  controller->AddInputConnection(n_conn);
+  controller->AddOutputConnection(p_conn);
 
   Ptr<PredCircuit> circ = CreateObject<PredCircuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
 
@@ -208,6 +215,9 @@ TorPredApp::StartApplication (void)
             }
         }
     }
+  
+  controller->Setup ();
+  Simulator::Schedule(Seconds(1), &PredController::Optimize, controller);
 
   m_triggerAppStart (Ptr<TorBaseApp>(this));
   NS_LOG_INFO ("StartApplication " << m_name << " ip=" << m_ip);
@@ -893,7 +903,55 @@ PredConnection::GetSocket ()
 void
 PredConnection::SetSocket (Ptr<Socket> socket)
 {
+  // called both when establishing the connection and when accepting it
   m_socket = socket;
+
+  // register our RTT estimator
+  auto tcp = DynamicCast<TcpSocketBase> (socket);
+  if (tcp)
+  {
+    
+    auto l4proto = tcp->GetNode()->GetObject<TcpL4Protocol> ();
+    cout << l4proto << endl;
+    TypeIdValue default_rtt;
+    l4proto->GetAttribute("RttEstimatorType", default_rtt);
+
+    ObjectFactory rttFactory;
+    rttFactory.SetTypeId (default_rtt.Get());
+
+    rtt_estimator = rttFactory.Create<RttEstimator> ();
+    tcp->SetRtt (rtt_estimator);
+
+    tcp->TraceConnectWithoutContext("HighestSequence", MakeCallback(&PredConnection::UpdateMaxSentSeq, this));
+  }
+}
+
+void
+PredConnection::UpdateMaxSentSeq (SequenceNumber32 old_value, SequenceNumber32 new_value)
+{
+  max_sent_seq = new_value;
+}
+
+Time
+PredConnection::EstimateRtt ()
+{
+  if (rtt_estimator && rtt_estimator->GetNSamples () > 0)
+  {
+    return rtt_estimator->GetEstimate ();
+  }
+  return MilliSeconds(200); // TODO
+}
+
+uint32_t
+PredConnection::GetBytesInTransit ()
+{
+    auto tcp = GetSocket()->GetObject<TcpSocketBase> ();
+    if (tcp)
+    {
+      auto buffer = tcp->GetTxBuffer();
+      return buffer->Size() - (buffer->TailSequence() - GetHighestTxSeq());
+    }
+    return 0;
 }
 
 Ipv4Address
@@ -1064,6 +1122,175 @@ uint32_t
 PredConnection::GetInbufSize ()
 {
   return inbuf.size;
+}
+
+
+//
+// The optimization-based controller of PredicTor.
+//
+
+void
+PredController::AddInputConnection (Ptr<PredConnection> conn)
+{
+  in_conns.insert(conn);
+}
+
+void
+PredController::AddOutputConnection (Ptr<PredConnection> conn)
+{
+  out_conns.insert(conn);
+}
+
+void
+PredController::Setup ()
+{
+  // Get the maximum data rate
+  DataRateValue datarate_app;
+  app->GetAttribute("BandwidthRate", datarate_app);
+
+  DataRateValue datarate_dev;
+  app->GetNode()->GetDevice(0)->GetObject<PointToPointNetDevice>()->GetAttribute("DataRate", datarate_dev);
+
+  DataRate datarate_limit = std::min (datarate_app.Get(), datarate_dev.Get());
+
+  // collect the input connections...
+  vector<vector<uint16_t>> inputs;
+
+  for (auto it = in_conns.begin (); it != in_conns.end(); ++it)
+  {
+    // ...and their circuits
+    auto conn = *it;
+    vector<uint16_t> circ_ids;
+    
+    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+    circ_ids.push_back(first_circuit->GetId());
+    
+    auto next_circuit = first_circuit->GetNextCirc(conn);
+    while (next_circuit != first_circuit)
+    {
+      circ_ids.push_back(next_circuit->GetId());
+      next_circuit = next_circuit->GetNextCirc(conn);
+    }
+
+    inputs.push_back(circ_ids);
+  }
+
+  // collect the output connections...
+  vector<vector<uint16_t>> outputs;
+
+  for (auto it = out_conns.begin (); it != out_conns.end(); ++it)
+  {
+    // ...and their circuits
+    auto conn = *it;
+    vector<uint16_t> circ_ids;
+    
+    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+    circ_ids.push_back(first_circuit->GetId());
+    
+    auto next_circuit = first_circuit->GetNextCirc(conn);
+    while (next_circuit != first_circuit)
+    {
+      circ_ids.push_back(next_circuit->GetId());
+      next_circuit = next_circuit->GetNextCirc(conn);
+    }
+
+    outputs.push_back(circ_ids);
+  }
+
+  auto obj = pyscript.call(
+    "foo",
+    "relay", app->GetNodeName (),
+    "max_datarate", to_packets_sec(datarate_limit),
+    "inputs", inputs,
+    "outputs", outputs
+  );
+}
+
+void
+PredController::Optimize ()
+{
+  // Firstly, measure the necessary local information.
+
+  // Estimate the out-conns' RTTs
+  vector<double> rtts_per_conn;
+
+  for (auto&& conn : out_conns)
+  {
+    rtts_per_conn.push_back(conn->EstimateRtt().GetSeconds());
+  }
+
+  // Get the circuits' queue lengthes
+  vector<double> packets_per_circuit;
+  // TODO: - Verify that the order of these circuits is correct!
+  //       - Which order does the solver need?
+  //       - Maybe use a map, instead?
+
+  for (auto&& conn : out_conns)
+  {
+    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+    packets_per_circuit.push_back(
+      first_circuit->GetQueueSize(first_circuit->GetDirection(conn))
+    );
+    
+    auto next_circuit = first_circuit->GetNextCirc(conn);
+    while (next_circuit != first_circuit)
+    {
+      packets_per_circuit.push_back(
+        next_circuit->GetQueueSize(next_circuit->GetDirection(conn))
+      );
+      next_circuit = next_circuit->GetNextCirc(conn);
+    }
+  }
+
+  // Get the connections' output buffer loads
+  vector<double> packets_per_conn;
+
+  for (auto&& conn : out_conns)
+  {
+    double packets = -1;
+
+    auto tcp = conn->GetSocket()->GetObject<TcpSocketBase> ();
+    if (tcp)
+    {
+      packets = (double) tcp->GetTxBuffer()->Size() / CELL_NETWORK_SIZE;
+    }
+    packets_per_conn.push_back(packets);
+  }
+
+  // Get the connections' output transit packet count
+  vector<double> transit_packets_per_conn;
+
+  for (auto&& conn : out_conns)
+  {
+    transit_packets_per_conn.push_back((double) conn->GetBytesInTransit() / CELL_NETWORK_SIZE);
+  }
+
+  // Call the optimizer
+  auto obj = pyscript.call(
+    "foo",
+    "relay", app->GetNodeName (),
+    "s_buffer_0", packets_per_conn,
+    "s_circuit_0", packets_per_circuit,
+    "s_transit_0", transit_packets_per_conn,
+    "output_delay", rtts_per_conn
+  );
+
+  // TODO: Save the results (plans, etc.)
+
+
+  Simulator::Schedule(Seconds(1), &PredController::Optimize, this);
+}
+
+double
+PredController::to_packets_sec(DataRate rate)
+{
+  return rate.GetBitRate() / (8.0*double{CELL_NETWORK_SIZE});
+}
+
+DataRate
+PredController::to_datarate(double pps)
+{
+  return DataRate { uint64_t(pps*8*CELL_NETWORK_SIZE) };
 }
 
 } //namespace ns3
