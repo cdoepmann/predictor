@@ -1,5 +1,5 @@
-#ifndef __TOR_H__
-#define __TOR_H__
+#ifndef __TOR_PREDICTOR_H__
+#define __TOR_PREDICTOR_H__
 
 #include "tor-base.h"
 #include "cell-header.h"
@@ -30,7 +30,7 @@ class PredController;
 class PredCircuit : public BaseCircuit
 {
 public:
-  PredCircuit (uint16_t, Ptr<PredConnection>, Ptr<PredConnection>, int, int);
+  PredCircuit (uint16_t, Ptr<PredConnection>, Ptr<PredConnection>);
   ~PredCircuit ();
   void DoDispose ();
 
@@ -180,8 +180,6 @@ public:
   Ptr<Socket> listen_socket;
   vector<Ptr<PredConnection> > connections;
   map<uint16_t,Ptr<PredCircuit> > circuits;
-  int m_windowStart;
-  int m_windowIncrement;
 
   // Remember which connection is the next to read from (or write to).
   // Previous operations did not continue because the token bucket ran empty.

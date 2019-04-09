@@ -83,7 +83,7 @@ TorPredApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_
   controller->AddInputConnection(n_conn);
   controller->AddOutputConnection(p_conn);
 
-  Ptr<PredCircuit> circ = CreateObject<PredCircuit> (id, n_conn, p_conn, m_windowStart, m_windowIncrement);
+  Ptr<PredCircuit> circ = CreateObject<PredCircuit> (id, n_conn, p_conn);
 
   // add to circuit list maintained by every connection
   AddActiveCircuit (p_conn, circ);
@@ -493,7 +493,7 @@ TorPredApp::LookupConn (Ptr<Socket> socket)
 void
 TorPredApp::RefillReadCallback (int64_t prev_read_bucket)
 {
-  NS_LOG_LOGIC ("read bucket was " << prev_read_bucket << ". Now " << m_readbucket.GetSize ());
+  NS_LOG_LOGIC ("[" << GetNodeName() << "] " << "read bucket was " << prev_read_bucket << ". Now " << m_readbucket.GetSize ());
   if (prev_read_bucket <= 0 && m_readbucket.GetSize () > 0)
     {
       vector<Ptr<PredConnection> >::iterator it;
@@ -520,7 +520,7 @@ TorPredApp::RefillReadCallback (int64_t prev_read_bucket)
 void
 TorPredApp::RefillWriteCallback (int64_t prev_write_bucket)
 {
-  NS_LOG_LOGIC ("write bucket was " << prev_write_bucket << ". Now " << m_writebucket.GetSize ());
+  NS_LOG_LOGIC ("[" << GetNodeName() << "] " << "write bucket was " << prev_write_bucket << ". Now " << m_writebucket.GetSize ());
 
   if (prev_write_bucket <= 0 && m_writebucket.GetSize () > 0)
     {
@@ -591,8 +591,7 @@ TorPredApp::RoundRobin (int base, int64_t global_bucket)
 
 
 
-PredCircuit::PredCircuit (uint16_t circ_id, Ptr<PredConnection> n_conn, Ptr<PredConnection> p_conn,
-                  int windowStart, int windowIncrement) : BaseCircuit (circ_id)
+PredCircuit::PredCircuit (uint16_t circ_id, Ptr<PredConnection> n_conn, Ptr<PredConnection> p_conn) : BaseCircuit (circ_id)
 {
   this->p_cellQ = new queue<Ptr<Packet> >;
   this->n_cellQ = new queue<Ptr<Packet> >;
@@ -972,7 +971,22 @@ string
 PredConnection::GetRemoteName ()
 {
   if (Ipv4Mask ("255.0.0.0").IsMatch (GetRemote (), Ipv4Address ("127.0.0.1")) )
-    return "pseudo";
+  {
+    stringstream ss;
+    // GetRemote().Print(ss);
+    ss << GetActiveCircuits()->GetId();
+    if(DynamicCast<PseudoServerSocket>(GetSocket()))
+    {
+      ss << "-server";
+    }
+    else
+    {
+      NS_ASSERT(DynamicCast<PseudoClientSocket>(GetSocket()));
+      ss << "-client";
+    }
+    
+    return string("pseudo-") + ss.str();
+  }
 
   map<Ipv4Address,string>::const_iterator it = PredConnection::remote_names.find(GetRemote ());
   NS_ASSERT(it != PredConnection::remote_names.end() );
@@ -1268,6 +1282,7 @@ PredController::Optimize ()
   // Call the optimizer
   auto obj = pyscript.call(
     "foo",
+    "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
     "s_buffer_0", packets_per_conn,
     "s_circuit_0", packets_per_circuit,
