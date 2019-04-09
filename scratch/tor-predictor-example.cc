@@ -60,6 +60,7 @@ int main (int argc, char *argv[]) {
     {
       th.SetTorAppType("ns3::TorPredApp");
     }
+    // th.EnablePcap(true);
 
     th.DisableProxies(true);
     th.SetRtt(MilliSeconds(rtt));
@@ -108,8 +109,9 @@ int main (int argc, char *argv[]) {
 
 template<typename T> void
 print_relay (TorStarHelper * th, const char * relay) {
-  cout << relay << ":";
+  cout << relay;
   auto app = DynamicCast<T> (th->GetTorApp(relay));
+  cout << "/" << app->GetNode()->GetId() << ":";
 
   cout << " [" << app->m_writebucket.GetSize() << "," << app->m_writebucket.GetSize() << "]";
   
@@ -119,8 +121,16 @@ print_relay (TorStarHelper * th, const char * relay) {
     if(conn->GetSocket())
     {
       cout << conn->GetSocket()->GetTxAvailable();
+      if (auto tcp = DynamicCast<TcpSocketBase>(conn->GetSocket()))
+      {
+        cout << "[" << tcp->GetTxBuffer()->Size() << "," << tcp->GetTxBuffer()->MaxBufferSize() << "]";
+      }
       cout << "/";
       cout << conn->GetSocket()->GetRxAvailable();
+      if (auto tcp = DynamicCast<TcpSocketBase>(conn->GetSocket()))
+      {
+        cout << "[" << tcp->GetRxBuffer()->Size() << "," << tcp->GetRxBuffer()->MaxRxSequence() << "," << tcp->GetRxBuffer()->NextRxSequence() << "]";
+      }
     }
     else
     {
