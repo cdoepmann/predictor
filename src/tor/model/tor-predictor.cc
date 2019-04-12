@@ -910,7 +910,18 @@ PredConnection::GetBytesInTransit ()
     if (tcp)
     {
       auto buffer = tcp->GetTxBuffer();
-      return buffer->Size() - (buffer->TailSequence() - GetHighestTxSeq());
+
+      NS_ASSERT (buffer->TailSequence() - GetHighestTxSeq() >= 0);
+
+      if (buffer->Size() > static_cast<uint32_t>(buffer->TailSequence() - GetHighestTxSeq()))
+      {
+        return buffer->Size() - static_cast<uint32_t>(buffer->TailSequence() - GetHighestTxSeq());
+      }
+      else
+      {
+        return 0;
+      }
+      
     }
     return 0;
 }
