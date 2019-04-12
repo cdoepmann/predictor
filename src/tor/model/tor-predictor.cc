@@ -1264,4 +1264,33 @@ PredController::to_datarate(double pps)
   return DataRate { uint64_t(pps*8*CELL_NETWORK_SIZE) };
 }
 
+//
+// Container for handling trajectory data
+//
+
+Trajectory Trajectory::InterpolateToTime (Time target_time)
+{
+  // TODO: If target time is after the current start time, do not "cut off"
+  //       the beginning of our trajectory, but keep the overall sum equal.
+  if (target_time == first_time)
+  {
+    // If no interpolation necessary, just copy this trajectory
+    return Trajectory{*this};
+  }
+
+  Trajectory result{time_step, target_time};
+  int num_steps = Steps();
+  
+  Time last_time = target_time;
+
+  for (int i=0; i<num_steps; i++)
+  {
+    // Add one step
+    result.elements.push_back(GetAverageValue(last_time, last_time + time_step));
+    last_time = last_time + time_step;
+  }
+
+  return result;
+}
+
 } //namespace ns3

@@ -12,6 +12,23 @@ void StatsCallback(TorStarHelper*, Time);
 bool use_predictor = false;
 bool use_vanilla = false;
 
+// void TestTrajectory()
+// {
+//   Trajectory base{Seconds(1), Seconds(0)};
+//   base.Elements().push_back(3);
+//   base.Elements().push_back(2);
+//   base.Elements().push_back(1);
+//   base.Elements().push_back(0);
+
+//   Trajectory shifted = base.InterpolateToTime(Seconds(0.5));
+
+//   cout << base.GetTime() << " -> " << shifted.GetTime() << endl;
+//   for (size_t i=0; i < base.Steps(); i++)
+//   {
+//     cout << base.Elements()[i] << " -> " << shifted.Elements()[i] << endl;
+//   }
+// }
+
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
     // Time simTime = Time("60s");
@@ -26,7 +43,10 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("vanilla", "use vanilla Tor", use_vanilla);
     cmd.Parse(argc, argv);
 
-    NS_ABORT_MSG_UNLESS(use_predictor ^ use_vanilla, "Exactly one out of --predictor or --vanilla must be speciefied");
+    // TestTrajectory();
+    // return 0;
+
+    NS_ABORT_MSG_UNLESS(use_predictor ^ use_vanilla, "Exactly one out of --predictor or --vanilla must be specified");
 
     SeedManager::SetSeed (12);
     SeedManager::SetRun (run);

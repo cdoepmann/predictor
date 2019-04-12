@@ -210,6 +210,8 @@ class PredController : public Object {
 public:
   PredController (Ptr<TorPredApp> app) : 
     app{app},
+    horizon{20},
+    time_step{MilliSeconds(10)},
     pyscript{"python3 /home/christoph/nstor/src/tor/model/solver.py"}
   {};
   // virtual ~PredController ();
@@ -236,9 +238,21 @@ public:
   // as well as information provided by our neighboring relays.
   void Optimize();
 
+  // Get the number of steps in the horizon
+  size_t Horizon () { return horizon; };
+
+  // Get the time step per horizon element
+  Time TimeStep () { return time_step; };
+
 protected:
   // The application this controller belongs to
   Ptr<TorPredApp> app;
+
+  // The number of steps in the horizon
+  size_t horizon;
+
+  // The time step per horizon element
+  Time time_step;
 
   // The connections that are used for receiving and sending data
   set<Ptr<PredConnection>> in_conns;
@@ -252,6 +266,112 @@ protected:
   static DataRate to_datarate(double pps);
 };
 
+struct time_out_of_range;
+
+class Trajectory {
+public:
+  Trajectory(Ptr<PredController> controller, Time first_time) : time_step{controller->TimeStep()}, first_time{first_time} {};
+  Trajectory(Time time_step, Time first_time) : time_step{time_step}, first_time{first_time} {};
+
+  // Interpolate this trajectory to fit the time of its first element to the given time
+  Trajectory InterpolateToTime (Time target_time);
+
+  // Get a reference to the elements
+  vector<double>& Elements() { return elements; }
+
+  // Get the number of steps in this trajectory
+  size_t Steps () { return elements.size(); };
+
+  // Get the time of a given trajectory element, defaulting to the first one
+  Time GetTime(size_t element = 0, bool allow_out_of_bounds = false)
+  {
+    if(!allow_out_of_bounds)
+      NS_ASSERT(element <= Steps());
+    
+    return first_time + element * time_step;
+  }
+
+  // Get the time of the last stored element
+  Time LastTime() 
+  {
+    NS_ASSERT(Steps() > 0);
+    return GetTime(Steps() - 1);
+  }
+
+  // Get the value of the trajectory at a given time
+  double GetValue(Time time)
+  {
+    NS_ASSERT(time >= GetTime());
+    NS_ASSERT(time <= LastTime());
+
+    size_t index = static_cast<size_t>((time - GetTime()) / time_step);
+    NS_ASSERT(index >= 0);
+    NS_ASSERT(index < Steps());
+
+    return elements[index];
+  }
+
+  // Get the value of the trajectory at a given time
+  double GetValueFailsafe(Time time, double lower = 0.0)
+  {
+    if(time < GetTime())
+      return lower;
+    
+    if(time > LastTime())
+    {
+      NS_ASSERT (Steps() > 0);
+      return elements[Steps() - 1];
+    }
+
+    return GetValue(time);
+  }
+
+  // Based on the given time, get the next point in time at which an element of
+  // the trajectory is either really stored, or would be stored if no later
+  // element exists.
+  Time GetNextStepAfter(Time time)
+  {
+    if(time < GetTime())
+      return GetTime();
+
+    size_t index = static_cast<size_t>((time - GetTime()) / time_step);
+    return GetTime(index + 1, true);
+  }
+
+  // Get the average value of the trajectory in a given time span
+  double GetAverageValue(Time t1, Time t2)
+  {
+    double sum = 0.0;
+
+    Time last_time = t1;
+    double last_value = GetValueFailsafe(t1);
+
+    while(last_time < t2)
+    {
+      Time new_time = GetNextStepAfter(last_time);
+
+      // do not go beyond t2
+      new_time = std::min(new_time, t2);
+
+      sum += last_value * ((new_time-last_time).GetSeconds() / (t2-t1).GetSeconds());
+
+      last_time = new_time;
+      last_value = GetValueFailsafe(new_time);
+    }
+
+    return sum;
+  }
+
+protected:
+  // The time step per element
+  Time time_step;
+
+  // Time of the first element in the horizon
+  Time first_time;
+
+  // Elements in the horizon
+  vector<double> elements;
+};
 
 } //namespace ns3
 
