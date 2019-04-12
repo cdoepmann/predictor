@@ -32,7 +32,7 @@ bool use_vanilla = false;
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
     // Time simTime = Time("60s");
-    Time simTime = Time("10s");
+    Time simTime = Time("20s");
     uint32_t rtt = 40;
 
     CommandLine cmd;
@@ -66,6 +66,9 @@ int main (int argc, char *argv[]) {
     Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
     Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
 
+    // Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue(QueueSize("2048B")) );
+    // Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (2048) );
+
     TorStarHelper th;
     // if (flavor == "pctcp")
     //     th.SetTorAppType("ns3::TorPctcpApp");
@@ -97,8 +100,8 @@ int main (int argc, char *argv[]) {
 
     /* state scenario/ add circuits inline */
     th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
-    // th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
-    // th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
+    th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(m_startTime->GetValue ())) );
 
     th.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2Mb/s")));
     th.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2Mb/s")));
