@@ -1164,6 +1164,7 @@ PredController::Setup ()
 
   // collect the output connections...
   vector<vector<uint16_t>> outputs;
+  vector<double> output_delays;
 
   for (auto it = out_conns.begin (); it != out_conns.end(); ++it)
   {
@@ -1182,14 +1183,30 @@ PredController::Setup ()
     }
 
     outputs.push_back(circ_ids);
+
+    // calculate the expected RTT for each outgoing connection
+    Time delay = conn->GetBaseRtt();
+
+    // do not allow plain zero, even for edge relays (solver requires this)
+    if (delay == Seconds(0))
+      delay = MilliSeconds(1);
+
+    output_delays.push_back(delay.GetSeconds ());
   }
 
   auto obj = pyscript.call(
-    "foo",
+    "setup",
     "relay", app->GetNodeName (),
-    "max_datarate", to_packets_sec(datarate_limit),
-    "inputs", inputs,
-    "outputs", outputs
+    "v_max", to_packets_sec(datarate_limit),
+    "s_max", 30,
+    "dt", TimeStep().GetSeconds(),
+    "N_steps", (int) Horizon(),
+    "weights", vector<string>({"control_delta", "0.1", "send", "1", "store", "0", "receive", "1"}),
+    "n_in", inputs.size(),
+    "input_circuits", inputs,
+    "n_out", outputs.size(),
+    "output_circuits", outputs,
+    "output_delays", output_delays
   );
 }
 

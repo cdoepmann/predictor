@@ -43,6 +43,13 @@ void PyScript::write_element(rapidjson::Writer<rapidjson::StringBuffer> &writer,
 
 template <>
 void PyScript::write_element(rapidjson::Writer<rapidjson::StringBuffer> &writer,
+                             unsigned long elem)
+{
+    writer.Int(elem);
+}
+
+template <>
+void PyScript::write_element(rapidjson::Writer<rapidjson::StringBuffer> &writer,
                              const char *elem)
 {
     writer.String(elem);

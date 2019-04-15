@@ -215,7 +215,7 @@ public:
     app{app},
     horizon{20},
     time_step{MilliSeconds(10)},
-    pyscript{"python3 /home/christoph/nstor/src/tor/model/solver.py"}
+    pyscript{"/home/christoph/nstor/src/tor/model/solver.sh"}
   {};
   // virtual ~PredController ();
   
@@ -269,7 +269,6 @@ protected:
   static DataRate to_datarate(double pps);
 };
 
-struct time_out_of_range;
 
 class Trajectory {
 public:
