@@ -903,6 +903,12 @@ PredConnection::EstimateRtt ()
   return MilliSeconds(200); // TODO
 }
 
+Time
+PredConnection::GetBaseRtt ()
+{
+  return torapp->GetPeerDelay (GetRemote ());
+}
+
 uint32_t
 PredConnection::GetBytesInTransit ()
 {

@@ -103,6 +103,9 @@ public:
   // high-level progress of the "reliable byte stream" service.
   uint32_t GetBytesInTransit ();
 
+  // Get the (theoretical) base delay to the remote site
+  Time GetBaseRtt ();
+
 private:
   TorPredApp* torapp;
   Ipv4Address remote;

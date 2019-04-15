@@ -76,6 +76,9 @@ public:
   // Get theoretical end-to-end RTT for a circuit
   Time GetCircuitRtt (int circuit, vector<string> relays = vector<string>(), bool one_way = false);
 
+  // Get theoretical RTT between two neighboring relays
+  Time GetHopRtt (string from_relay, string to_relay);
+
   // Get the underlay link delay with which a relay is connected to the router
   Time GetRelayDelay (string relay);
 

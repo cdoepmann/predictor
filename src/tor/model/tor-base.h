@@ -62,6 +62,15 @@ public:
   TracedCallback<Ptr<TorBaseApp> // this app that was just started
                  > m_triggerAppStart;
   typedef void (* TorAppStartedCallback) (Ptr<TorBaseApp>);
+
+  // Remember theoretical delay to a neighbor, identified by its IP address
+  void RememberPeerDelay (Ipv4Address, Time);
+
+  // Get the theoretical delay to a neighbor, identified by its IP address
+  Time GetPeerDelay (Ipv4Address);
+
+protected:
+  map<Ipv4Address,Time> base_delays;
 };
 
 class BaseCircuit : public Object

@@ -329,17 +329,39 @@ TorStarHelper::InstallCircuits ()
       Ipv4Address middleAddress = m_starHelper->GetSpokeIpv4Address (m_relays[e.middle ()].spokeId);
       Ipv4Address exitAddress   = m_starHelper->GetSpokeIpv4Address (m_relays[e.exit ()].spokeId);
       Ipv4Address serverAddress = ipHelper.NewAddress ();
+      Ipv4Address userAddress = ipHelper.NewAddress ();
 
       exitApp->AddCircuit (e.id, serverAddress, SERVEREDGE, middleAddress, RELAYEDGE);
       middleApp->AddCircuit (e.id, exitAddress, RELAYEDGE, entryAddress, RELAYEDGE);
       if (!m_disableProxies)
         {
           entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, clientAddress, RELAYEDGE);
-          clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_clientSocket);
+          clientApp->AddCircuit (e.id, entryAddress, RELAYEDGE, userAddress, PROXYEDGE, e.m_clientSocket);
         }
       else
         {
-          entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, ipHelper.NewAddress (), PROXYEDGE, e.m_clientSocket);
+          entryApp->AddCircuit (e.id, middleAddress, RELAYEDGE, userAddress, PROXYEDGE, e.m_clientSocket);
+        }
+      
+      // Remember the theoretical hop-by-hop RTTs
+      exitApp->RememberPeerDelay (serverAddress, Seconds(0));
+      exitApp->RememberPeerDelay (middleAddress, GetHopRtt(e.exit(), e.middle()));
+
+      middleApp->RememberPeerDelay (exitAddress, GetHopRtt(e.middle(), e.exit()));
+      middleApp->RememberPeerDelay (entryAddress, GetHopRtt(e.middle(), e.entry()));
+
+      if (!m_disableProxies)
+        {
+          entryApp->RememberPeerDelay (middleAddress, GetHopRtt(e.entry(), e.middle()));
+          entryApp->RememberPeerDelay (clientAddress, GetHopRtt(e.entry(), e.proxy()));
+
+          clientApp->RememberPeerDelay (entryAddress, GetHopRtt(e.proxy(), e.entry()));
+          clientApp->RememberPeerDelay (userAddress, Seconds(0));
+        }
+      else
+        {
+          entryApp->RememberPeerDelay (middleAddress, GetHopRtt(e.entry(), e.middle()));
+          entryApp->RememberPeerDelay (userAddress, Seconds(0));
         }
     }
 
@@ -568,6 +590,12 @@ TorStarHelper::GetCircuitRtt (int circuit, vector<string> relays, bool one_way)
   }
   
   return delay;
+}
+
+Time
+TorStarHelper::GetHopRtt (string from_relay, string to_relay)
+{
+  return 2*GetRelayDelay(from_relay) + 2*GetRelayDelay(to_relay);
 }
 
 DataRate

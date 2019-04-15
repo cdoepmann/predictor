@@ -104,6 +104,18 @@ TorBaseApp::GetNodeName (void)
   return m_name;
 }
 
+void
+TorBaseApp::RememberPeerDelay (Ipv4Address ip, Time time)
+{
+  base_delays[ip] = time;
+}
+
+Time
+TorBaseApp::GetPeerDelay (Ipv4Address ip)
+{
+  return base_delays.at(ip);
+}
+
 
 
 
