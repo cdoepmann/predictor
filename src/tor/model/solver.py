@@ -27,7 +27,7 @@ class Handler:
 
         #return {'debug': repr(setup_dict)}
         
-        self.ots = optimal_traffic_scheduler(setup_dict, record_values=False)
+        self.ots = optimal_traffic_scheduler(setup_dict)
 
         self.ots.setup(
             n_in = kwargs['n_in'],
@@ -39,8 +39,23 @@ class Handler:
 
         return setup_dict
 
-    def foo(self, **kwargs):
-        pass
+    def solve(self, **kwargs):
+        self.ots.solve(
+            np.array(kwargs['s_buffer_0']),
+            np.array(kwargs['s_circuit_0']),
+            np.array(kwargs['s_transit_0']),
+            np.array(kwargs['v_in_req']),
+            np.array(kwargs['cv_in']),
+            np.array(kwargs['v_out_max']),
+            np.array(kwargs['bandwidth_load_target']),
+            np.array(kwargs['memory_load_target']),
+            np.array(kwargs['bandwidth_load_source']),
+            np.array(kwargs['memory_load_source']),
+            np.array(kwargs['output_delay']),
+        )
+
+        return ots.predict[-1]
+
 
 if __name__ == '__main__':
 #    buffer = ""

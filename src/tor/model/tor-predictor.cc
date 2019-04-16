@@ -1138,7 +1138,7 @@ PredController::Setup ()
   DataRateValue datarate_dev;
   app->GetNode()->GetDevice(0)->GetObject<PointToPointNetDevice>()->GetAttribute("DataRate", datarate_dev);
 
-  DataRate datarate_limit = std::min (datarate_app.Get(), datarate_dev.Get());
+  max_datarate = std::min (datarate_app.Get(), datarate_dev.Get());
 
   // collect the input connections...
   vector<vector<uint16_t>> inputs;
@@ -1197,7 +1197,7 @@ PredController::Setup ()
   auto obj = pyscript.call(
     "setup",
     "relay", app->GetNodeName (),
-    "v_max", to_packets_sec(datarate_limit),
+    "v_max", to_packets_sec(MaxDataRate ()),
     "s_max", 30,
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
@@ -1269,21 +1269,207 @@ PredController::Optimize ()
     transit_packets_per_conn.push_back((double) conn->GetBytesInTransit() / CELL_NETWORK_SIZE);
   }
 
+  //
+  // Collect the trajectories necessary for optimizing
+  //
+
+  // data we are expected to receive from our predecessors (their v_out)
+  vector<Trajectory> v_in_req;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume that they do not send anything
+    Trajectory idle{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      idle.Elements().push_back(0.0);
+    }
+
+    for (unsigned int i=0; i<out_conns.size() ; i++)
+    {
+      v_in_req.push_back(idle);
+    }
+  }
+
+  // composition of each input connection
+  vector<vector<vector<double>>> cv_in;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume the circuits share
+    // the connection's traffic equally.
+
+    for (auto&& conn : in_conns)
+    {
+      int n_circuit_in = 1;
+      Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+      
+      auto next_circuit = first_circuit->GetNextCirc(conn);
+      while (next_circuit != first_circuit)
+      {
+        n_circuit_in++;
+        next_circuit = next_circuit->GetNextCirc(conn);
+      }
+
+      vector<double> composition;
+      for (int i=0; i<n_circuit_in; i++)
+      {
+        composition.push_back (1.0 / n_circuit_in);
+      }
+
+      vector<vector<double>> over_time;
+      for (unsigned int i=0; i<Horizon(); i++)
+      {
+        over_time.push_back(composition);
+      }
+
+      cv_in.push_back (over_time);
+    }
+  }
+
+  // maximum outgoing data rate we were given by the successor
+  vector<Trajectory> v_out_max;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume we can can go full blast
+    Trajectory unlimited{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      unlimited.Elements().push_back(to_packets_sec(MaxDataRate ()));
+    }
+
+    for (unsigned int i=0; i<out_conns.size() ; i++)
+    {
+      v_out_max.push_back(unlimited);
+    }
+  }
+
+  // future development of the successors' memory load
+  vector<Trajectory> memory_load_target;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume that they are idle
+    Trajectory idle{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      idle.Elements().push_back(0.0);
+    }
+
+    for (unsigned int i=0; i<out_conns.size() ; i++)
+    {
+      memory_load_target.push_back(idle);
+    }
+  }
+
+  // future development of the predecessors' memory load
+  vector<Trajectory> memory_load_source;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume that they are idle
+    Trajectory idle{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      idle.Elements().push_back(0.0);
+    }
+
+    for (unsigned int i=0; i<out_conns.size() ; i++)
+    {
+      memory_load_source.push_back(idle);
+    }
+  }
+
+  // future development of the successors' bandwidth load
+  vector<Trajectory> bandwidth_load_target;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume that they are idle
+    Trajectory idle{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      idle.Elements().push_back(0.0);
+    }
+
+    for (unsigned int i=0; i<out_conns.size() ; i++)
+    {
+      bandwidth_load_target.push_back(idle);
+    }
+  }
+
+  // future development of the predecessors' bandwidth load
+  vector<Trajectory> bandwidth_load_source;
+  if (false)
+  {
+    // TODO
+    // use collected data from other relays
+  }
+  else
+  {
+    // We do not yet have data from other relays, assume that they are idle
+    Trajectory idle{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      idle.Elements().push_back(0.0);
+    }
+
+    for (unsigned int i=0; i<out_conns.size() ; i++)
+    {
+      bandwidth_load_source.push_back(idle);
+    }
+  }
+  
+
   // Call the optimizer
   auto obj = pyscript.call(
-    "foo",
+    "solve",
     "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
     "s_buffer_0", packets_per_conn,
     "s_circuit_0", packets_per_circuit,
     "s_transit_0", transit_packets_per_conn,
-    "output_delay", rtts_per_conn
+    "output_delay", rtts_per_conn,
+
+    // trajectories
+    "v_in_req", to_double_vectors(v_in_req),
+    "cv_in", cv_in,
+    "v_out_max", to_double_vectors(v_out_max),
+    "memory_load_target", to_double_vectors(memory_load_target),
+    "memory_load_source", to_double_vectors(memory_load_source),
+    "bandwidth_load_target", to_double_vectors(bandwidth_load_target),
+    "bandwidth_load_source", to_double_vectors(bandwidth_load_source)
   );
 
   // TODO: Save the results (plans, etc.)
 
 
-  Simulator::Schedule(Seconds(1), &PredController::Optimize, this);
+  Simulator::Schedule(TimeStep (), &PredController::Optimize, this);
 }
 
 double
@@ -1296,6 +1482,17 @@ DataRate
 PredController::to_datarate(double pps)
 {
   return DataRate { uint64_t(pps*8*CELL_NETWORK_SIZE) };
+}
+
+vector<vector<double>>
+PredController::to_double_vectors(vector<Trajectory> trajectories)
+{
+  vector<vector<double>> result;
+  for (auto&& traj : trajectories)
+  {
+    result.push_back(traj.Elements());
+  }
+  return result;
 }
 
 //

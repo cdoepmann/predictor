@@ -25,6 +25,7 @@ class PredCircuit;
 class PredConnection;
 class TorPredApp;
 class PredController;
+class Trajectory;
 
 
 class PredCircuit : public BaseCircuit
@@ -247,6 +248,9 @@ public:
   // Get the time step per horizon element
   Time TimeStep () { return time_step; };
 
+  // Get the maximum data rate we can achieve
+  DataRate MaxDataRate () { return max_datarate; };
+
 protected:
   // The application this controller belongs to
   Ptr<TorPredApp> app;
@@ -267,6 +271,12 @@ protected:
   // Convert between DataRate and packets/s
   static double to_packets_sec(DataRate rate);
   static DataRate to_datarate(double pps);
+
+  // Convert vector of trajectories to vector of double vectors
+  vector<vector<double>> to_double_vectors(vector<Trajectory> trajectories);
+
+  // The maximum data rate of this relay
+  DataRate max_datarate;
 };
 
 
