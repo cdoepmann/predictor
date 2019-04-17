@@ -40,21 +40,41 @@ class Handler:
         return setup_dict
 
     def solve(self, **kwargs):
+        def inner_nparray(l):
+            return [np.array([x]).T for x in l]
+
+        def process_cv_in(orig):
+            res = []
+            for h in orig:
+                for con in h:
+                    res.append(np.array(con).reshape(-1,1))
+            return np.array([res])
+
         self.ots.solve(
-            np.array(kwargs['s_buffer_0']),
-            np.array(kwargs['s_circuit_0']),
-            np.array(kwargs['s_transit_0']),
-            np.array(kwargs['v_in_req']),
-            np.array(kwargs['cv_in']),
-            np.array(kwargs['v_out_max']),
-            np.array(kwargs['bandwidth_load_target']),
-            np.array(kwargs['memory_load_target']),
-            np.array(kwargs['bandwidth_load_source']),
-            np.array(kwargs['memory_load_source']),
+            inner_nparray(kwargs['s_buffer_0']),
+            inner_nparray(kwargs['s_circuit_0']),
+            inner_nparray(kwargs['s_transit_0']),
+            inner_nparray(kwargs['v_in_req']),
+            process_cv_in(kwargs['cv_in']),
+            inner_nparray(kwargs['v_out_max']),
+            inner_nparray(kwargs['bandwidth_load_target']),
+            inner_nparray(kwargs['memory_load_target']),
+            inner_nparray(kwargs['bandwidth_load_source']),
+            inner_nparray(kwargs['memory_load_source']),
             np.array(kwargs['output_delay']),
         )
 
-        return ots.predict[-1]
+        def make_serializable(x):
+            if isinstance(x, dict):
+                return {k: make_serializable(v) for k,v in x.items()}
+            if isinstance(x, np.ndarray):
+                return x.tolist()
+            if isinstance(x, list):
+                return [make_serializable(v) for v in x]
+            return x
+
+        # print(repr(self.ots.predict[-1]))
+        return make_serializable(self.ots.predict[-1])
 
 
 if __name__ == '__main__':

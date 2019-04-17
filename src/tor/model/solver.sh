@@ -24,4 +24,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $SOLVER_REPO
 conda activate py36_64bit_new
 cd - 2>&1 > /dev/null
+
+# make MA27 solver available
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/christoph/forschung/paper-predictor/casadi/hsl-bin/lib
+
 cat - | PYTHONPATH=$SOLVER_REPO/OTS python3 $SCRIPT_DIR/solver.py

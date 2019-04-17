@@ -275,6 +275,11 @@ protected:
   // Convert vector of trajectories to vector of double vectors
   vector<vector<double>> to_double_vectors(vector<Trajectory> trajectories);
 
+  // Convert vector of trajectories to vector of double vectors while
+  // transposing the matrix (?), such that the highest-level list corresponds
+  // to the horizon steps.
+  vector<vector<double>> transpose_to_double_vectors(vector<Trajectory> trajectories);
+
   // The maximum data rate of this relay
   DataRate max_datarate;
 };

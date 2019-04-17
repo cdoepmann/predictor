@@ -1289,7 +1289,7 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (unsigned int i=0; i<in_conns.size() ; i++)
     {
       v_in_req.push_back(idle);
     }
@@ -1307,31 +1307,34 @@ PredController::Optimize ()
     // We do not yet have data from other relays, assume the circuits share
     // the connection's traffic equally.
 
-    for (auto&& conn : in_conns)
+    // - horizon
+    //   - n_in (connections)
+    //     - n_circuit_in[i] (circuits)
+
+    for (unsigned int i=0; i<Horizon(); i++)
     {
-      int n_circuit_in = 1;
-      Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-      
-      auto next_circuit = first_circuit->GetNextCirc(conn);
-      while (next_circuit != first_circuit)
+      vector<vector<double>> this_step;
+      for (auto&& conn : in_conns)
       {
-        n_circuit_in++;
-        next_circuit = next_circuit->GetNextCirc(conn);
-      }
+        int n_circuit_in = 1;
+        Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+        
+        auto next_circuit = first_circuit->GetNextCirc(conn);
+        while (next_circuit != first_circuit)
+        {
+          n_circuit_in++;
+          next_circuit = next_circuit->GetNextCirc(conn);
+        }
 
-      vector<double> composition;
-      for (int i=0; i<n_circuit_in; i++)
-      {
-        composition.push_back (1.0 / n_circuit_in);
-      }
+        vector<double> composition;
+        for (int i=0; i<n_circuit_in; i++)
+        {
+          composition.push_back (1.0 / n_circuit_in);
+        }
 
-      vector<vector<double>> over_time;
-      for (unsigned int i=0; i<Horizon(); i++)
-      {
-        over_time.push_back(composition);
+        this_step.push_back(composition);
       }
-
-      cv_in.push_back (over_time);
+      cv_in.push_back(this_step);
     }
   }
 
@@ -1395,7 +1398,7 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (unsigned int i=0; i<in_conns.size() ; i++)
     {
       memory_load_source.push_back(idle);
     }
@@ -1439,10 +1442,37 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (unsigned int i=0; i<in_conns.size() ; i++)
     {
       bandwidth_load_source.push_back(idle);
     }
+  }
+  vector<double> output_delays;
+
+  for (auto it = out_conns.begin (); it != out_conns.end(); ++it)
+  {
+    // ...and their circuits
+    auto conn = *it;
+    vector<uint16_t> circ_ids;
+    
+    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+    circ_ids.push_back(first_circuit->GetId());
+    
+    auto next_circuit = first_circuit->GetNextCirc(conn);
+    while (next_circuit != first_circuit)
+    {
+      circ_ids.push_back(next_circuit->GetId());
+      next_circuit = next_circuit->GetNextCirc(conn);
+    }
+
+    // calculate the expected RTT for each outgoing connection
+    Time delay = conn->GetBaseRtt();
+
+    // do not allow plain zero, even for edge relays (solver requires this)
+    if (delay == Seconds(0))
+      delay = MilliSeconds(1);
+
+    output_delays.push_back(delay.GetSeconds ());
   }
   
 
@@ -1454,16 +1484,16 @@ PredController::Optimize ()
     "s_buffer_0", packets_per_conn,
     "s_circuit_0", packets_per_circuit,
     "s_transit_0", transit_packets_per_conn,
-    "output_delay", rtts_per_conn,
+    "output_delay", output_delays,
 
     // trajectories
-    "v_in_req", to_double_vectors(v_in_req),
+    "v_in_req", transpose_to_double_vectors(v_in_req),
     "cv_in", cv_in,
-    "v_out_max", to_double_vectors(v_out_max),
-    "memory_load_target", to_double_vectors(memory_load_target),
-    "memory_load_source", to_double_vectors(memory_load_source),
-    "bandwidth_load_target", to_double_vectors(bandwidth_load_target),
-    "bandwidth_load_source", to_double_vectors(bandwidth_load_source)
+    "v_out_max", transpose_to_double_vectors(v_out_max),
+    "memory_load_target", transpose_to_double_vectors(memory_load_target),
+    "memory_load_source", transpose_to_double_vectors(memory_load_source),
+    "bandwidth_load_target", transpose_to_double_vectors(bandwidth_load_target),
+    "bandwidth_load_source", transpose_to_double_vectors(bandwidth_load_source)
   );
 
   // TODO: Save the results (plans, etc.)
@@ -1492,6 +1522,30 @@ PredController::to_double_vectors(vector<Trajectory> trajectories)
   {
     result.push_back(traj.Elements());
   }
+  return result;
+}
+
+vector<vector<double>>
+PredController::transpose_to_double_vectors(vector<Trajectory> trajectories)
+{
+  vector<vector<double>> result;
+
+  NS_ASSERT (trajectories.size() > 0);
+  
+  const int horizon = trajectories[0].Steps();
+
+  for (int i=0; i<horizon; i++)
+  {
+    vector<double> this_step;
+
+    for (auto&& traj : trajectories)
+    {
+      this_step.push_back(traj.Elements().at(i));
+    }
+
+    result.push_back(this_step);
+  }
+
   return result;
 }
 
