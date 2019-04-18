@@ -76,9 +76,18 @@ rapidjson::Document PyScript::call(const char *cmd, Args... args)
     childin << sb.GetString();
     childin << std::endl;
 
+    // read until magic output
+    while (true) {
+        std::string magic_line;
+        std::getline(childout, magic_line);
+        
+        if (magic_line == "::: PyTalk Output :::") {
+            break;
+        }
+    }
+
     std::string result;
     std::getline(childout, result);
-    std::cout << result << std::endl;
 
     Document d;
     d.Parse(result.c_str());

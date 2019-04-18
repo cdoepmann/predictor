@@ -149,6 +149,7 @@ if __name__ == '__main__':
                 obj['ok'] = True
                 # raise Exception("oh my gawd!")
                 # print("obj:", obj)
+                print("::: PyTalk Output :::")
                 print(json.dumps(obj))
                 sys.stdout.flush()
 
@@ -158,6 +159,7 @@ if __name__ == '__main__':
                     'exception': f'{e}',
                     'stacktrace': traceback.format_exc(),
                 }
+                print("::: PyTalk Output :::")
                 print(json.dumps(obj))
                 sys.stdout.flush()
 
