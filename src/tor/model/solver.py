@@ -115,7 +115,7 @@ class Handler:
 
         # print(repr(self.ots.predict[-1]))
         # print("pre-obj:", self.ots.predict[-1])
-        return make_serializable(self.ots.predict[-1])
+        return make_serializable(make_serializable(self.ots.predict[-1]))
 
 
 if __name__ == '__main__':
