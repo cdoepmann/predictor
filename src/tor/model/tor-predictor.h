@@ -9,6 +9,11 @@
 #include "ns3/traced-value.h"
 #include "ns3/trace-source-accessor.h"
 
+#include <functional>
+#include <thread>
+#include <future>
+#include <deque>
+
 namespace ns3 {
 
 // TODO: do not define here
@@ -209,6 +214,94 @@ protected:
 };
 
 
+// Helper class to carry out calls to the optimizer in parallel if they happen
+// at the same simulation time
+class BatchedExecutor {
+public:
+  // Add a task for computation
+  void Compute(std::function<rapidjson::Document*()> worker, Callback<void,rapidjson::Document*> cb) {
+    calls.push_back(std::make_pair(worker, cb));
+
+    compute_event.Cancel ();
+    compute_event = Simulator::ScheduleNow(&BatchedExecutor::DoCompute, this);
+  }
+
+  // Carry out the computation
+  void DoCompute()
+  {
+    std::vector<std::thread> threads;
+
+    std::mutex input_mutex;
+    std::mutex output_mutex;
+
+    for (int i=0; i<4; i++) {
+      threads.push_back(
+        std::thread{
+          [&input_mutex,&output_mutex,this] {
+            while (true) {
+              // get the next job
+              std::pair<std::function<rapidjson::Document*()>,Callback<void,rapidjson::Document*>> job;
+              {
+                std::lock_guard<std::mutex> lock{input_mutex};
+
+                if (this->calls.size() == 0)
+                  return;
+                
+                job = this->calls.front();
+                this->calls.pop_front();
+              }
+
+              // do the computation
+              auto doc = job.first();
+
+              // save the result
+              {
+                std::lock_guard<std::mutex> lock{output_mutex};
+                
+                this->results.push_back(
+                  std::make_pair(job.second, doc)
+                );
+              }
+            } // loop in lambda
+          } // lambda
+        } // thread
+      ); // push to vector
+    } // for loop
+
+    // wait for the threads to finish
+    for (auto&& t : threads) {
+      t.join();
+    }
+
+    // trigger the callbacks
+    for (auto result : this->results) {
+      result.first(result.second);
+    }
+
+    results.clear ();
+  }
+
+protected:
+  // The list of computations to carry out
+  std::deque<
+    std::pair<
+      std::function<rapidjson::Document*()>,
+      Callback<void,rapidjson::Document*>
+    >
+  > calls;
+
+  // The results of the computations
+  std::vector<
+    std::pair<
+      Callback<void,rapidjson::Document*>,
+      rapidjson::Document*
+    >
+  > results;
+  
+  // The event that will trigger the parallel processing
+  EventId compute_event;
+};
+
 // The interface to our model-predictive controller
 class PredController : public Object {
 public:
@@ -241,6 +334,9 @@ public:
   // Carry out the regular optimization step, based on current local information
   // as well as information provided by our neighboring relays.
   void Optimize();
+
+  // Callex when the optimization step is complete.
+  void OptimizeDone(rapidjson::Document * doc);
 
   // Get the number of steps in the horizon
   size_t Horizon () { return horizon; };
@@ -282,6 +378,9 @@ protected:
 
   // The maximum data rate of this relay
   DataRate max_datarate;
+
+  // (shared) pool executor to run the optimizations in parallel
+  static BatchedExecutor executor;
 };
 
 

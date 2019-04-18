@@ -1194,7 +1194,8 @@ PredController::Setup ()
     output_delays.push_back(delay.GetSeconds ());
   }
 
-  auto obj = pyscript.call(
+  // auto obj = 
+  delete pyscript.call(
     "setup",
     "relay", app->GetNodeName (),
     "v_max", to_packets_sec(MaxDataRate ()),
@@ -1208,6 +1209,8 @@ PredController::Setup ()
     "output_circuits", outputs,
     "output_delays", output_delays
   );
+
+  // TODO: verify success
 }
 
 void
@@ -1477,23 +1480,28 @@ PredController::Optimize ()
   
 
   // Call the optimizer
-  auto obj = pyscript.call(
-    "solve",
-    "time", Simulator::Now().GetSeconds(),
-    "relay", app->GetNodeName (),
-    "s_buffer_0", packets_per_conn,
-    "s_circuit_0", packets_per_circuit,
-    "s_transit_0", transit_packets_per_conn,
-    "output_delay", output_delays,
+  executor.Compute([=]
+    {
+      return pyscript.call(
+        "solve",
+        "time", Simulator::Now().GetSeconds(),
+        "relay", app->GetNodeName (),
+        "s_buffer_0", packets_per_conn,
+        "s_circuit_0", packets_per_circuit,
+        "s_transit_0", transit_packets_per_conn,
+        "output_delay", output_delays,
 
-    // trajectories
-    "v_in_req", transpose_to_double_vectors(v_in_req),
-    "cv_in", cv_in,
-    "v_out_max", transpose_to_double_vectors(v_out_max),
-    "memory_load_target", transpose_to_double_vectors(memory_load_target),
-    "memory_load_source", transpose_to_double_vectors(memory_load_source),
-    "bandwidth_load_target", transpose_to_double_vectors(bandwidth_load_target),
-    "bandwidth_load_source", transpose_to_double_vectors(bandwidth_load_source)
+        // trajectories
+        "v_in_req", transpose_to_double_vectors(v_in_req),
+        "cv_in", cv_in,
+        "v_out_max", transpose_to_double_vectors(v_out_max),
+        "memory_load_target", transpose_to_double_vectors(memory_load_target),
+        "memory_load_source", transpose_to_double_vectors(memory_load_source),
+        "bandwidth_load_target", transpose_to_double_vectors(bandwidth_load_target),
+        "bandwidth_load_source", transpose_to_double_vectors(bandwidth_load_source)
+      );
+    },
+    MakeCallback(&PredController::OptimizeDone, this)
   );
 
   // TODO: Save the results (plans, etc.)
@@ -1548,6 +1556,18 @@ PredController::transpose_to_double_vectors(vector<Trajectory> trajectories)
 
   return result;
 }
+
+void
+PredController::OptimizeDone(rapidjson::Document * doc)
+{
+  cout << "got JSON result" << endl;
+  // TODO: clean up (unique) pointer
+
+  delete doc;
+  cout << "deleted" << endl;
+}
+
+BatchedExecutor PredController::executor;
 
 //
 // Container for handling trajectory data

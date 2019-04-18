@@ -33,7 +33,7 @@ class PyScript
     ~PyScript();
 
     template <typename... Args>
-    rapidjson::Document call(const char *cmd, Args... args);
+    rapidjson::Document * call(const char *cmd, Args... args);
 
   private:
     template <typename T, typename... Args>
@@ -58,7 +58,7 @@ class PyScript
 };
 
 template <typename... Args>
-rapidjson::Document PyScript::call(const char *cmd, Args... args)
+rapidjson::Document * PyScript::call(const char *cmd, Args... args)
 {
     using namespace rapidjson;
 
@@ -89,8 +89,8 @@ rapidjson::Document PyScript::call(const char *cmd, Args... args)
     std::string result;
     std::getline(childout, result);
 
-    Document d;
-    d.Parse(result.c_str());
+    Document * d = new Document;
+    d->Parse(result.c_str());
 
     return d;
 }
