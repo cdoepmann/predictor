@@ -234,7 +234,7 @@ public:
     std::mutex input_mutex;
     std::mutex output_mutex;
 
-    for (int i=0; i<4; i++) {
+    for (int i=0; i<8; i++) {
       threads.push_back(
         std::thread{
           [&input_mutex,&output_mutex,this] {
