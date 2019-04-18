@@ -1251,7 +1251,7 @@ PredController::Optimize ()
 
   for (auto&& conn : out_conns)
   {
-    double packets = -1;
+    double packets = 0;
 
     auto tcp = conn->GetSocket()->GetObject<TcpSocketBase> ();
     if (tcp)
