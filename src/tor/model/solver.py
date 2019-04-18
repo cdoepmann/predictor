@@ -9,11 +9,48 @@ import copy
 import numpy as np
 from optimal_traffic_scheduler import optimal_traffic_scheduler
 
+class Wrap:
+    def __init__(self, name, func, argnames=None):
+        self.name = name
+        self.func = func
+        self.argnames = argnames
+
+    def __call__(self, *args, **kwargs):
+        res = ''
+
+        def print_argname(i):
+            nonlocal res
+            if self.argnames:
+                res += '    # ' + self.argnames[i] + '\n'
+
+        i = 0
+        res += self.name + '(\n'
+
+        for x in args:
+            print_argname(i)
+            res += '    ' + repr(x).replace('\n', ' ') + ',\n'
+            i += 1
+
+        for k,v in kwargs.items():
+            print_argname(i)
+            res += '    ' + str(k) + ' = ' + repr(v).replace('\n', ' ') + ',\n'
+            i += 1
+
+        res += ')\n'
+        
+        res = res.replace('array', 'np.array')
+
+        # print(res)
+        return self.func(*args, **kwargs)
+
 class Handler:
     def __init__(self):
         self.ots = None
+        self.relay = None
 
     def setup(self, **kwargs):
+        self.relay = kwargs['relay']
+
         setup_dict = dict()
         for k in ['v_max','s_max','dt','N_steps']:
             setup_dict[k] = kwargs[k]
@@ -27,9 +64,11 @@ class Handler:
 
         #return {'debug': repr(setup_dict)}
         
-        self.ots = optimal_traffic_scheduler(setup_dict)
+        # print('# ' + self.relay)
+        self.ots = Wrap('ots = optimal_traffic_scheduler', optimal_traffic_scheduler)(setup_dict)
 
-        self.ots.setup(
+        # print('# ' + self.relay)
+        Wrap('ots.setup', self.ots.setup)(
             n_in = kwargs['n_in'],
             n_out = kwargs['n_out'],
             input_circuits = kwargs['input_circuits'],
@@ -50,7 +89,8 @@ class Handler:
                     res.append(np.array(con).reshape(-1,1))
             return np.array([res])
 
-        self.ots.solve(
+        # print('# ' + self.relay)
+        Wrap('ots.solve', self.ots.solve, argnames=[ 's_buffer_0', 's_circuit_0', 's_transit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source', 'output_delay' ])(
             inner_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['s_circuit_0']),
             inner_nparray(kwargs['s_transit_0']),
@@ -74,6 +114,7 @@ class Handler:
             return x
 
         # print(repr(self.ots.predict[-1]))
+        # print("pre-obj:", self.ots.predict[-1])
         return make_serializable(self.ots.predict[-1])
 
 
@@ -107,6 +148,7 @@ if __name__ == '__main__':
 
                 obj['ok'] = True
                 # raise Exception("oh my gawd!")
+                # print("obj:", obj)
                 print(json.dumps(obj))
                 sys.stdout.flush()
 
