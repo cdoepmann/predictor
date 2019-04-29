@@ -9,6 +9,27 @@ import copy
 import numpy as np
 from optimal_traffic_scheduler import optimal_traffic_scheduler
 
+from copy import deepcopy
+
+# https://gist.github.com/Wilfred/7889868
+def flatten_list(nested_list):
+    """Flatten an arbitrarily nested list, without recursion (to avoid
+    stack overflows). Returns a new list, the original list is unchanged.
+    >> list(flatten_list([1, 2, 3, [4], [], [[[[[[[[[5]]]]]]]]]]))
+    [1, 2, 3, 4, 5]
+    >> list(flatten_list([[1, 2], 3]))
+    [1, 2, 3]
+    """
+    nested_list = deepcopy(nested_list)
+
+    while nested_list:
+        sublist = nested_list.pop(0)
+
+        if isinstance(sublist, list):
+            nested_list = sublist + nested_list
+        else:
+            yield sublist
+
 class Wrap:
     def __init__(self, name, func, argnames=None):
         self.name = name
@@ -40,7 +61,9 @@ class Wrap:
         
         res = res.replace('array', 'np.array')
 
-        # print(res)
+        with open('/tmp/pytalk.calls', 'a') as f:
+            print(res, file=f)
+
         return self.func(*args, **kwargs)
 
 class Handler:
@@ -65,10 +88,10 @@ class Handler:
         #return {'debug': repr(setup_dict)}
         
         # print('# ' + self.relay)
-        self.ots = Wrap('ots = optimal_traffic_scheduler', optimal_traffic_scheduler)(setup_dict)
+        self.ots = Wrap(f'({self.relay}) ots = optimal_traffic_scheduler', optimal_traffic_scheduler)(setup_dict)
 
         # print('# ' + self.relay)
-        Wrap('ots.setup', self.ots.setup)(
+        Wrap(f'({self.relay}) ots.setup', self.ots.setup)(
             n_in = kwargs['n_in'],
             n_out = kwargs['n_out'],
             input_circuits = kwargs['input_circuits'],
@@ -90,7 +113,7 @@ class Handler:
             return np.array([res])
 
         # print('# ' + self.relay)
-        Wrap('ots.solve', self.ots.solve, argnames=[ 's_buffer_0', 's_circuit_0', 's_transit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source', 'output_delay' ])(
+        Wrap(f'({self.relay}) ots.solve', self.ots.solve, argnames=[ 's_buffer_0', 's_circuit_0', 's_transit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source', 'output_delay' ])(
             inner_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['s_circuit_0']),
             inner_nparray(kwargs['s_transit_0']),

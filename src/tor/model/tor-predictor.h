@@ -358,8 +358,14 @@ protected:
   Time time_step;
 
   // The connections that are used for receiving and sending data
+  //
+  // Note: After being used for the first time, these sets are not allowed to
+  // be modified anymore since the order identifies the contained elements.
   set<Ptr<PredConnection>> in_conns;
   set<Ptr<PredConnection>> out_conns;
+
+  // The number of circuits handled by this relay
+  size_t num_circuits;
 
   // Interface for talking to the python component
   PyScript pyscript;
@@ -381,6 +387,29 @@ protected:
 
   // (shared) pool executor to run the optimizations in parallel
   static BatchedExecutor executor;
+
+  // Parse rapidjson object into a vector of trajectories, checking the number
+  // of parsed trajectories
+  void ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj);
+
+  // Parse rapidjson object containing the special multidimensional composition
+  // matrix into a vector of vectors of trajectories
+  void ParseCvOutIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t expected_traj_outer);
+  void ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t connections);
+
+  vector<Trajectory> pred_v_in;
+  vector<Trajectory> pred_v_in_max;
+  vector<Trajectory> pred_v_out;
+  vector<Trajectory> pred_v_out_max;
+  vector<Trajectory> pred_s_buffer;
+  vector<Trajectory> pred_s_circuit;
+  vector<Trajectory> pred_bandwidth_load_target;
+  vector<Trajectory> pred_bandwidth_load_source;
+  vector<Trajectory> pred_memory_load_target;
+  vector<Trajectory> pred_memory_load_source;
+
+  vector<vector<Trajectory>> pred_cv_in;
+  vector<vector<Trajectory>> pred_cv_out;
 };
 
 

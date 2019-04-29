@@ -1165,6 +1165,7 @@ PredController::Setup ()
   // collect the output connections...
   vector<vector<uint16_t>> outputs;
   vector<double> output_delays;
+  num_circuits = 0;
 
   for (auto it = out_conns.begin (); it != out_conns.end(); ++it)
   {
@@ -1183,6 +1184,7 @@ PredController::Setup ()
     }
 
     outputs.push_back(circ_ids);
+    num_circuits += circ_ids.size();
 
     // calculate the expected RTT for each outgoing connection
     Time delay = conn->GetBaseRtt();
@@ -1195,7 +1197,7 @@ PredController::Setup ()
   }
 
   // auto obj = 
-  delete pyscript.call(
+  auto result = pyscript.call(
     "setup",
     "relay", app->GetNodeName (),
     "v_max", to_packets_sec(MaxDataRate ()),
@@ -1209,6 +1211,10 @@ PredController::Setup ()
     "output_circuits", outputs,
     "output_delays", output_delays
   );
+
+  // Since the batched executor does only return a plain pointer to the parsed
+  // JSON doc, we need to free it here.
+  delete result;
 
   // TODO: verify success
 }
@@ -1504,9 +1510,7 @@ PredController::Optimize ()
     MakeCallback(&PredController::OptimizeDone, this)
   );
 
-  // TODO: Save the results (plans, etc.)
-
-
+  // Schedule the next optimization step
   Simulator::Schedule(TimeStep (), &PredController::Optimize, this);
 }
 
@@ -1560,11 +1564,161 @@ PredController::transpose_to_double_vectors(vector<Trajectory> trajectories)
 void
 PredController::OptimizeDone(rapidjson::Document * doc)
 {
-  cout << "got JSON result" << endl;
-  // TODO: clean up (unique) pointer
+  // TODO: Save the results (plans, etc.)
+  Time now = Simulator::Now();
+  Time next_step = now + TimeStep();
 
+  ParseIntoTrajectories((*doc)["v_in"], pred_v_in, now, in_conns.size());
+  ParseIntoTrajectories((*doc)["v_in_max"], pred_v_in_max, now, in_conns.size());
+  ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
+  ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
+  ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size());
+  ParseIntoTrajectories((*doc)["s_circuit"], pred_s_circuit, next_step, num_circuits);
+  ParseIntoTrajectories((*doc)["bandwidth_load_target"], pred_bandwidth_load_target, next_step, out_conns.size());
+  ParseIntoTrajectories((*doc)["memory_load_target"], pred_memory_load_target, next_step, out_conns.size());
+  ParseIntoTrajectories((*doc)["bandwidth_load_source"], pred_bandwidth_load_source, next_step, in_conns.size());
+  ParseIntoTrajectories((*doc)["memory_load_source"], pred_memory_load_source, next_step, in_conns.size());
+
+  ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
+  ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
+  
+
+  // Since the batched executor does only return a plain pointer to the parsed
+  // JSON doc, we need to free it here.
   delete doc;
-  cout << "deleted" << endl;
+}
+
+void
+PredController::ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj)
+{
+  NS_ASSERT(array.IsArray());
+  NS_ASSERT(array.Size() > 0);
+
+  NS_ASSERT(array[0].IsArray());
+  const size_t num_traj = array[0].Size();
+  NS_ASSERT(num_traj == expected_traj);
+
+  target.clear();
+  for (size_t i=0; i<num_traj; i++) {
+    target.push_back(Trajectory{this, first_time});
+  }
+
+  for (size_t step=0; step<array.Size(); step++) {
+    NS_ASSERT(array[step].IsArray());
+    NS_ASSERT(array[step].Size() == num_traj);
+
+    for (size_t traj=0; traj< num_traj; traj++) {
+
+    //   const char* kTypeNames[] = 
+    // { "Null", "False", "True", "Object", "Array", "String", "Number" };
+    //   cout << kTypeNames[array[step][traj].GetType()] << endl;
+
+      // make sure this is a one-element array...
+      NS_ASSERT(array[step][traj].IsArray());
+      NS_ASSERT(array[step][traj].Size() == 1);
+
+      NS_ASSERT(array[step][traj][0].IsDouble());
+
+      target[traj].Elements().push_back(array[step][traj][0].GetDouble());
+    }
+  }
+}
+
+void
+PredController::ParseCvOutIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t expected_traj_outer)
+{
+  NS_ASSERT(array.IsArray());
+  NS_ASSERT(array.Size() > 0);
+
+  NS_ASSERT(array[0].IsArray());
+  const size_t num_conns = array[0].Size();
+  cout << num_conns << " " << expected_traj_outer << endl;
+  NS_ASSERT(num_conns == expected_traj_outer);
+
+  target.clear();
+
+  map<size_t,size_t> conn_to_circnum;
+
+  // For each of the connections, add a vector that contains all of the respective circuits...
+  for (size_t conn=0; conn<num_conns; conn++) {
+    target.push_back(vector<Trajectory>{});
+    
+    /// ...and initialize a trajectory for each of its circuits
+    NS_ASSERT(array[0][conn].IsArray());
+    conn_to_circnum[conn] = array[0][conn].Size();
+
+    for (size_t i=0; i<conn_to_circnum[conn]; i++) {
+      target[conn].push_back(Trajectory{this,first_time});
+    }
+  }
+
+  for (size_t step=0; step<array.Size(); step++) {
+    NS_ASSERT(array[step].IsArray());
+    NS_ASSERT(array[step].Size() == num_conns);
+
+    for (size_t conn=0; conn<num_conns; conn++) {
+      NS_ASSERT(array[step][conn].IsArray());
+
+      // Ensure the number of circuits per connection is constant over time
+      NS_ASSERT(array[step][conn].Size() == conn_to_circnum[conn]);
+
+      for (size_t circ=0; circ<array[step][conn].Size(); circ++) {
+        NS_ASSERT(array[step][conn][circ].IsArray());
+        NS_ASSERT(array[step][conn][circ].Size() == 1);
+        NS_ASSERT(array[step][conn][circ][0].IsDouble());
+        double val = array[step][conn][circ][0].GetDouble();
+        
+        target[conn][circ].Elements().push_back(val);
+      }
+    }
+  }
+}
+
+void
+PredController::ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t connections)
+{
+  NS_ASSERT(array.IsArray());
+  NS_ASSERT(array.Size() > 0);
+
+  NS_ASSERT(array[0].IsArray());
+  const size_t num_elements = array[0].Size();
+
+  NS_ASSERT(num_elements > 0);
+  NS_ASSERT(num_elements % connections == 0);
+  size_t num_steps = num_elements / connections;
+
+  map<size_t,size_t> conn_to_circnum;
+  
+  target.clear();
+
+  for(size_t conn=0; conn<connections; conn++) {
+    NS_ASSERT(array[0][conn].IsArray());
+
+    conn_to_circnum[conn] = array[0][conn].Size();
+    target.push_back(vector<Trajectory>{});
+
+    for (size_t i=0; i<conn_to_circnum[conn]; i++) {
+      target[conn].push_back(Trajectory{this,first_time});
+    }
+  }
+
+  for (size_t step=0; step<num_steps; step++) {
+    for (size_t conn=0; conn<connections; conn++) {
+      NS_ASSERT(array[0][step*connections+conn].IsArray());
+
+      // Ensure the number of circuits per connection is constant over time
+      NS_ASSERT(array[0][step*connections+conn].Size() == conn_to_circnum[conn]);
+
+      for (size_t circ=0; circ<array[0][step*connections+conn].Size(); circ++) {
+        NS_ASSERT(array[0][step*connections+conn][circ].IsArray());
+        NS_ASSERT(array[0][step*connections+conn][circ].Size() == 1);
+        NS_ASSERT(array[0][step*connections+conn][circ][0].IsDouble());
+        double val = array[0][step*connections+conn][circ][0].GetDouble();
+        
+        target[conn][circ].Elements().push_back(val);
+      }
+    }
+  }
 }
 
 BatchedExecutor PredController::executor;
