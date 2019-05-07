@@ -1201,7 +1201,7 @@ PredController::Setup ()
     "setup",
     "relay", app->GetNodeName (),
     "v_max", to_packets_sec(MaxDataRate ()),
-    "s_max", 30,
+    "s_max", 10000, // TODO
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
     "weights", vector<string>({"control_delta", "0.1", "send", "1", "store", "0", "receive", "1"}),
