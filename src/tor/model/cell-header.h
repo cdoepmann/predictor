@@ -10,6 +10,10 @@ namespace ns3 {
 
 //used cell types
         #define RELAY 3
+        #define DIRECT_MULTI 4
+        #define DIRECT_MULTI_END 6
+
+//used cell commands
         #define RELAY_DATA 2
         #define RELAY_SENDME 5
 

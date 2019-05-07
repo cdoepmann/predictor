@@ -31,6 +31,7 @@ class PredConnection;
 class TorPredApp;
 class PredController;
 class Trajectory;
+class MultiCellDecoder;
 
 
 class PredCircuit : public BaseCircuit
@@ -111,6 +112,21 @@ public:
 
   // Get the (theoretical) base delay to the remote site
   Time GetBaseRtt ();
+
+  void PushConnLevelCell (Ptr<Packet>);
+
+  // Get the total size of cells queued for connection-level communication
+  size_t GetConnLevelQueueSize() {
+    size_t res = 0;
+    for (auto && p : connlevel_queue) {
+      res += p->GetSize();
+    }
+    return res;
+  };
+
+protected:
+  // Queue of cells that are to be sent without being associated to a circuit.
+  deque<Ptr<Packet>> connlevel_queue;
 
 private:
   TorPredApp* torapp;
@@ -208,9 +224,17 @@ public:
   // The controller used for our optimization-based scheduling
   Ptr<PredController> controller;
 
+  // Handle an incoming connection-level cell
+  void HandleDirectCell (Ptr<PredConnection> conn, Ptr<Packet> cell);
+
 protected:
   virtual void DoDispose (void);
 
+  // Determine if a received cell is on the connection level (a.k.a. direct)
+  bool IsDirectCell (Ptr<Packet> cell);
+
+  // Decoder to re-assemble previously fragmented multi-cells
+  map<Ptr<PredConnection>, MultiCellDecoder> multicell_decoders;
 };
 
 
@@ -338,6 +362,9 @@ public:
   // Callex when the optimization step is complete.
   void OptimizeDone(rapidjson::Document * doc);
 
+  // Assemble information to be sent to our neighbors, after optimization
+  void SendToNeighbors();
+
   // Get the number of steps in the horizon
   size_t Horizon () { return horizon; };
 
@@ -363,6 +390,10 @@ protected:
   // be modified anymore since the order identifies the contained elements.
   set<Ptr<PredConnection>> in_conns;
   set<Ptr<PredConnection>> out_conns;
+
+  // Helper functions to lookup the index of a given connection in the data vectors
+  size_t GetInConnIndex(Ptr<PredConnection>);
+  size_t GetOutConnIndex(Ptr<PredConnection>);
 
   // The number of circuits handled by this relay
   size_t num_circuits;
@@ -516,6 +547,90 @@ protected:
 
   // Elements in the horizon
   vector<double> elements;
+};
+
+// Helper classes to transfer data that does not fit into a single cell.
+class MultiCellDecoder {
+public:
+  MultiCellDecoder() : finished{false} {};
+
+  void AddCell(Ptr<Packet> cell) {
+    NS_ASSERT(!finished);
+    NS_ASSERT(cell);
+
+    cell = cell->Copy();
+
+    CellHeader h;
+    cell->RemoveHeader (h);
+
+    NS_ASSERT(h.GetType() == DIRECT_MULTI || h.GetType() == DIRECT_MULTI_END);
+    NS_ASSERT(h.GetLength() <= cell->GetSize());
+
+    size_t old_size = data.size();
+    data.resize(old_size + h.GetLength());
+    cell->CopyData(data.data() + old_size, h.GetLength());
+
+    if (h.GetType() == DIRECT_MULTI_END) {
+      finished = true;
+    }
+  };
+
+  bool IsReady() { return finished; }
+
+  Ptr<Packet> GetAndReset() {
+    NS_ASSERT(finished);
+
+    Ptr<Packet> result = Create<Packet> (data.data(), data.size());
+    finished = false;
+    data.clear();
+
+    return result;
+  }
+
+private:
+  vector<uint8_t> data;
+  bool finished;
+};
+
+class MultiCellEncoder {
+public:
+  // Create a series of smaller cells from a packet too large for a single cell
+  static vector<Ptr<Packet>> encode(Ptr<Packet> large_packet) {
+    large_packet = large_packet->Copy();
+    vector<Ptr<Packet>> result;
+
+    while (large_packet->GetSize() > 0) {
+      Ptr<Packet> new_packet = Create<Packet>();
+
+      if (large_packet->GetSize() <= CELL_PAYLOAD_SIZE) {
+        new_packet = large_packet->Copy();
+      }
+      else {
+        new_packet = large_packet->CreateFragment(0, CELL_PAYLOAD_SIZE);
+      }
+      large_packet->RemoveAtStart(new_packet->GetSize());
+
+      CellHeader h;
+
+      if (large_packet->GetSize() > 0)
+        h.SetType (DIRECT_MULTI);
+      else
+        h.SetType (DIRECT_MULTI_END);
+
+      h.SetCircId (0);
+      h.SetCmd (RELAY_DATA);
+      h.SetLength (new_packet->GetSize ());
+
+      if (new_packet->GetSize() < CELL_PAYLOAD_SIZE){
+        new_packet->AddPaddingAtEnd(CELL_PAYLOAD_SIZE - new_packet->GetSize());
+      }
+      new_packet->AddHeader (h);
+
+      result.push_back(new_packet);
+    }
+
+    return std::move(result);
+  }
 };
 
 } //namespace ns3
