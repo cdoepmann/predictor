@@ -1238,36 +1238,30 @@ PredController::Optimize ()
   //       - Which order does the solver need?
   //       - Maybe use a map, instead?
 
-  for (auto&& conn : out_conns)
-  {
-    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-    packets_per_circuit.push_back(
-      first_circuit->GetQueueSize(first_circuit->GetDirection(conn))
-    );
-    
-    auto next_circuit = first_circuit->GetNextCirc(conn);
-    while (next_circuit != first_circuit)
-    {
-      packets_per_circuit.push_back(
-        next_circuit->GetQueueSize(next_circuit->GetDirection(conn))
-      );
-      next_circuit = next_circuit->GetNextCirc(conn);
-    }
-  }
-
-  // Get the connections' output buffer loads
+  // Also, accumulate the values per connection
   vector<double> packets_per_conn;
 
   for (auto&& conn : out_conns)
   {
-    double packets = 0;
+    double this_conn = 0.0;
 
-    auto tcp = conn->GetSocket()->GetObject<TcpSocketBase> ();
-    if (tcp)
+    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+
+    double queue_size = first_circuit->GetQueueSize(first_circuit->GetDirection(conn));
+    packets_per_circuit.push_back(queue_size);
+    this_conn += queue_size;
+    
+    auto next_circuit = first_circuit->GetNextCirc(conn);
+    while (next_circuit != first_circuit)
     {
-      packets = (double) tcp->GetTxBuffer()->Size() / CELL_NETWORK_SIZE;
+      queue_size = next_circuit->GetQueueSize(next_circuit->GetDirection(conn));
+      packets_per_circuit.push_back(queue_size);
+      this_conn += queue_size;
+      
+      next_circuit = next_circuit->GetNextCirc(conn);
     }
-    packets_per_conn.push_back(packets);
+
+    packets_per_conn.push_back(this_conn);
   }
 
   // Get the connections' output transit packet count
