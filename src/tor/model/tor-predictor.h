@@ -444,7 +444,7 @@ protected:
 };
 
 
-class Trajectory {
+class Trajectory : public SimpleRefCount<Trajectory> {
 public:
   Trajectory(Ptr<PredController> controller, Time first_time) : time_step{controller->TimeStep()}, first_time{first_time} {};
   Trajectory(Time time_step, Time first_time) : time_step{time_step}, first_time{first_time} {};
@@ -537,6 +537,9 @@ public:
 
     return sum;
   }
+
+  // Get the time step
+  Time GetTimeStep() { return time_step; }
 
 protected:
   // The time step per element
@@ -633,6 +636,229 @@ public:
   }
 };
 
+class TrajectoryHeader : public Header
+{
+public:
+
+  TrajectoryHeader () : m_trajectory{0} { }
+
+  TypeId
+  GetTypeId () const
+  {
+    static TypeId tid = TypeId ("ns3::TrajectoryHeader")
+      .SetParent<Header> ()
+      .AddConstructor<TrajectoryHeader> ()
+    ;
+    return tid;
+  }
+
+  TypeId
+  GetInstanceTypeId () const
+  {
+    return GetTypeId ();
+  }
+
+  void
+  Print (ostream &os) const
+  {
+    if (m_trajectory) {
+      os << "first_time=" << m_trajectory->GetTime().GetSeconds() << " ";
+      os << "time_step=" << m_trajectory->GetTimeStep().GetSeconds() << " ";
+      os << "num_elements=" << m_trajectory->Steps();
+    }
+    else {
+      os << "(empty/invalid trajectory)";
+    }
+  }
+
+  uint32_t
+  GetSerializedSize () const
+  {
+    NS_ASSERT(m_trajectory);
+    return 2*sizeof(double) + 1*sizeof(uint16_t) + m_trajectory->Steps()*sizeof(double);
+  }
+
+  void
+  Serialize (Buffer::Iterator start) const
+  {
+    NS_ASSERT(m_trajectory);
+    Buffer::Iterator iter = start;
+
+    WriteDouble(iter, m_trajectory->GetTime().GetSeconds());
+    WriteDouble(iter, m_trajectory->GetTimeStep().GetSeconds());
+    iter.WriteU16((uint16_t) m_trajectory->Steps());
+
+    for (auto&& val : m_trajectory->Elements()) {
+      WriteDouble(iter, val);
+    }
+  }
+
+  uint32_t
+  Deserialize (Buffer::Iterator start)
+  {
+    Buffer::Iterator iter = start;
+    double time_step = ReadDouble(iter);
+    double first_time = ReadDouble(iter);
+    uint16_t num_elements = iter.ReadU16();
+
+    m_trajectory = Create<Trajectory>(Seconds(time_step), Seconds(first_time));
+
+    for (int i=0; i<(int)num_elements; i++) {
+      double val = ReadDouble(iter);
+      m_trajectory->Elements().push_back(val);
+    }
+
+    return GetSerializedSize ();
+  }
+
+  // Copy a trajectory into this header object
+  void SetTrajectory(Ptr<Trajectory> origin) {
+    m_trajectory = origin;
+  }
+
+  Ptr<Trajectory> GetTrajectory() { return m_trajectory; }
+
+protected:
+  Ptr<Trajectory> m_trajectory;
+
+private:
+  double ReadDouble(Buffer::Iterator& iter) {
+    double v;
+    uint8_t *buf = (uint8_t *)&v;
+
+    for (uint32_t i = 0; i < sizeof (double); ++i, ++buf) {
+      *buf = iter.ReadU8 ();
+    }
+
+    return v;
+  }
+
+  void WriteDouble(Buffer::Iterator& iter, double v) const {
+    uint8_t *buf = (uint8_t *)&v;
+
+    for (uint32_t i = 0; i < sizeof (double); ++i, ++buf) {
+      iter.WriteU8 (*buf);
+    }
+  }
+};
+
+// Stores the meaning of what a serialized trajectory denotes (symbol), as
+// regarded by the *sender*.
+enum class FeedbackTrajectoryKind : uint8_t {VInMax, VOut, CvOut, MemoryLoad, BandwidthLoad};
+
+class FeedbackKindHeader : public Header
+{
+public:
+  FeedbackKindHeader () { }
+
+  TypeId
+  GetTypeId () const
+  {
+    static TypeId tid = TypeId ("ns3::FeedbackKindHeader")
+      .SetParent<Header> ()
+      .AddConstructor<FeedbackKindHeader> ()
+    ;
+    return tid;
+  }
+
+  TypeId
+  GetInstanceTypeId () const
+  {
+    return GetTypeId ();
+  }
+
+  void
+  Print (ostream &os) const
+  {
+    os << "kind=" << (uint8_t) kind;
+  }
+
+  uint32_t
+  GetSerializedSize () const
+  {
+    return 1;
+  }
+
+  void
+  Serialize (Buffer::Iterator start) const
+  {
+    Buffer::Iterator iter = start;
+    iter.WriteU8((uint8_t) kind);
+  }
+
+  uint32_t
+  Deserialize (Buffer::Iterator start)
+  {
+    Buffer::Iterator iter = start;
+    kind = (FeedbackTrajectoryKind) iter.ReadU8() ;
+    return GetSerializedSize ();
+  }
+
+  void SetKind(FeedbackTrajectoryKind new_kind) { kind = new_kind; }
+
+  FeedbackTrajectoryKind GetKind() { return kind; }
+
+protected:
+  FeedbackTrajectoryKind kind;
+};
+
+// Generate and parse messages that are exchanged between the controllers of
+// neighboring relays.
+class PredFeedbackMessage {
+public:
+  // Construct by parsing an existing packet
+  PredFeedbackMessage(Ptr<Packet> packet) {
+    // parse the packet
+    packet = packet->Copy();
+    while (packet->GetSize() > 0) {
+      FeedbackKindHeader kind;
+      packet->RemoveHeader(kind);
+
+      TrajectoryHeader traj;
+      packet->RemoveHeader(traj);
+
+      entries[kind.GetKind()] = traj.GetTrajectory();
+    }
+  };
+
+  // Construct an empty message to be filled with local information
+  PredFeedbackMessage() { };
+
+  // Add a trajectory to this message
+  void Add(FeedbackTrajectoryKind key, Trajectory& value) {
+    // this relies on the copy constructor of Trajectory
+    entries[key] = Create<Trajectory> (value);
+  }
+
+  // Get one of the contained trajectories
+  const Ptr<Trajectory> Get(FeedbackTrajectoryKind key) {
+    NS_ASSERT(entries.find(key) != entries.end());
+
+    return entries[key];
+  }
+
+  // Construct a packet from the previously added trajectories
+  Ptr<Packet> MakePacket() {
+    Ptr<Packet> packet = Create<Packet> ();
+
+    for (auto& kv : entries) {
+      FeedbackKindHeader kind;
+      kind.SetKind(kv.first);
+
+      TrajectoryHeader traj;
+      traj.SetTrajectory(kv.second);
+
+      packet->AddHeader(traj);
+      packet->AddHeader(kind);
+    }
+
+    return packet;
+  }
+
+protected:
+  map<FeedbackTrajectoryKind,Ptr<Trajectory>> entries;
+};
+
 } //namespace ns3
 
-#endif /* __TOR_H__ */
+#endif /* __TOR_PREDICTOR_H__ */

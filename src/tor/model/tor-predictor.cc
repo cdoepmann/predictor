@@ -1846,32 +1846,22 @@ PredController::SendToNeighbors()
   conn_index = 0;
   for (auto&& conn : in_conns)
   {
-    // Trajectory& v_in_max = pred_v_in_max[conn_index];
-    
-    conn_index++;
+    PredFeedbackMessage msg;
 
-    // Ptr<Packet> cell = Create<Packet> (CELL_PAYLOAD_SIZE);
-    // CellHeader h;
-    // h.SetCircId (0);
-    // h.SetType (DIRECT_MULTI_END);
-    // h.SetCmd (0);
-    // h.SetLength (cell->GetSize ());
-    // cell->AddHeader (h);
+    Trajectory& v_in_max = pred_v_in_max[conn_index];
+    msg.Add(FeedbackTrajectoryKind::VInMax, v_in_max);
 
-    // TODO
-    vector<uint8_t> payload;
-    for (int i=0; i<2211; i++) {
-      payload.push_back(i % 256);
-    }
-    Ptr<Packet> large = Create<Packet> (payload.data(), payload.size());
+    Ptr<Packet> packet = msg.MakePacket();
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    for (auto && fragment : MultiCellEncoder::encode(large))
+    for (auto && fragment : MultiCellEncoder::encode(packet))
     {
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
       conn->PushConnLevelCell(fragment);
     }
+    
+    conn_index++;
   }
 }
 
