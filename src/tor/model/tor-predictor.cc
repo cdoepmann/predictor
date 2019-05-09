@@ -1659,6 +1659,8 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["memory_load_target"], pred_memory_load_target, next_step, out_conns.size());
   ParseIntoTrajectories((*doc)["bandwidth_load_source"], pred_bandwidth_load_source, next_step, in_conns.size());
   ParseIntoTrajectories((*doc)["memory_load_source"], pred_memory_load_source, next_step, in_conns.size());
+  ParseIntoTrajectories((*doc)["bandwidth_load"], pred_bandwidth_load_local, next_step, 1);
+  ParseIntoTrajectories((*doc)["memory_load"], pred_memory_load_local, next_step, 1);
 
   ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
   ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
@@ -1843,14 +1845,56 @@ PredController::SendToNeighbors()
 
   NS_ASSERT(in_conns.size() == pred_v_in_max.size());
   
+  // successor
   conn_index = 0;
   for (auto&& conn : in_conns)
   {
     PredFeedbackMessage msg;
 
-    Trajectory& v_in_max = pred_v_in_max[conn_index];
-    msg.Add(FeedbackTrajectoryKind::VInMax, v_in_max);
+    msg.Add(FeedbackTrajectoryKind::VInMax, pred_v_in_max[conn_index]);
+    msg.Add(FeedbackTrajectoryKind::BandwidthLoad, pred_bandwidth_load_local[0]);
+    msg.Add(FeedbackTrajectoryKind::MemoryLoad, pred_memory_load_local[0]);
 
+    // Assemble the trajectories
+    Ptr<Packet> packet = msg.MakePacket();
+
+    NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
+
+    for (auto && fragment : MultiCellEncoder::encode(packet))
+    {
+      NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
+      conn->PushConnLevelCell(fragment);
+    }
+    
+    conn_index++;
+  }
+  
+  // predecessor
+  conn_index = 0;
+  for (auto&& conn : out_conns)
+  {
+    PredFeedbackMessage msg;
+
+    msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out_max[conn_index]);
+
+    // collect the composition share of each circuit
+    // TODO: make sure that the order matches the receiver's order
+    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
+    size_t circ_index = 0;
+    msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
+    
+    auto next_circuit = first_circuit->GetNextCirc(conn);
+    circ_index++;
+
+    while (next_circuit != first_circuit)
+    {
+      msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
+
+      next_circuit = next_circuit->GetNextCirc(conn);
+      circ_index++;
+    }
+
+    // Assemble the trajectories
     Ptr<Packet> packet = msg.MakePacket();
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");

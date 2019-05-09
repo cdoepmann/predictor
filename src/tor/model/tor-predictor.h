@@ -438,6 +438,8 @@ protected:
   vector<Trajectory> pred_bandwidth_load_source;
   vector<Trajectory> pred_memory_load_target;
   vector<Trajectory> pred_memory_load_source;
+  vector<Trajectory> pred_bandwidth_load_local; // only contains one element
+  vector<Trajectory> pred_memory_load_local;    // only contains one element
 
   vector<vector<Trajectory>> pred_cv_in;
   vector<vector<Trajectory>> pred_cv_out;
@@ -817,7 +819,7 @@ public:
       TrajectoryHeader traj;
       packet->RemoveHeader(traj);
 
-      entries[kind.GetKind()] = traj.GetTrajectory();
+      Add(kind.GetKind(), traj.GetTrajectory());
     }
   };
 
@@ -825,16 +827,33 @@ public:
   PredFeedbackMessage() { };
 
   // Add a trajectory to this message
+  void Add(FeedbackTrajectoryKind key, Ptr<Trajectory> value) {
+    auto entry = make_pair(key, value);
+    entries.push_back(entry);
+  }
   void Add(FeedbackTrajectoryKind key, Trajectory& value) {
     // this relies on the copy constructor of Trajectory
-    entries[key] = Create<Trajectory> (value);
+    Add(key, Create<Trajectory> (value));
   }
 
-  // Get one of the contained trajectories
+  // Get the first contained trajectory of a given type
   const Ptr<Trajectory> Get(FeedbackTrajectoryKind key) {
-    NS_ASSERT(entries.find(key) != entries.end());
+    for (auto&& entry : entries) {
+      if (entry.first == key)
+        return entry.second;
+    }
+    NS_ABORT_MSG("feedback message does not contain an entry of the requested type");
+    return 0;
+  }
 
-    return entries[key];
+  // Get all contained trajectories of a given type
+  const vector<Ptr<Trajectory>> GetAll(FeedbackTrajectoryKind key) {
+    vector<Ptr<Trajectory>> result;
+    for (auto&& entry : entries) {
+      if (entry.first == key)
+        result.push_back(entry.second);
+    }
+    return result;
   }
 
   // Construct a packet from the previously added trajectories
@@ -856,7 +875,7 @@ public:
   }
 
 protected:
-  map<FeedbackTrajectoryKind,Ptr<Trajectory>> entries;
+  vector<std::pair<FeedbackTrajectoryKind,Ptr<Trajectory>>> entries;
 };
 
 } //namespace ns3
