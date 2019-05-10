@@ -132,9 +132,32 @@ TorPredApp::AddActiveCircuit (Ptr<PredConnection> conn, Ptr<PredCircuit> circ)
         }
       else
         {
-          Ptr<PredCircuit> temp = conn->GetActiveCircuits ()->GetNextCirc (conn);
-          circ->SetNextCirc (conn, temp);
-          conn->GetActiveCircuits ()->SetNextCirc (conn, circ);
+          // insert in sorted order (sorted by circuit ID)
+          Ptr<PredCircuit> first = conn->GetActiveCircuits();
+          if (circ->GetId() <= first->GetId()) {
+            circ->SetNextCirc (conn, first);
+            conn->SetActiveCircuits (circ);
+
+            // fix circular reference that still points to old "first" circuit
+            Ptr<PredCircuit> current = first;
+            while (current->GetNextCirc(conn) != first) {
+              current = current->GetNextCirc(conn);
+            }
+            current->SetNextCirc(conn, circ);
+          }
+          else {
+            // insert at a later position
+            Ptr<PredCircuit> current = first;
+            while (
+              (current->GetNextCirc(conn)->GetId() <= circ->GetId()) &&
+              (current->GetNextCirc(conn) != first)
+            ) {
+              current = current->GetNextCirc(conn);
+            }
+            // insert after current
+            circ->SetNextCirc(conn, current->GetNextCirc(conn));
+            current->SetNextCirc(conn, circ);
+          }
         }
     }
 }
