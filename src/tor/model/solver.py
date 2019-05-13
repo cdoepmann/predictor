@@ -75,7 +75,7 @@ class Handler:
         self.relay = kwargs['relay']
 
         setup_dict = dict()
-        for k in ['v_max','s_max','dt','N_steps']:
+        for k in ['v_in_max_total','v_out_max_total','s_softmax','dt','N_steps']:
             setup_dict[k] = kwargs[k]
 
         # parse weights
@@ -96,7 +96,6 @@ class Handler:
             n_out = kwargs['n_out'],
             input_circuits = kwargs['input_circuits'],
             output_circuits = kwargs['output_circuits'],
-            output_delay = np.array(kwargs['output_delays']),
         )
 
         return setup_dict
@@ -113,10 +112,9 @@ class Handler:
             return np.array([res])
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}) ots.solve', self.ots.solve, argnames=[ 's_buffer_0', 's_circuit_0', 's_transit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source', 'output_delay' ])(
+        Wrap(f'({self.relay}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source'])(
             inner_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['s_circuit_0']),
-            inner_nparray(kwargs['s_transit_0']),
             inner_nparray(kwargs['v_in_req']),
             process_cv_in(kwargs['cv_in']),
             inner_nparray(kwargs['v_out_max']),
@@ -124,7 +122,6 @@ class Handler:
             inner_nparray(kwargs['memory_load_target']),
             inner_nparray(kwargs['bandwidth_load_source']),
             inner_nparray(kwargs['memory_load_source']),
-            np.array(kwargs['output_delay']),
         )
 
         def make_serializable(x):

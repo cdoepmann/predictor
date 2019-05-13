@@ -1274,7 +1274,6 @@ PredController::Setup ()
 
   // collect the output connections...
   vector<vector<uint16_t>> outputs;
-  vector<double> output_delays;
   num_circuits = 0;
 
   for (auto it = out_conns.begin (); it != out_conns.end(); ++it)
@@ -1295,31 +1294,22 @@ PredController::Setup ()
 
     outputs.push_back(circ_ids);
     num_circuits += circ_ids.size();
-
-    // calculate the expected RTT for each outgoing connection
-    Time delay = conn->GetBaseRtt();
-
-    // do not allow plain zero, even for edge relays (solver requires this)
-    if (delay == Seconds(0))
-      delay = MilliSeconds(1);
-
-    output_delays.push_back(delay.GetSeconds ());
   }
 
   // auto obj = 
   auto result = pyscript.call(
     "setup",
     "relay", app->GetNodeName (),
-    "v_max", to_packets_sec(MaxDataRate ()),
-    "s_max", 10000, // TODO
+    "v_in_max_total", to_packets_sec(MaxDataRate ()),
+    "v_out_max_total", to_packets_sec(MaxDataRate ()),
+    "s_softmax", 500, // TODO
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
     "weights", vector<string>({"control_delta", "0.1", "send", "1", "store", "0", "receive", "1"}),
     "n_in", inputs.size(),
     "input_circuits", inputs,
     "n_out", outputs.size(),
-    "output_circuits", outputs,
-    "output_delays", output_delays
+    "output_circuits", outputs
   );
 
   // Since the batched executor does only return a plain pointer to the parsed
@@ -1372,14 +1362,6 @@ PredController::Optimize ()
     }
 
     packets_per_conn.push_back(this_conn);
-  }
-
-  // Get the connections' output transit packet count
-  vector<double> transit_packets_per_conn;
-
-  for (auto&& conn : out_conns)
-  {
-    transit_packets_per_conn.push_back((double) conn->GetBytesInTransit() / CELL_NETWORK_SIZE);
   }
 
   //
@@ -1598,7 +1580,6 @@ PredController::Optimize ()
         "relay", app->GetNodeName (),
         "s_buffer_0", packets_per_conn,
         "s_circuit_0", packets_per_circuit,
-        "s_transit_0", transit_packets_per_conn,
         "output_delay", output_delays,
 
         // trajectories
