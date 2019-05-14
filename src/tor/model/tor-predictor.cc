@@ -1013,25 +1013,6 @@ PredConnection::SetSocket (Ptr<Socket> socket)
 {
   // called both when establishing the connection and when accepting it
   m_socket = socket;
-
-  // register our RTT estimator
-  auto tcp = DynamicCast<TcpSocketBase> (socket);
-  if (tcp)
-  {
-    
-    auto l4proto = tcp->GetNode()->GetObject<TcpL4Protocol> ();
-    cout << l4proto << endl;
-    TypeIdValue default_rtt;
-    l4proto->GetAttribute("RttEstimatorType", default_rtt);
-
-    ObjectFactory rttFactory;
-    rttFactory.SetTypeId (default_rtt.Get());
-
-    rtt_estimator = rttFactory.Create<RttEstimator> ();
-    tcp->SetRtt (rtt_estimator);
-
-    tcp->TraceConnectWithoutContext("HighestSequence", MakeCallback(&PredConnection::UpdateMaxSentSeq, this));
-  }
 }
 
 void
@@ -1041,49 +1022,10 @@ PredConnection::SetControlSocket (Ptr<Socket> socket)
   m_controlsocket = socket;
 }
 
-void
-PredConnection::UpdateMaxSentSeq (SequenceNumber32 old_value, SequenceNumber32 new_value)
-{
-  max_sent_seq = new_value;
-}
-
-Time
-PredConnection::EstimateRtt ()
-{
-  if (rtt_estimator && rtt_estimator->GetNSamples () > 0)
-  {
-    return rtt_estimator->GetEstimate ();
-  }
-  return MilliSeconds(200); // TODO
-}
-
 Time
 PredConnection::GetBaseRtt ()
 {
   return torapp->GetPeerDelay (GetRemote ());
-}
-
-uint32_t
-PredConnection::GetBytesInTransit ()
-{
-    auto tcp = GetSocket()->GetObject<TcpSocketBase> ();
-    if (tcp)
-    {
-      auto buffer = tcp->GetTxBuffer();
-
-      NS_ASSERT (buffer->TailSequence() - GetHighestTxSeq() >= 0);
-
-      if (buffer->Size() > static_cast<uint32_t>(buffer->TailSequence() - GetHighestTxSeq()))
-      {
-        return buffer->Size() - static_cast<uint32_t>(buffer->TailSequence() - GetHighestTxSeq());
-      }
-      else
-      {
-        return 0;
-      }
-      
-    }
-    return 0;
 }
 
 Ipv4Address
@@ -1442,19 +1384,9 @@ PredController::Optimize ()
 {
   // Firstly, measure the necessary local information.
 
-  // Estimate the out-conns' RTTs
-  vector<double> rtts_per_conn;
-
-  for (auto&& conn : out_conns)
-  {
-    rtts_per_conn.push_back(conn->EstimateRtt().GetSeconds());
-  }
-
   // Get the circuits' queue lengthes
   vector<double> packets_per_circuit;
   // TODO: - Verify that the order of these circuits is correct!
-  //       - Which order does the solver need?
-  //       - Maybe use a map, instead?
 
   // Also, accumulate the values per connection
   vector<double> packets_per_conn;
@@ -1660,34 +1592,6 @@ PredController::Optimize ()
       bandwidth_load_source.push_back(idle);
     }
   }
-  vector<double> output_delays;
-
-  for (auto it = out_conns.begin (); it != out_conns.end(); ++it)
-  {
-    // ...and their circuits
-    auto conn = *it;
-    vector<uint16_t> circ_ids;
-    
-    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-    circ_ids.push_back(first_circuit->GetId());
-    
-    auto next_circuit = first_circuit->GetNextCirc(conn);
-    while (next_circuit != first_circuit)
-    {
-      circ_ids.push_back(next_circuit->GetId());
-      next_circuit = next_circuit->GetNextCirc(conn);
-    }
-
-    // calculate the expected RTT for each outgoing connection
-    Time delay = conn->GetBaseRtt();
-
-    // do not allow plain zero, even for edge relays (solver requires this)
-    if (delay == Seconds(0))
-      delay = MilliSeconds(1);
-
-    output_delays.push_back(delay.GetSeconds ());
-  }
-  
 
   // Call the optimizer
   executor.Compute([=]
@@ -1698,7 +1602,6 @@ PredController::Optimize ()
         "relay", app->GetNodeName (),
         "s_buffer_0", packets_per_conn,
         "s_circuit_0", packets_per_circuit,
-        "output_delay", output_delays,
 
         // trajectories
         "v_in_req", transpose_to_double_vectors(v_in_req),

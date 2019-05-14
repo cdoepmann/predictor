@@ -109,14 +109,6 @@ public:
   string GetRemoteName ();
   TorPredApp * GetTorApp() { return torapp; }
 
-  // Get the current RTT estimate or 0 if there is none
-  Time EstimateRtt ();
-
-  // Get the number of bytes currently in transit. This differs from "BytesInFlight"
-  // in that we do not want to count retransmissions etc., but focus on the
-  // high-level progress of the "reliable byte stream" service.
-  uint32_t GetBytesInTransit ();
-
   // Get the (theoretical) base delay to the remote site
   Time GetBaseRtt ();
 
@@ -148,20 +140,6 @@ private:
   Ipv4Address remote;
   Ptr<Socket> m_socket;
   Ptr<Socket> m_controlsocket;
-
-  // make the RTT estimation accessible
-  Ptr<RttEstimator> rtt_estimator;
-
-  // Highest sequence number sent by the socket, used for calculating the
-  // sequence number range that is currently in transit. We do this in order to
-  // avoid counting retransmissions etc. of the TCP logic.
-  SequenceNumber32 max_sent_seq;
-
-  // callback to update the maximum seq number sent so far
-  void UpdateMaxSentSeq (SequenceNumber32 old_value, SequenceNumber32 new_value);
-
-  // Get the highest sequence number that was transmitted over the underlying socket
-  SequenceNumber32 GetHighestTxSeq () { return max_sent_seq; }
 
   pred_buf_t inbuf; /**< Buffer holding left over data read over this connection. */
   pred_buf_t outbuf; /**< Buffer holding left over data to write over this connection. */
