@@ -34,6 +34,7 @@ TorPredApp::GetTypeId (void)
 TorPredApp::TorPredApp (void)
 {
   listen_socket = 0;
+  control_socket = 0;
   m_scheduleReadHead = 0;
   m_scheduleWriteHead = 0;
   controller = CreateObject<PredController> (this);
@@ -49,6 +50,7 @@ TorPredApp::DoDispose (void)
 {
   NS_LOG_FUNCTION (this);
   listen_socket = 0;
+  control_socket = 0;
 
   map<uint16_t,Ptr<PredCircuit> >::iterator i;
   for (i = circuits.begin (); i != circuits.end (); ++i)
@@ -182,6 +184,17 @@ TorPredApp::StartApplication (void)
   listen_socket->SetAcceptCallback (MakeNullCallback<bool,Ptr<Socket>,const Address &> (),
                                     MakeCallback (&TorPredApp::HandleAccept,this));
 
+  // create control socket
+  if (!control_socket)
+    {
+      control_socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
+      control_socket->Bind (InetSocketAddress (Ipv4Address::GetAny (), 9002));
+      control_socket->Listen ();
+    }
+
+  control_socket->SetAcceptCallback (MakeNullCallback<bool,Ptr<Socket>,const Address &> (),
+                                    MakeCallback (&TorPredApp::HandleControlAccept,this));
+
   Ipv4Mask ipmask = Ipv4Mask ("255.0.0.0");
 
   // iterate over all neighboring connections
@@ -202,6 +215,12 @@ TorPredApp::StartApplication (void)
           socket->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadCallback, this));
           conn->SetSocket (socket);
           m_triggerNewSocket(this, OUTBOUND, socket);
+
+          Ptr<Socket> control_socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
+          control_socket->Bind ();
+          control_socket->Connect (Address (InetSocketAddress (conn->GetRemote (), 9002)));
+          control_socket->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadControlCallback, this));
+          conn->SetControlSocket (control_socket);
         }
 
       if (ipmask.IsMatch (conn->GetRemote (), Ipv4Address ("127.0.0.1")) )
@@ -255,6 +274,13 @@ TorPredApp::StopApplication (void)
       listen_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
     }
 
+  // close control socket
+  if (control_socket)
+    {
+      control_socket->Close ();
+      control_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+    }
+
   // close all connections
   vector<Ptr<PredConnection> >::iterator it_conn;
   for ( it_conn = connections.begin (); it_conn != connections.end (); ++it_conn )
@@ -277,6 +303,23 @@ TorPredApp::GetCircuit (uint16_t circid)
   return circuits[circid];
 }
 
+void
+TorPredApp::ConnReadControlCallback (Ptr<Socket> socket)
+{
+  NS_ASSERT (socket);
+  Ptr<PredConnection> conn = LookupConnByControlSocket (socket);
+  NS_ASSERT (conn);
+  NS_ASSERT (conn->SpeaksCells ());
+
+  vector<Ptr<Packet>> packet_list;
+  conn->ReadControl (packet_list);
+
+  for (auto& cell : packet_list)
+  {
+    NS_ASSERT (IsDirectCell (cell));
+    HandleDirectCell(conn, cell);
+  }
+}
 
 void
 TorPredApp::ConnReadCallback (Ptr<Socket> socket)
@@ -384,11 +427,7 @@ TorPredApp::ReceiveRelayCell (Ptr<PredConnection> conn, Ptr<Packet> cell)
 
   NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] received relay cell (" << (IsDirectCell(cell) ? "connection" : "circuit") << "-level)");
 
-  if (IsDirectCell(cell))
-  {
-    HandleDirectCell(conn, cell);
-    return;
-  }
+  NS_ASSERT (!IsDirectCell(cell));
 
   Ptr<PredCircuit> circ = LookupCircuitFromCell (cell);
   NS_ASSERT (circ);
@@ -475,16 +514,6 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   // separate connection, esp. if data flows bidirectionally.
   
   uint32_t bucket_allowed = m_writebucket.GetSize ();
-  uint32_t connlevel_queued = (uint32_t) conn->GetConnLevelQueueSize ();
-  if (connlevel_queued > 0) {
-    uint32_t needed = conn->GetOutbufSize() + connlevel_queued;
-
-    if (bucket_allowed < needed)
-    {
-      NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] surpass global write bucket by " << needed-bucket_allowed << " bytes to accommodate connection-level cells");
-      bucket_allowed = needed;
-    }
-  }
 
   int written_bytes = 0;
   uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
@@ -542,6 +571,27 @@ TorPredApp::HandleAccept (Ptr<Socket> s, const Address& from)
   conn->ScheduleRead();
 }
 
+void
+TorPredApp::HandleControlAccept (Ptr<Socket> s, const Address& from)
+{
+  Ptr<PredConnection> conn;
+  Ipv4Address ip = InetSocketAddress::ConvertFrom (from).GetIpv4 ();
+  vector<Ptr<PredConnection> >::iterator it;
+  for (it = connections.begin (); it != connections.end (); ++it)
+    {
+      if ((*it)->GetRemote () == ip && !(*it)->GetControlSocket () )
+        {
+          conn = *it;
+          break;
+        }
+    }
+
+  NS_ASSERT (conn);
+  conn->SetControlSocket (s);
+
+  s->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadControlCallback, this));
+}
+
 
 
 Ptr<PredConnection>
@@ -552,6 +602,21 @@ TorPredApp::LookupConn (Ptr<Socket> socket)
     {
       NS_ASSERT (*it);
       if ((*it)->GetSocket () == socket)
+        {
+          return (*it);
+        }
+    }
+  return NULL;
+}
+
+Ptr<PredConnection>
+TorPredApp::LookupConnByControlSocket (Ptr<Socket> socket)
+{
+  vector<Ptr<PredConnection> >::iterator it;
+  for ( it = connections.begin (); it != connections.end (); it++ )
+    {
+      NS_ASSERT (*it);
+      if ((*it)->GetControlSocket () == socket)
         {
           return (*it);
         }
@@ -937,6 +1002,12 @@ PredConnection::GetSocket ()
   return m_socket;
 }
 
+Ptr<Socket>
+PredConnection::GetControlSocket ()
+{
+  return m_controlsocket;
+}
+
 void
 PredConnection::SetSocket (Ptr<Socket> socket)
 {
@@ -961,6 +1032,13 @@ PredConnection::SetSocket (Ptr<Socket> socket)
 
     tcp->TraceConnectWithoutContext("HighestSequence", MakeCallback(&PredConnection::UpdateMaxSentSeq, this));
   }
+}
+
+void
+PredConnection::SetControlSocket (Ptr<Socket> socket)
+{
+  // called both when establishing the connection and when accepting it
+  m_controlsocket = socket;
 }
 
 void
@@ -1090,6 +1168,45 @@ PredConnection::Read (vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 
 
 uint32_t
+PredConnection::ReadControl (vector<Ptr<Packet>>& packet_list)
+{
+  uint32_t available = m_controlsocket->GetRxAvailable();
+  if (available == 0)
+  {
+    return 0;
+  }
+
+  // make room for all the data that is available from the socket
+  size_t old_bufsize = control_inbuf.size();
+  control_inbuf.resize(old_bufsize + available);
+
+  // read the data into our buffer
+  int read_bytes = m_controlsocket->Recv (
+    control_inbuf.data() + old_bufsize,
+    available,
+    0
+  );
+
+  // determine number of complete cells
+  NS_ASSERT(SpeaksCells());
+  const uint32_t base = CELL_NETWORK_SIZE;
+  size_t num_packets = control_inbuf.size() / base;
+
+  // slice data into packets
+  for (size_t i=0; i<num_packets; i++)
+  {
+    Ptr<Packet> cell = Create<Packet> (control_inbuf.data() + i*base, base);
+    packet_list.push_back (cell);
+  }
+
+  // remove read data, but keep potential leftover
+  control_inbuf.erase(control_inbuf.begin(), control_inbuf.begin() + num_packets*base);
+
+  return read_bytes;
+}
+
+
+uint32_t
 PredConnection::Write (uint32_t max_write)
 {
   uint32_t base = SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
@@ -1110,46 +1227,29 @@ PredConnection::Write (uint32_t max_write)
 
   while (datasize < max_write)
     {
-      circ = nullptr;
+      circ = GetActiveCircuits ();
+      NS_ASSERT (circ);
 
-      NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] connection layer queue has size " << connlevel_queue.size());
-      if (connlevel_queue.size() > 0)
-      {
-        cell = connlevel_queue.front();
-        connlevel_queue.pop_front();
-      }
-      else
-      {
-        circ = GetActiveCircuits ();
-        NS_ASSERT (circ);
-
-        direction = circ->GetDirection (this);
-        cell = circ->PopCell (direction);
-      }
+      direction = circ->GetDirection (this);
+      cell = circ->PopCell (direction);
 
       if (cell)
         {
           datasize += cell->CopyData (&raw_data[datasize], cell->GetSize ());
           flushed_some = true;
-          if (circ)
-            NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
-          else
-            NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell on the connection layer");
+          NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
         }
 
-      if (circ)
-      {
-        SetActiveCircuits (circ->GetNextCirc (this));
+      SetActiveCircuits (circ->GetNextCirc (this));
 
-        if (GetActiveCircuits () == start_circ)
-          {
-            if (!flushed_some)
-              {
-                break;
-              }
-            flushed_some = false;
-          }
-      }
+      if (GetActiveCircuits () == start_circ)
+        {
+          if (!flushed_some)
+            {
+              break;
+            }
+          flushed_some = false;
+        }
     }
 
   // send data
@@ -1173,10 +1273,19 @@ PredConnection::Write (uint32_t max_write)
 }
 
 void
-PredConnection::PushConnLevelCell (Ptr<Packet> cell)
+PredConnection::SendConnLevelCell (Ptr<Packet> cell)
 {
-  connlevel_queue.push_back(cell);
-  ScheduleWrite();
+  if (!SpeaksCells())
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Dropping connection-level cell before sending because the remote is not a relay");
+    return;
+  }
+
+  int sent_bytes = m_controlsocket->Send(cell);
+
+  // We do not handle a full transmission buffer here, this is expected
+  // not to happen (might fail if feedback messages grow).
+  NS_ASSERT(sent_bytes == (int) cell->GetSize());
 }
 
 void
@@ -2003,7 +2112,7 @@ PredController::SendToNeighbors()
     for (auto && fragment : MultiCellEncoder::encode(packet))
     {
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
-      conn->PushConnLevelCell(fragment);
+      conn->SendConnLevelCell(fragment);
     }
     
     conn_index++;
@@ -2044,7 +2153,7 @@ PredController::SendToNeighbors()
     for (auto && fragment : MultiCellEncoder::encode(packet))
     {
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
-      conn->PushConnLevelCell(fragment);
+      conn->SendConnLevelCell(fragment);
     }
     
     conn_index++;

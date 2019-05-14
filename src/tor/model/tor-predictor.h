@@ -96,6 +96,11 @@ public:
   void ScheduleRead (Time = Seconds (0));
   Ptr<Socket> GetSocket ();
   void SetSocket (Ptr<Socket>);
+
+  void SetControlSocket (Ptr<Socket> socket);
+  Ptr<Socket> GetControlSocket ();
+  uint32_t ReadControl (vector<Ptr<Packet>> &);
+
   Ipv4Address GetRemote ();
   uint32_t GetOutbufSize ();
   uint32_t GetInbufSize ();
@@ -115,16 +120,7 @@ public:
   // Get the (theoretical) base delay to the remote site
   Time GetBaseRtt ();
 
-  void PushConnLevelCell (Ptr<Packet>);
-
-  // Get the total size of cells queued for connection-level communication
-  size_t GetConnLevelQueueSize() {
-    size_t res = 0;
-    for (auto && p : connlevel_queue) {
-      res += p->GetSize();
-    }
-    return res;
-  };
+  void SendConnLevelCell (Ptr<Packet>);
 
   size_t CountCircuits()
   {
@@ -146,13 +142,12 @@ public:
   };
 
 protected:
-  // Queue of cells that are to be sent without being associated to a circuit.
-  deque<Ptr<Packet>> connlevel_queue;
 
 private:
   TorPredApp* torapp;
   Ipv4Address remote;
   Ptr<Socket> m_socket;
+  Ptr<Socket> m_controlsocket;
 
   // make the RTT estimation accessible
   Ptr<RttEstimator> rtt_estimator;
@@ -170,6 +165,8 @@ private:
 
   pred_buf_t inbuf; /**< Buffer holding left over data read over this connection. */
   pred_buf_t outbuf; /**< Buffer holding left over data to write over this connection. */
+
+  vector<uint8_t> control_inbuf;
 
   uint8_t m_conntype;
 
@@ -218,8 +215,13 @@ public:
   void GlobalBucketsDecrement (uint32_t num_read, uint32_t num_written);
   uint32_t RoundRobin (int base, int64_t bucket);
   Ptr<PredConnection> LookupConn (Ptr<Socket>);
+  
+  void HandleControlAccept (Ptr<Socket>, const Address& from);
+  virtual void ConnReadControlCallback (Ptr<Socket>);
+  Ptr<PredConnection> LookupConnByControlSocket (Ptr<Socket>);
 
   Ptr<Socket> listen_socket;
+  Ptr<Socket> control_socket;
   vector<Ptr<PredConnection> > connections;
   map<uint16_t,Ptr<PredCircuit> > circuits;
 
