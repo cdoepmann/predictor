@@ -239,8 +239,7 @@ TorPredApp::StartApplication (void)
         }
     }
   
-  controller->Setup ();
-  Simulator::Schedule(Seconds(1), &PredController::Optimize, controller);
+  controller->Setup (); 
 
   m_triggerAppStart (Ptr<TorBaseApp>(this));
   NS_LOG_INFO ("StartApplication " << m_name << " ip=" << m_ip);
@@ -426,17 +425,7 @@ TorPredApp::HandleDirectCell (Ptr<PredConnection> conn, Ptr<Packet> cell)
   if (decoder.IsReady())
   {
     Ptr<Packet> multicell = decoder.GetAndReset();
-
-    // Just for printing
-    vector<uint8_t> rawdata;
-    rawdata.resize(multicell->GetSize());
-    multicell->CopyData(rawdata.data(), rawdata.size());
-
-    stringstream ss;
-    for (auto && byte : rawdata) {
-      ss << std::hex << static_cast<int>(byte) << " ";
-    }
-    NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] received completed connection-level multi-cell: [" << ss.str() << "]");
+    controller->HandleFeedback(conn, multicell);
   }
 }
 
@@ -1312,6 +1301,26 @@ PredController::Setup ()
     "output_circuits", outputs
   );
 
+  // Initialize some trajectories to be set by later optimization.
+  // These are not needed, but the indices need to exist.
+  for (size_t i=0; i<in_conns.size(); i++)
+  {
+    pred_v_in_req.push_back(Trajectory{this, Simulator::Now()});
+    pred_memory_load_source.push_back(Trajectory{this, Simulator::Now()});
+    pred_bandwidth_load_source.push_back(Trajectory{this, Simulator::Now()});
+    pred_cv_in.push_back(vector<Trajectory>{});
+  }
+
+  for (size_t i=0; i<out_conns.size(); i++)
+  {
+    pred_v_out_max.push_back(Trajectory{this, Simulator::Now()});
+    pred_memory_load_target.push_back(Trajectory{this, Simulator::Now()});
+    pred_bandwidth_load_target.push_back(Trajectory{this, Simulator::Now()});
+  }
+
+  // Schedule the first optimizer event
+  optimize_event = Simulator::Schedule(Seconds(1), &PredController::Optimize, this);
+
   // Since the batched executor does only return a plain pointer to the parsed
   // JSON doc, we need to free it here.
   delete result;
@@ -1596,7 +1605,7 @@ PredController::Optimize ()
   );
 
   // Schedule the next optimization step
-  Simulator::Schedule(TimeStep (), &PredController::Optimize, this);
+  optimize_event = Simulator::Schedule(TimeStep (), &PredController::Optimize, this);
 }
 
 double
@@ -1653,6 +1662,7 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   Time now = Simulator::Now();
   Time next_step = now + TimeStep();
 
+  // TODO: Have all stored from current time
   ParseIntoTrajectories((*doc)["v_in"], pred_v_in, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_in_max"], pred_v_in_max, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
@@ -1810,6 +1820,132 @@ PredController::ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<
   }
 }
 
+void
+PredController::MergeTrajectories(Trajectory& target, Trajectory& source)
+{
+  // TODO: maybe take into account initial value of target
+  target = source.InterpolateToTime(GetNextOptimizationTime());
+}
+
+void
+PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Trajectory>>& source)
+{
+  NS_ASSERT(target.size() == source.size());
+  
+  Time target_time = GetNextOptimizationTime();
+
+  Time source_time;
+  size_t source_length;
+  bool first = true;
+
+  for (auto&& traj : source)
+  {
+    if (first)
+    {
+      source_time = traj->GetTime();
+      source_length = traj->Steps();
+    }
+    else
+    {
+      NS_ASSERT(source_time == traj->GetTime());
+    }
+  }
+
+  double steps = (target_time - source_time).GetSeconds() / TimeStep().GetSeconds();
+  NS_ASSERT(std::abs(std::round(steps) - steps) < 0.001);
+  NS_ASSERT(std::lround(steps) >= 0);
+  size_t start_index = (size_t) std::lround(steps);
+
+  NS_ASSERT(start_index < source_length);
+
+  target.clear();
+  for (size_t i=0; i<source.size(); i++)
+  {
+    target.push_back(Trajectory{this, target_time});
+  }
+
+  for (size_t i=start_index; i<source_length; i++)
+  {
+    for (size_t j=0; j<source.size(); j++)
+    {
+      target[j].Elements().push_back(source[j]->Elements()[i]);
+    }
+  }
+
+  // repeat the last element of each trajectory if necessary
+  for (size_t i=(source_length-start_index); i<source_length; i++)
+  {
+    for (size_t j=0; j<source.size(); j++)
+    {
+      target[j].Elements().push_back(source[j]->Elements()[source[j]->Elements().size()-1]);
+    }
+  }
+
+  NS_ASSERT(target.size() == source.size());
+}
+
+void
+PredController::HandleInputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
+{
+    NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] received feedback from predecessor (input)");
+
+    PredFeedbackMessage msg{cell};
+    size_t conn_index = GetInConnIndex(conn);
+
+    Ptr<Trajectory> v_out = msg.Get(FeedbackTrajectoryKind::VOut);
+    MergeTrajectories(pred_v_in_req[conn_index], *v_out);
+
+    Ptr<Trajectory> memory_load = msg.Get(FeedbackTrajectoryKind::MemoryLoad);
+    MergeTrajectories(pred_memory_load_source[conn_index], *memory_load);
+
+    Ptr<Trajectory> bandwidth_load = msg.Get(FeedbackTrajectoryKind::BandwidthLoad);
+    MergeTrajectories(pred_bandwidth_load_source[conn_index], *bandwidth_load);
+    
+    vector<Ptr<Trajectory>> cv_out = msg.GetAll(FeedbackTrajectoryKind::CvOut);
+    NS_ASSERT(cv_out.size() == conn->CountCircuits());
+    MergeTrajectories(pred_cv_in[conn_index], cv_out);
+}
+
+void
+PredController::HandleOutputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
+{
+    NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] received feedback from successor (output)");
+
+    PredFeedbackMessage msg{cell};
+    size_t conn_index = GetOutConnIndex(conn);
+
+    Ptr<Trajectory> v_in_max = msg.Get(FeedbackTrajectoryKind::VInMax);
+    MergeTrajectories(pred_v_out_max[conn_index], *v_in_max);
+
+    Ptr<Trajectory> memory_load = msg.Get(FeedbackTrajectoryKind::MemoryLoad);
+    MergeTrajectories(pred_memory_load_target[conn_index], *memory_load);
+
+    Ptr<Trajectory> bandwidth_load = msg.Get(FeedbackTrajectoryKind::BandwidthLoad);
+    MergeTrajectories(pred_bandwidth_load_target[conn_index], *bandwidth_load);
+}
+
+bool
+PredController::IsInConn(Ptr<PredConnection> conn)
+{
+  for (auto&& candidate : in_conns)
+  {
+    if(candidate == conn)
+      return true;
+  }
+  return false;
+}
+
+bool
+PredController::IsOutConn(Ptr<PredConnection> conn)
+{
+  for (auto&& candidate : out_conns)
+  {
+    if(candidate == conn)
+      return true;
+  }
+  return false;
+}
+
 size_t
 PredController::GetInConnIndex(Ptr<PredConnection> conn)
 {
@@ -1849,7 +1985,7 @@ PredController::SendToNeighbors()
 
   NS_ASSERT(in_conns.size() == pred_v_in_max.size());
   
-  // successor
+  // predecessor
   conn_index = 0;
   for (auto&& conn : in_conns)
   {
@@ -1873,13 +2009,15 @@ PredController::SendToNeighbors()
     conn_index++;
   }
   
-  // predecessor
+  // successor
   conn_index = 0;
   for (auto&& conn : out_conns)
   {
     PredFeedbackMessage msg;
 
     msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out_max[conn_index]);
+    msg.Add(FeedbackTrajectoryKind::BandwidthLoad, pred_bandwidth_load_local[0]);
+    msg.Add(FeedbackTrajectoryKind::MemoryLoad, pred_memory_load_local[0]);
 
     // collect the composition share of each circuit
     // TODO: make sure that the order matches the receiver's order
@@ -1943,5 +2081,25 @@ Trajectory Trajectory::InterpolateToTime (Time target_time)
 
   return result;
 }
+
+string FormatFeedbackKind(FeedbackTrajectoryKind kind)
+{
+  switch(kind)
+  {
+    case FeedbackTrajectoryKind::VInMax: return "VInMax";
+    case FeedbackTrajectoryKind::VOut: return "VOut";
+    case FeedbackTrajectoryKind::CvOut: return "CvOut";
+    case FeedbackTrajectoryKind::MemoryLoad: return "MemoryLoad";
+    case FeedbackTrajectoryKind::BandwidthLoad: return "BandwidthLoad";
+  }
+
+  NS_ABORT_MSG("Unknown feedback trajectory type: " << (int) kind);
+}
+
+std::ostream & operator << (std::ostream & os, const FeedbackTrajectoryKind & kind)
+{
+  os << FormatFeedbackKind(kind);
+  return os;
+};
 
 } //namespace ns3

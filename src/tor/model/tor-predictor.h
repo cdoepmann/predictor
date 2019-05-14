@@ -13,6 +13,8 @@
 #include <thread>
 #include <future>
 #include <deque>
+#include <ostream>
+#include <cmath>
 
 namespace ns3 {
 
@@ -122,6 +124,24 @@ public:
       res += p->GetSize();
     }
     return res;
+  };
+
+  size_t CountCircuits()
+  {
+    Ptr<PredCircuit> first_circuit = GetActiveCircuits ();
+
+    if (!first_circuit) {
+      return 0;
+    }
+    
+    size_t count = 1;
+    auto next_circuit = first_circuit->GetNextCirc(this);
+    while (next_circuit != first_circuit)
+    {
+      count++;
+    }
+
+    return count;
   };
 
 protected:
@@ -374,6 +394,25 @@ public:
   // Get the maximum data rate we can achieve
   DataRate MaxDataRate () { return max_datarate; };
 
+  // Handle a feedback cell received from another relay.
+  // The input packet is a re-assembled multicell.
+  void HandleFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
+  {
+    // Is this an input or output connection?
+    if (IsInConn(conn))
+    {
+      HandleInputFeedback(conn, cell);
+    }
+    else
+    {
+      NS_ASSERT(IsOutConn(conn));
+      HandleOutputFeedback(conn, cell);
+    }
+  };
+
+  // Get the time of the next optimization step
+  Time GetNextOptimizationTime() { return ns3::TimeStep(optimize_event.GetTs()); }
+
 protected:
   // The application this controller belongs to
   Ptr<TorPredApp> app;
@@ -392,14 +431,27 @@ protected:
   set<Ptr<PredConnection>> out_conns;
 
   // Helper functions to lookup the index of a given connection in the data vectors
+  bool IsInConn(Ptr<PredConnection>);
+  bool IsOutConn(Ptr<PredConnection>);
   size_t GetInConnIndex(Ptr<PredConnection>);
   size_t GetOutConnIndex(Ptr<PredConnection>);
+
+  // Handle a feedback cell received from a predecessor.
+  // The input packet is a re-assembled multicell.
+  void HandleInputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell);
+
+  // Handle a feedback cell received from a successor.
+  // The input packet is a re-assembled multicell.
+  void HandleOutputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell);
 
   // The number of circuits handled by this relay
   size_t num_circuits;
 
   // Interface for talking to the python component
   PyScript pyscript;
+
+  // Event of the next optimization step
+  EventId optimize_event;
 
   // Convert between DataRate and packets/s
   static double to_packets_sec(DataRate rate);
@@ -428,8 +480,13 @@ protected:
   void ParseCvOutIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t expected_traj_outer);
   void ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t connections);
 
+  // Merge two trajectories
+  void MergeTrajectories(Trajectory& target, Trajectory& source);
+  void MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Trajectory>>& source);
+
   vector<Trajectory> pred_v_in;
   vector<Trajectory> pred_v_in_max;
+  vector<Trajectory> pred_v_in_req;
   vector<Trajectory> pred_v_out;
   vector<Trajectory> pred_v_out_max;
   vector<Trajectory> pred_s_buffer;
@@ -699,8 +756,8 @@ public:
   Deserialize (Buffer::Iterator start)
   {
     Buffer::Iterator iter = start;
-    double time_step = ReadDouble(iter);
     double first_time = ReadDouble(iter);
+    double time_step = ReadDouble(iter);
     uint16_t num_elements = iter.ReadU16();
 
     m_trajectory = Create<Trajectory>(Seconds(time_step), Seconds(first_time));
@@ -747,6 +804,10 @@ private:
 // Stores the meaning of what a serialized trajectory denotes (symbol), as
 // regarded by the *sender*.
 enum class FeedbackTrajectoryKind : uint8_t {VInMax, VOut, CvOut, MemoryLoad, BandwidthLoad};
+
+string FormatFeedbackKind(FeedbackTrajectoryKind kind);
+
+std::ostream & operator << (std::ostream & os, const FeedbackTrajectoryKind & kind);
 
 class FeedbackKindHeader : public Header
 {
@@ -842,7 +903,7 @@ public:
       if (entry.first == key)
         return entry.second;
     }
-    NS_ABORT_MSG("feedback message does not contain an entry of the requested type");
+    NS_ABORT_MSG("feedback message does not contain an entry of kind " << key);
     return 0;
   }
 
