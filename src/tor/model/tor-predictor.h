@@ -355,7 +355,7 @@ public:
   PredController (Ptr<TorPredApp> app) : 
     app{app},
     horizon{20},
-    time_step{MilliSeconds(10)},
+    time_step{MilliSeconds(20)},
     pyscript{"/home/christoph/nstor/src/tor/model/solver.sh"}
   {};
   // virtual ~PredController ();
