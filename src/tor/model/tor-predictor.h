@@ -139,6 +139,7 @@ public:
     while (next_circuit != first_circuit)
     {
       count++;
+      next_circuit = next_circuit->GetNextCirc(this);
     }
 
     return count;
