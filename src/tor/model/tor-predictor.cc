@@ -1420,23 +1420,26 @@ PredController::Optimize ()
 
   // data we are expected to receive from our predecessors (their v_out)
   vector<Trajectory> v_in_req;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume that they do not send anything
+    // Use the following "idle" trajectory if we do not yet have data from other relays,
+    // assuming that they do not send anything
     Trajectory idle{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<in_conns.size() ; i++)
+    for (auto&& req : pred_v_in_req)
     {
-      v_in_req.push_back(idle);
+      if (req.Steps() == 0)
+      {
+        v_in_req.push_back(idle);
+      }
+      else
+      {
+        v_in_req.push_back(req);
+      }
     }
   }
 
