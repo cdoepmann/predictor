@@ -1495,23 +1495,26 @@ PredController::Optimize ()
 
   // maximum outgoing data rate we were given by the successor
   vector<Trajectory> v_out_max;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume we can can go full blast
+    // Use the following default trajectory if we do not yet have data from other relays,
+    // assuming that we can can go full blast
     Trajectory unlimited{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       unlimited.Elements().push_back(to_packets_sec(MaxDataRate ()));
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (auto&& val : pred_v_out_max)
     {
-      v_out_max.push_back(unlimited);
+      if (val.Steps() == 0)
+      {
+        v_out_max.push_back(unlimited);
+      }
+      else
+      {
+        v_out_max.push_back(val);
+      }
     }
   }
 
