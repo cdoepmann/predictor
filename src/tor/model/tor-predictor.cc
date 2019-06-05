@@ -1420,176 +1420,201 @@ PredController::Optimize ()
 
   // data we are expected to receive from our predecessors (their v_out)
   vector<Trajectory> v_in_req;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume that they do not send anything
+    // Use the following "idle" trajectory if we do not yet have data from other relays,
+    // assuming that they do not send anything
     Trajectory idle{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<in_conns.size() ; i++)
+    for (auto&& req : pred_v_in_req)
     {
-      v_in_req.push_back(idle);
+      if (req.Steps() == 0)
+      {
+        v_in_req.push_back(idle);
+      }
+      else
+      {
+        v_in_req.push_back(req);
+      }
     }
   }
 
   // composition of each input connection
   vector<vector<vector<double>>> cv_in;
-  if (false)
+  
+  for (unsigned int i=0; i<Horizon(); i++)
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume the circuits share
-    // the connection's traffic equally.
+    vector<vector<double>> this_step;
 
-    // - horizon
-    //   - n_in (connections)
-    //     - n_circuit_in[i] (circuits)
-
-    for (unsigned int i=0; i<Horizon(); i++)
+    size_t conn_index = 0;
+    for (auto&& conn : in_conns)
     {
-      vector<vector<double>> this_step;
-      for (auto&& conn : in_conns)
+      // Do we have data from the predecessor relay?
+      if (pred_cv_in[conn_index].size() == 0)
       {
-        int n_circuit_in = 1;
-        Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-        
-        auto next_circuit = first_circuit->GetNextCirc(conn);
-        while (next_circuit != first_circuit)
-        {
-          n_circuit_in++;
-          next_circuit = next_circuit->GetNextCirc(conn);
-        }
+        // We do not yet have info on the composition of this connection.
+        // Assume a uniform distribution
+        size_t n_circuit_in = conn->CountCircuits();
 
         vector<double> composition;
-        for (int i=0; i<n_circuit_in; i++)
+        for (size_t i=0; i<n_circuit_in; i++)
         {
           composition.push_back (1.0 / n_circuit_in);
         }
 
         this_step.push_back(composition);
       }
-      cv_in.push_back(this_step);
+      else
+      {
+        // Use the information we got from the predecessor relay.
+        vector<double> composition;
+
+        for (auto&& circ_traj : pred_cv_in[conn_index])
+        {
+          double val = circ_traj.Elements()[i];
+
+          if (val < 0.0)
+          {
+            NS_ASSERT(val > -0.001);
+            val = 0.0;
+          }
+          composition.push_back(val);
+        }
+
+        this_step.push_back(composition);
+      }
+
+      conn_index++;
     }
+    cv_in.push_back(this_step);
   }
 
   // maximum outgoing data rate we were given by the successor
   vector<Trajectory> v_out_max;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume we can can go full blast
+    // Use the following default trajectory if we do not yet have data from other relays,
+    // assuming that we can can go full blast
     Trajectory unlimited{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       unlimited.Elements().push_back(to_packets_sec(MaxDataRate ()));
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (auto&& val : pred_v_out_max)
     {
-      v_out_max.push_back(unlimited);
+      if (val.Steps() == 0)
+      {
+        v_out_max.push_back(unlimited);
+      }
+      else
+      {
+        v_out_max.push_back(val);
+      }
     }
   }
 
   // future development of the successors' memory load
   vector<Trajectory> memory_load_target;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume that they are idle
+    // Use the following "idle" trajectory if we do not yet have data from other relays,
+    // assuming that they are idle anything
     Trajectory idle{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (auto&& val : pred_memory_load_target)
     {
-      memory_load_target.push_back(idle);
+      if (val.Steps() == 0)
+      {
+        memory_load_target.push_back(idle);
+      }
+      else
+      {
+        memory_load_target.push_back(val);
+      }
     }
   }
 
   // future development of the predecessors' memory load
   vector<Trajectory> memory_load_source;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume that they are idle
+    // Use the following "idle" trajectory if we do not yet have data from other relays,
+    // assuming that they are idle anything
     Trajectory idle{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<in_conns.size() ; i++)
+    for (auto&& val : pred_memory_load_source)
     {
-      memory_load_source.push_back(idle);
+      if (val.Steps() == 0)
+      {
+        memory_load_source.push_back(idle);
+      }
+      else
+      {
+        memory_load_source.push_back(val);
+      }
     }
   }
 
   // future development of the successors' bandwidth load
   vector<Trajectory> bandwidth_load_target;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume that they are idle
+    // Use the following "idle" trajectory if we do not yet have data from other relays,
+    // assuming that they are idle anything
     Trajectory idle{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<out_conns.size() ; i++)
+    for (auto&& val : pred_bandwidth_load_target)
     {
-      bandwidth_load_target.push_back(idle);
+      if (val.Steps() == 0)
+      {
+        bandwidth_load_target.push_back(idle);
+      }
+      else
+      {
+        bandwidth_load_target.push_back(val);
+      }
     }
   }
 
   // future development of the predecessors' bandwidth load
   vector<Trajectory> bandwidth_load_source;
-  if (false)
+
   {
-    // TODO
-    // use collected data from other relays
-  }
-  else
-  {
-    // We do not yet have data from other relays, assume that they are idle
+    // Use the following "idle" trajectory if we do not yet have data from other relays,
+    // assuming that they are idle anything
     Trajectory idle{this, Simulator::Now()};
     for (unsigned int i=0; i<Horizon(); i++)
     {
       idle.Elements().push_back(0.0);
     }
 
-    for (unsigned int i=0; i<in_conns.size() ; i++)
+    for (auto&& val : pred_bandwidth_load_source)
     {
-      bandwidth_load_source.push_back(idle);
+      if (val.Steps() == 0)
+      {
+        bandwidth_load_source.push_back(idle);
+      }
+      else
+      {
+        bandwidth_load_source.push_back(val);
+      }
     }
   }
 
