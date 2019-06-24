@@ -505,13 +505,6 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   NS_ASSERT (conn);
 
   uint32_t newtx = socket->GetTxAvailable ();
-
-  // Allow surpassing the global write bucket temporarily in order not to delay
-  // predictor info packets.
-  // Beware that buckets will become negative (mind starvation etc.!).
-  //
-  // This, however also flushes other data (periodically). Consider using a
-  // separate connection, esp. if data flows bidirectionally.
   
   uint32_t bucket_allowed = m_writebucket.GetSize ();
 
