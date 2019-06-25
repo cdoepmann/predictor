@@ -508,6 +508,28 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   
   uint32_t bucket_allowed = m_writebucket.GetSize ();
 
+  // Find out if this is an outgoing connection according to the optimization problem
+  bool is_outconn = controller->IsOutConn(conn);
+
+  // Additionally, limit the allowed sending data size/rate by the per-connection
+  // token bucket, realizing the throttling defined by v_out.
+  std::function<void(int)> decrement_per_conn_bucket;
+  if (is_outconn)
+  {
+    NS_ASSERT(controller->conn_buckets.find(conn) != controller->conn_buckets.end());
+    TokenBucket& conn_bucket = controller->conn_buckets[conn];
+    decrement_per_conn_bucket = [&conn_bucket] (int diff) { conn_bucket.Decrement(diff); };
+
+    NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] Applying per-connection token bucket");
+    bucket_allowed = std::min(bucket_allowed, conn_bucket.GetSize());
+  }
+  else
+  {
+    // remember to not decrement the bucket later (there is none)
+    decrement_per_conn_bucket = [] (int) { };
+  }
+
+
   int written_bytes = 0;
   uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t max_write = RoundRobin (base, bucket_allowed);
@@ -530,6 +552,7 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   if (written_bytes > 0)
     {
       GlobalBucketsDecrement (0, written_bytes);
+      decrement_per_conn_bucket(written_bytes);
 
       /* try flushing more */
       conn->ScheduleWrite ();
@@ -1224,12 +1247,18 @@ PredConnection::SendConnLevelCell (Ptr<Packet> cell)
 }
 
 void
-PredConnection::ScheduleWrite (Time delay)
+PredConnection::ScheduleWrite (void)
 {
   if (m_socket && write_event.IsExpired ())
     {
-      write_event = Simulator::Schedule (delay, &TorPredApp::ConnWriteCallback, torapp, m_socket, m_socket->GetTxAvailable ());
+      write_event = Simulator::Schedule (Seconds(0), &TorPredApp::ConnWriteCallback, torapp, m_socket, m_socket->GetTxAvailable ());
     }
+}
+
+void
+PredConnection::ScheduleWriteWrapper (int64_t prev_write_bucket)
+{
+  ScheduleWrite ();
 }
 
 void
@@ -1360,6 +1389,21 @@ PredController::Setup ()
     pred_v_out_max.push_back(Trajectory{this, Simulator::Now()});
     pred_memory_load_target.push_back(Trajectory{this, Simulator::Now()});
     pred_bandwidth_load_target.push_back(Trajectory{this, Simulator::Now()});
+  }
+
+  // Set up the per-connection token buckets, initially assuming no restrictions
+  // on the sending rate (v_out).
+
+  Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
+  rng->SetAttribute ("Min", DoubleValue (0.0));
+  rng->SetAttribute ("Max", DoubleValue (0.001));
+
+  for (auto& conn : out_conns)
+  {
+    conn_buckets[conn] = TokenBucket{MaxDataRate(), MaxDataRate(), MilliSeconds(1)};
+    Time offset = Seconds (rng->GetValue ());
+    conn_buckets[conn].SetRefilledCallback (MakeCallback (&PredConnection::ScheduleWriteWrapper, conn));
+    conn_buckets[conn].StartBucket(offset);
   }
 
   // Schedule the first optimizer event
@@ -1715,6 +1759,29 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   // Since the batched executor does only return a plain pointer to the parsed
   // JSON doc, we need to free it here.
   delete doc;
+}
+
+void
+PredController::CalculateSendPlan()
+{
+  // Transfer the calculated send plan (v_out from the optimization step) into
+  // read-to-execute token buckets
+
+  auto conn_it = out_conns.begin();
+
+  for (auto& traj : pred_v_out)
+  {
+    NS_ASSERT(conn_it != out_conns.end());
+
+    DataRate rate = to_datarate(traj.Elements().at(0));
+    Ptr<PredConnection> conn = *conn_it;
+
+    NS_ASSERT(conn_buckets.find(conn) != conn_buckets.end());
+
+    conn_buckets[conn].SetRate(rate, rate);
+
+    ++conn_it;
+  }
 }
 
 void

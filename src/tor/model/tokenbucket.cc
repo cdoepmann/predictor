@@ -56,6 +56,38 @@ TokenBucket::Decrement (uint32_t n)
 }
 
 void
+TokenBucket::SetRate (DataRate rate, DataRate burst)
+{
+  m_rate = rate;
+  m_burst = burst;
+
+  // Refill the bucket to the new rate, but take into account that some time
+  // of the current bucket interval may have passed already.
+  Refill ();
+}
+
+void
+TokenBucket::RefillPartial ()
+{
+  double interval = (TimeStep(m_refillevent.GetTs()) - Simulator::Now()).GetSeconds ();
+  int64_t prev_bucket = GetSize ();
+  double rate = m_rate.GetBitRate () * interval / 8.0;
+  double burst = m_burst.GetBitRate () * interval / 8.0;
+  m_bucket += rate;
+  if (burst < m_bucket)
+    {
+      m_bucket = burst;
+    }
+
+  if (!m_refilled.IsNull ())
+    {
+      m_refilled (prev_bucket);
+    }
+
+  m_refillevent = Simulator::Schedule (m_refilltime,&TokenBucket::Refill, this);
+}
+
+void
 TokenBucket::Refill ()
 {
   int64_t prev_bucket = GetSize ();

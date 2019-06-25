@@ -19,9 +19,11 @@ public:
   void SetRefilledCallback (Callback<void,int64_t>);
   uint32_t GetSize ();
   void Decrement (uint32_t);
+  void SetRate (DataRate, DataRate);
 
 private:
   void Refill ();
+  void RefillPartial ();
 
   double m_bucket;
   DataRate m_rate;

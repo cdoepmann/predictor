@@ -92,7 +92,8 @@ public:
   bool SpeaksCells ();
   uint32_t Read (vector<Ptr<Packet> >*, uint32_t);
   uint32_t Write (uint32_t);
-  void ScheduleWrite (Time = Seconds (0));
+  void ScheduleWrite ();
+  void ScheduleWriteWrapper (int64_t);
   void ScheduleRead (Time = Seconds (0));
   Ptr<Socket> GetSocket ();
   void SetSocket (Ptr<Socket>);
@@ -360,8 +361,12 @@ public:
   // as well as information provided by our neighboring relays.
   void Optimize();
 
-  // Callex when the optimization step is complete.
+  // Called when the optimization step is complete.
   void OptimizeDone(rapidjson::Document * doc);
+
+  // Based on the predicted v_out values, calculate a concrete output plan per
+  // connection.
+  void CalculateSendPlan();
 
   // Assemble information to be sent to our neighbors, after optimization
   void SendToNeighbors();
@@ -448,6 +453,12 @@ protected:
 
   // The maximum data rate of this relay
   DataRate max_datarate;
+
+  // Token buckets for the per-connection rate limiting based on v_out
+  map<Ptr<PredConnection>, TokenBucket> conn_buckets;
+
+  // Grant access to application for using the per-connection token buckets
+  friend void TorPredApp::ConnWriteCallback(Ptr<Socket>, uint32_t);
 
   // (shared) pool executor to run the optimizations in parallel
   static BatchedExecutor executor;
