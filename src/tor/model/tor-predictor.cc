@@ -2045,7 +2045,7 @@ PredController::SendToNeighbors()
   {
     PredFeedbackMessage msg;
 
-    msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out_max[conn_index]);
+    msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out[conn_index]);
     msg.Add(FeedbackTrajectoryKind::BandwidthLoad, pred_bandwidth_load_local[0]);
     msg.Add(FeedbackTrajectoryKind::MemoryLoad, pred_memory_load_local[0]);
 
