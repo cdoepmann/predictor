@@ -1956,7 +1956,8 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
   NS_ASSERT(std::lround(steps) >= 0);
   size_t start_index = (size_t) std::lround(steps);
 
-  NS_ASSERT(start_index < source_length);
+  // NS_ASSERT(start_index < source_length);
+  start_index = std::min(start_index, source_length-1);
 
   target.clear();
   for (size_t i=0; i<source.size(); i++)
