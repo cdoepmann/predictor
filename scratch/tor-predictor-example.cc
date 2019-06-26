@@ -8,6 +8,7 @@ using namespace std;
 NS_LOG_COMPONENT_DEFINE ("TorPredictorExample");
 
 void StatsCallback(TorStarHelper*, Time);
+void remember_leadtime(TorStarHelper*, Time);
 
 bool use_predictor = false;
 bool use_vanilla = false;
@@ -29,10 +30,12 @@ bool use_vanilla = false;
 //   }
 // }
 
+map<int,uint64_t> leadtime_offsets;
+
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
     // Time simTime = Time("60s");
-    Time simTime = Time("20s");
+    Time simTime = Time("5s");
     uint32_t rtt = 40;
 
     CommandLine cmd;
@@ -87,6 +90,7 @@ int main (int argc, char *argv[]) {
 
     th.DisableProxies(true);
     th.SetRtt(MilliSeconds(rtt));
+    th.SetUnderlayRate(DataRate("10Mbps"));
 
     Ptr<ConstantRandomVariable> m_bulkRequest = CreateObject<ConstantRandomVariable>();
     m_bulkRequest->SetAttribute("Constant", DoubleValue(pow(2,30)));
@@ -109,6 +113,15 @@ int main (int argc, char *argv[]) {
     // th.PrintCircuits();
     th.BuildTopology(); // finally build topology, setup relays and seed circuits
 
+    // Make link of bottleneck slower
+    {
+      DataRate rate = DataRate("4Mb/s");
+      Ptr<Node> client = th.GetTorNode("btlnk");
+      client->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(rate);
+      client->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(rate);
+      client->GetDevice(0)->GetChannel()->GetDevice(1)->GetObject<PointToPointNetDevice>()->SetDataRate(rate);
+    }
+
     /* limit the access link */
     // Ptr<Node> client = th.GetTorNode("btlnk");
     // client->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("1MB/s"));
@@ -120,15 +133,37 @@ int main (int argc, char *argv[]) {
     Simulator::Stop (simTime);
 
     Simulator::Schedule(Seconds(0.01), &StatsCallback, &th, simTime);
+    Simulator::Schedule(Seconds(2.5), &remember_leadtime, &th, simTime);
 
     NS_LOG_INFO("start simulation");
     Simulator::Run ();
-
     NS_LOG_INFO("stop simulation");
-    Simulator::Destroy ();
 
+    cout << "=== Summary ===" << endl;
+
+    cout << "Total bytes completed (all circuits): ";
+    uint64_t total_bytes_completed = 0;
+
+    for (auto id = th.circuitIds.begin(); id != th.circuitIds.end(); ++id) {
+      uint64_t val = th.GetProxyApp(*id)->baseCircuits[*id]->GetBytesWritten(INBOUND) - leadtime_offsets[*id];
+      cout << "(" << val << ") ";
+      total_bytes_completed += val;
+    }
+
+    cout << total_bytes_completed << endl;
+
+    Simulator::Destroy ();
     return 0;
 }
+
+void
+remember_leadtime(TorStarHelper* th, Time simTime)
+{
+  for (auto id = th->circuitIds.begin(); id != th->circuitIds.end(); ++id) {
+    leadtime_offsets[*id] = th->GetProxyApp(*id)->baseCircuits[*id]->GetBytesWritten(INBOUND);
+  }
+}
+
 
 template<typename T> void
 print_relay (TorStarHelper * th, const char * relay) {

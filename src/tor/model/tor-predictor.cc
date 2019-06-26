@@ -1945,8 +1945,11 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
     else
     {
       NS_ASSERT(source_time == traj->GetTime());
+      NS_ASSERT(source_length == traj->Steps());
     }
   }
+
+  NS_LOG_LOGIC ("[" << app->GetNodeName() << "] (merging into cv_in) time diff: " << (target_time-source_time).GetSeconds());
 
   double steps = (target_time - source_time).GetSeconds() / TimeStep().GetSeconds();
   NS_ASSERT(std::abs(std::round(steps) - steps) < 0.001);
@@ -1958,11 +1961,13 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
   target.clear();
   for (size_t i=0; i<source.size(); i++)
   {
+    NS_LOG_LOGIC ("[" << app->GetNodeName() << "] (merging into cv_in) pushing traj");
     target.push_back(Trajectory{this, target_time});
   }
 
   for (size_t i=start_index; i<source_length; i++)
   {
+    NS_LOG_LOGIC ("[" << app->GetNodeName() << "] (merging into cv_in) pushing regular element");
     for (size_t j=0; j<source.size(); j++)
     {
       target[j].Elements().push_back(source[j]->Elements()[i]);
@@ -1972,11 +1977,18 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
   // repeat the last element of each trajectory if necessary
   for (size_t i=(source_length-start_index); i<source_length; i++)
   {
+    NS_LOG_LOGIC ("[" << app->GetNodeName() << "] (merging into cv_in) pushing dummy element");
     for (size_t j=0; j<source.size(); j++)
     {
       target[j].Elements().push_back(source[j]->Elements()[source[j]->Elements().size()-1]);
     }
   }
+
+  for (auto& traj : target)
+  {
+    NS_ASSERT(traj.Steps() == source_length);
+  }
+
 
   NS_ASSERT(target.size() == source.size());
 }
@@ -2127,6 +2139,7 @@ PredController::SendToNeighbors()
 
     while (next_circuit != first_circuit)
     {
+      NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] - cv_out length: " << pred_cv_out[conn_index][circ_index].Steps());
       msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
 
       next_circuit = next_circuit->GetNextCirc(conn);
