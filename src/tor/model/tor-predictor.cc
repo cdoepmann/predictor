@@ -1774,6 +1774,8 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   // Trigger sending of new information to peers
   SendToNeighbors();
 
+  CalculateSendPlan();
+
   // Since the batched executor does only return a plain pointer to the parsed
   // JSON doc, we need to free it here.
   delete doc;
