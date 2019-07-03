@@ -1312,6 +1312,12 @@ PredController::Setup ()
 
   max_datarate = std::min (datarate_app.Get(), datarate_dev.Get());
 
+  dumper.dump("max-datarate",
+              "time", Simulator::Now().GetSeconds(),
+              "node", app->GetNodeName(),
+              "pps", to_packets_sec(max_datarate)
+  );
+
   // collect the input connections...
   vector<vector<uint16_t>> inputs;
 
@@ -1769,11 +1775,16 @@ PredController::CalculateSendPlan()
 
   auto conn_it = out_conns.begin();
 
+  vector<double> dumped_rates;
+
   for (auto& traj : pred_v_out)
   {
     NS_ASSERT(conn_it != out_conns.end());
 
-    DataRate rate = to_datarate(traj.Elements().at(0));
+    double rate_pps = traj.Elements().at(0);
+    DataRate rate = to_datarate(rate_pps);
+    dumped_rates.push_back(rate_pps);
+
     Ptr<PredConnection> conn = *conn_it;
 
     NS_ASSERT(conn_buckets.find(conn) != conn_buckets.end());
@@ -1782,6 +1793,13 @@ PredController::CalculateSendPlan()
 
     ++conn_it;
   }
+
+  // Dump optimization result
+  dumper.dump("calculated-plan",
+              "time", Simulator::Now().GetSeconds(),
+              "node", app->GetNodeName(),
+              "conn_rates_pps", dumped_rates
+  );
 }
 
 void
@@ -1920,6 +1938,9 @@ PredController::ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<
 void
 PredController::MergeTrajectories(Trajectory& target, Trajectory& source)
 {
+  Time target_time = GetNextOptimizationTime();
+  NS_LOG_LOGIC ("[" << app->GetNodeName() << "] (merging something different) time diff: " << (target_time-source.GetTime()).GetSeconds());
+
   // TODO: maybe take into account initial value of target
   target = source.InterpolateToTime(GetNextOptimizationTime());
 }
@@ -2212,5 +2233,7 @@ std::ostream & operator << (std::ostream & os, const FeedbackTrajectoryKind & ki
   os << FormatFeedbackKind(kind);
   return os;
 };
+
+PyScript dumper{"/bin/cat"};
 
 } //namespace ns3

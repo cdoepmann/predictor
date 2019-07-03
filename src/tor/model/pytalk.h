@@ -34,6 +34,9 @@ class PyScript
 
     template <typename... Args>
     rapidjson::Document * call(const char *cmd, Args... args);
+    
+    template <typename... Args>
+    void dump(const char *cmd, Args... args);
 
   private:
     template <typename T, typename... Args>
@@ -56,6 +59,26 @@ class PyScript
         rapidjson::Writer<rapidjson::StringBuffer> &writer,
         std::vector<T> list);
 };
+
+template <typename... Args>
+void PyScript::dump(const char *cmd, Args... args)
+{
+    using namespace rapidjson;
+
+    StringBuffer sb;
+    Writer<StringBuffer> writer{sb};
+
+    writer.StartObject();
+
+    writer.Key("event");
+    writer.String(cmd);
+
+    call_recursive(writer, args...);
+    writer.EndObject();
+
+    std::cout << "#<#" << sb.GetString();
+    std::cout << "#>#" << std::endl;
+}
 
 template <typename... Args>
 rapidjson::Document * PyScript::call(const char *cmd, Args... args)

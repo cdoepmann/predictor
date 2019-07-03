@@ -140,6 +140,9 @@ int main (int argc, char *argv[]) {
     Simulator::Schedule(Seconds(0.01), &StatsCallback, &th, simTime);
     Simulator::Schedule(Seconds(2.5), &remember_leadtime, &th, simTime);
 
+    // Dump a few static facts
+    dumper.dump("cell-size", "bytes", CELL_NETWORK_SIZE);
+
     NS_LOG_INFO("start simulation");
     Simulator::Run ();
     NS_LOG_INFO("stop simulation");
@@ -156,6 +159,8 @@ int main (int argc, char *argv[]) {
     }
 
     cout << total_bytes_completed << endl;
+
+    dumper.dump("result", "total", total_bytes_completed);
 
     Simulator::Destroy ();
     return 0;
@@ -221,16 +226,60 @@ StatsCallback(TorStarHelper* th, Time simTime)
       Ptr<BaseCircuit> middleCirc = middleApp->baseCircuits[*id];
       Ptr<BaseCircuit> exitCirc = exitApp->baseCircuits[*id];
 
-      cout << "(" << proxyCirc->GetId() << ") "
-        << proxyCirc->GetBytesWritten(INBOUND) << "," << proxyCirc->GetBytesRead(INBOUND) << " / "
-        << middleCirc->GetBytesWritten(INBOUND) << "," << middleCirc->GetBytesRead(INBOUND) << " / "
-        << exitCirc->GetBytesWritten(INBOUND) << "," << exitCirc->GetBytesRead(INBOUND) << " ";
+      // cout << "(" << proxyCirc->GetId() << ") "
+      //   << proxyCirc->GetBytesWritten(INBOUND) << "," << proxyCirc->GetBytesRead(INBOUND) << " / "
+      //   << middleCirc->GetBytesWritten(INBOUND) << "," << middleCirc->GetBytesRead(INBOUND) << " / "
+      //   << exitCirc->GetBytesWritten(INBOUND) << "," << exitCirc->GetBytesRead(INBOUND) << " ";
 
       // cout << "(" << proxyCirc->GetId() << ") " << proxyCirc->GetBytesWritten(INBOUND) << "," << proxyCirc->GetBytesRead(INBOUND) << "/" << exitCirc->GetBytesWritten(INBOUND) << "," << exitCirc->GetBytesRead(INBOUND) << " ";
 
       // cout << exitCirc->GetBytesRead(INBOUND) << " " << proxyCirc->GetBytesWritten(INBOUND) << " ";
       // cout << proxyCirc->GetBytesRead(OUTBOUND) << " " << exitCirc->GetBytesWritten(OUTBOUND) << " ";
       // proxyCirc->ResetStats(); exitCirc->ResetStats();
+
+      dumper.dump("received-applevel-cumulative",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "position", "entry",
+                  "node", proxyApp->GetNodeName(),
+                  "bytes", (int) proxyCirc->GetBytesRead(INBOUND)
+      );
+      dumper.dump("received-applevel-cumulative",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "position", "middle",
+                  "node", middleApp->GetNodeName(),
+                  "bytes", (int) middleCirc->GetBytesRead(INBOUND)
+      );
+      dumper.dump("received-applevel-cumulative",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "position", "exit",
+                  "node", exitApp->GetNodeName(),
+                  "bytes", (int) exitCirc->GetBytesRead(INBOUND)
+      );
+
+      dumper.dump("forwarded-applevel-cumulative",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "position", "entry",
+                  "node", proxyApp->GetNodeName(),
+                  "bytes", (int) proxyCirc->GetBytesWritten(INBOUND)
+      );
+      dumper.dump("forwarded-applevel-cumulative",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "position", "middle",
+                  "node", middleApp->GetNodeName(),
+                  "bytes", (int) middleCirc->GetBytesWritten(INBOUND)
+      );
+      dumper.dump("forwarded-applevel-cumulative",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "position", "exit",
+                  "node", exitApp->GetNodeName(),
+                  "bytes", (int) exitCirc->GetBytesWritten(INBOUND)
+      );
     }
     cout << endl;
     

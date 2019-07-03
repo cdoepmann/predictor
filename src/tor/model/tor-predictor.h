@@ -328,6 +328,8 @@ protected:
   EventId compute_event;
 };
 
+extern PyScript dumper;
+
 // The interface to our model-predictive controller
 class PredController : public Object {
 public:
