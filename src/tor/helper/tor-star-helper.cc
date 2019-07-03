@@ -240,7 +240,8 @@ TorStarHelper::BuildTopology ()
   MakeLinkDelaysFuzzy ();
 
   // Disable high-level traffic control
-  TrafficControlHelper tch;
+  // TrafficControlHelper tch;
+  // tch.SetRootQueueDisc ("ns3::PfifoFastQueueDisc");
 
   //install stack
   m_stackHelper.Install (m_starHelper->GetHub ());
@@ -265,6 +266,12 @@ TorStarHelper::BuildTopology ()
         }
     }
 
+  // for (int i = 0; i < m_nSpokes; ++i)
+  //   {
+  //     tch.Install (m_starHelper->GetHub()->GetDevice(i));
+  //     tch.Install (m_starHelper->GetSpokeNode (i)->GetDevice(0));
+  //   }
+
   //assign ipv4
   m_addressHelper.SetBase ("10.1.0.0", "255.255.255.0");
   m_starHelper->AssignIpv4Addresses (m_addressHelper);
@@ -286,11 +293,11 @@ TorStarHelper::BuildTopology ()
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  for (int i = 0; i < m_nSpokes; ++i)
-    {
-      tch.Uninstall (m_starHelper->GetHub()->GetDevice(i));
-      tch.Uninstall (m_starHelper->GetSpokeNode (i)->GetDevice(0));
-    }
+  // for (int i = 0; i < m_nSpokes; ++i)
+  //   {
+  //     tch.Uninstall (m_starHelper->GetHub()->GetDevice(i));
+  //     tch.Uninstall (m_starHelper->GetSpokeNode (i)->GetDevice(0));
+  //   }
 
   InstallCircuits ();
 }
