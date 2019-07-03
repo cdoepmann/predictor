@@ -359,6 +359,9 @@ public:
   // been added before.
   void Setup();
 
+  // Start the regular optimization schedule
+  void Start();
+
   // Carry out the regular optimization step, based on current local information
   // as well as information provided by our neighboring relays.
   void Optimize();

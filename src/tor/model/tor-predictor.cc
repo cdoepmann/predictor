@@ -606,6 +606,8 @@ TorPredApp::HandleControlAccept (Ptr<Socket> s, const Address& from)
   conn->SetControlSocket (s);
 
   s->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadControlCallback, this));
+
+  controller->Start();
 }
 
 
@@ -1413,13 +1415,23 @@ PredController::Setup ()
   }
 
   // Schedule the first optimizer event
-  optimize_event = Simulator::Schedule(Seconds(1), &PredController::Optimize, this);
+  // TODO: evaluate when starting the optimizer makes the most sense
+  optimize_event = Simulator::Schedule(Seconds(0.1), &PredController::Optimize, this);
 
   // Since the batched executor does only return a plain pointer to the parsed
   // JSON doc, we need to free it here.
   delete result;
 
   // TODO: verify success
+}
+
+void
+PredController::Start ()
+{
+  // NS_LOG_LOGIC ("[" << app->GetNodeName() << "] starting the optimizer.");
+
+  // // Schedule the first optimizer event
+  // optimize_event = Simulator::ScheduleNow(&PredController::Optimize, this);
 }
 
 void
