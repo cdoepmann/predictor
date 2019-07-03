@@ -279,8 +279,8 @@ TorStarHelper::BuildTopology ()
   if (m_enablePcap)
     {
       m_p2pHelper.EnablePcapAll ("node");
-      AsciiTraceHelper ascii;
-      m_p2pHelper.EnableAsciiAll (ascii.CreateFileStream ("tor.tr"));
+      // AsciiTraceHelper ascii;
+      // m_p2pHelper.EnableAsciiAll (ascii.CreateFileStream ("tor.tr"));
     }
 
   // Ptr<RateErrorModel> em = CreateObject<RateErrorModel> ();
