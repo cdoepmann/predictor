@@ -213,21 +213,14 @@ TorPredApp::StartApplication (void)
           // socket->SetSendCallback (MakeCallback(&TorPredApp::ConnWriteCallback, this));
           socket->SetDataSentCallback (MakeCallback (&TorPredApp::ConnWriteCallback, this));
           socket->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadCallback, this));
-          socket->SetConnectCallback (MakeCallback (&TorPredApp::ConnEstablishedCallback, this), MakeNullCallback<void, Ptr<Socket>>());
           conn->SetSocket (socket);
           m_triggerNewSocket(this, OUTBOUND, socket);
-          LogConnSendState(conn, "connecting");
 
           Ptr<Socket> control_socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
           control_socket->Bind ();
           control_socket->Connect (Address (InetSocketAddress (conn->GetRemote (), 9002)));
           control_socket->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadControlCallback, this));
           conn->SetControlSocket (control_socket);
-        }
-      else
-        {
-          if (conn->SpeaksCells ())
-            LogConnSendState(conn, "listening");
         }
 
       if (ipmask.IsMatch (conn->GetRemote (), Ipv4Address ("127.0.0.1")) )
@@ -243,7 +236,6 @@ TorPredApp::StartApplication (void)
 
               int circId = conn->GetActiveCircuits () ->GetId ();
               m_triggerNewPseudoServerSocket(this, circId, DynamicCast<PseudoServerSocket>(socket));
-              LogConnSendState(conn, "server-start");
             }
 
           if (conn->GetType () == PROXYEDGE)
@@ -262,7 +254,6 @@ TorPredApp::StartApplication (void)
               // socket->SetSendCallback(MakeCallback(&TorPredApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadCallback, this));
               conn->SetSocket (socket);
-              LogConnSendState(conn, "proxy-start");
             }
         }
     }
@@ -271,27 +262,6 @@ TorPredApp::StartApplication (void)
 
   m_triggerAppStart (Ptr<TorBaseApp>(this));
   NS_LOG_INFO ("StartApplication " << m_name << " ip=" << m_ip);
-}
-
-void
-TorPredApp::LogConnSendState(Ptr<PredConnection> conn, const char * state)
-{
-  dumper.dump("conn-send-state",
-              "time", Simulator::Now().GetSeconds(),
-              "node", GetNodeName(),
-              "conn", conn->GetRemoteName(),
-              "state", state
-  );
-}
-
-void
-TorPredApp::ConnEstablishedCallback (Ptr<Socket> socket)
-{
-  NS_ASSERT (socket);
-  Ptr<PredConnection> conn = LookupConn (socket);
-  NS_ASSERT (conn);
-
-  LogConnSendState(conn, "established");
 }
 
 void
@@ -538,11 +508,6 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   
   uint32_t bucket_allowed = m_writebucket.GetSize ();
 
-  if (bucket_allowed == 0)
-  {
-    LogConnSendState(conn, "global-bucket-limit");
-  }
-
   // Find out if this is an outgoing connection according to the optimization problem
   bool is_outconn = controller->IsOutConn(conn);
 
@@ -556,11 +521,7 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
     decrement_per_conn_bucket = [&conn_bucket] (int diff) { conn_bucket.Decrement(diff); };
 
     NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] Applying per-connection token bucket");
-    if (conn_bucket.GetSize() < bucket_allowed)
-    {
-      LogConnSendState(conn, "conn-bucket-limit");
-      bucket_allowed = conn_bucket.GetSize();
-    }
+    bucket_allowed = std::min(bucket_allowed, conn_bucket.GetSize());
   }
   else
   {
@@ -572,12 +533,7 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   int written_bytes = 0;
   uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t max_write = RoundRobin (base, bucket_allowed);
-
-  if (newtx <= max_write)
-  {
-    LogConnSendState(conn, "tx-avail-limit");
-    max_write = newtx;
-  }
+  max_write = max_write > newtx ? newtx : max_write;
 
   NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] writing at most " << max_write << " bytes into Conn");
 
@@ -601,20 +557,6 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
       /* try flushing more */
       conn->ScheduleWrite ();
     }
-  
-  if (m_writebucket.GetSize () == 0)
-  {
-    LogConnSendState(conn, "global-bucket-limit");
-  }
-  if (is_outconn)
-  {
-    NS_ASSERT(controller->conn_buckets.find(conn) != controller->conn_buckets.end());
-    TokenBucket& conn_bucket = controller->conn_buckets[conn];
-    if (conn_bucket.GetSize () == 0)
-    {
-      LogConnSendState(conn, "conn-bucket-limit");
-    }
-  }
 }
 
 
@@ -637,8 +579,6 @@ TorPredApp::HandleAccept (Ptr<Socket> s, const Address& from)
   NS_ASSERT (conn);
   conn->SetSocket (s);
   m_triggerNewSocket(this, INBOUND, s);
-
-  LogConnSendState(conn, "established");
 
   s->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadCallback, this));
   // s->SetSendCallback (MakeCallback(&TorPredApp::ConnWriteCallback, this));
@@ -1142,13 +1082,7 @@ PredConnection::GetRemoteName ()
   }
 
   map<Ipv4Address,string>::const_iterator it = PredConnection::remote_names.find(GetRemote ());
-  if (it == PredConnection::remote_names.end() )
-  {
-    stringstream ss;
-    ss << "unknown/";
-    GetRemote().Print(ss);
-    return ss.str();
-  }
+  NS_ASSERT(it != PredConnection::remote_names.end() );
   return it->second;
 }
 
