@@ -181,7 +181,7 @@ print_relay (TorStarHelper * th, const char * relay) {
   auto app = DynamicCast<T> (th->GetTorApp(relay));
   cout << "/" << app->GetNode()->GetId() << ":";
 
-  cout << " [" << app->m_writebucket.GetSize() << "," << app->m_writebucket.GetSize() << "]";
+  cout << " [" << app->m_writebucket.GetSize() << "," << app->m_readbucket.GetSize() << "]";
   
   for (auto&& conn : app->connections)
   {
