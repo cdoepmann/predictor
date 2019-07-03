@@ -229,6 +229,13 @@ public:
   // Handle an incoming connection-level cell
   void HandleDirectCell (Ptr<PredConnection> conn, Ptr<Packet> cell);
 
+  // Log the current sending state of a connection
+  void LogConnSendState(Ptr<PredConnection> conn, const char * state);
+
+  // Callback that we have successfully established a connection to some remote host.
+  // (we were the initializing client).
+  void ConnEstablishedCallback (Ptr<Socket> socket);
+
 protected:
   virtual void DoDispose (void);
 
