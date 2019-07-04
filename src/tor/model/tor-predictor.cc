@@ -1219,6 +1219,7 @@ PredConnection::Write (uint32_t max_write)
       written_bytes = m_socket->Send (raw_data, max_write, 0);
     }
   NS_ASSERT(written_bytes >= 0);
+  NS_ASSERT(written_bytes == (int)max_write); // because, before calling Write(), this is capped at GetTxAvailable()
 
   /* save leftover for next time */
   written_bytes = max (written_bytes,0);
