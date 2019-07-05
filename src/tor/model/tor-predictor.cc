@@ -2150,6 +2150,14 @@ PredController::SendToNeighbors()
     {
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
       conn->SendConnLevelCell(fragment);
+
+      dumper.dump("send-feedback",
+                  "time", Simulator::Now().GetSeconds(),
+                  "node", app->GetNodeName(),
+                  "conn", conn->GetRemoteName(),
+                  "direction", "to-pred",
+                  "bytes", (int) fragment->GetSize()
+      );
     }
     
     conn_index++;
@@ -2192,6 +2200,14 @@ PredController::SendToNeighbors()
     {
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
       conn->SendConnLevelCell(fragment);
+
+      dumper.dump("send-feedback",
+                  "time", Simulator::Now().GetSeconds(),
+                  "node", app->GetNodeName(),
+                  "conn", conn->GetRemoteName(),
+                  "direction", "to-succ",
+                  "bytes", (int) fragment->GetSize()
+      );
     }
     
     conn_index++;

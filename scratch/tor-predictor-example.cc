@@ -160,7 +160,7 @@ int main (int argc, char *argv[]) {
 
     cout << total_bytes_completed << endl;
 
-    dumper.dump("result", "total", total_bytes_completed);
+    dumper.dump("result", "time", simTime.GetSeconds(), "total", total_bytes_completed);
 
     Simulator::Destroy ();
     return 0;
