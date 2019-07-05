@@ -260,11 +260,18 @@ public:
     std::mutex input_mutex;
     std::mutex output_mutex;
 
+    // Make sure the results vector is not re-allocated during the computation,
+    // so the references stay valid
+    results.reserve(calls.size());
+
     for (int i=0; i<8; i++) {
       threads.push_back(
         std::thread{
           [&input_mutex,&output_mutex,this] {
             while (true) {
+              // pointer to where we will save the result
+              decltype(this->results)::value_type * result;
+
               // get the next job
               std::pair<std::function<rapidjson::Document*()>,Callback<void,rapidjson::Document*>> job;
               {
@@ -275,6 +282,17 @@ public:
                 
                 job = this->calls.front();
                 this->calls.pop_front();
+
+                // Push a dummy result now and alter it later with the real result.
+                // This way, we ensure that the results vector has the same order
+                // as the original calls (no variation due to lock contention
+                // and other races).
+                // The reference stays valid because we avoid re-allocation and
+                // the vector is only grown, not shrunken before all threads are done.
+                this->results.push_back(
+                  std::make_pair(MakeNullCallback<void,rapidjson::Document*>(), nullptr)
+                );
+                result = &this->results.back();
               }
 
               // do the computation
@@ -284,9 +302,7 @@ public:
               {
                 std::lock_guard<std::mutex> lock{output_mutex};
                 
-                this->results.push_back(
-                  std::make_pair(job.second, doc)
-                );
+                *result = std::make_pair(job.second, doc);
               }
             } // loop in lambda
           } // lambda
