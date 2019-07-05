@@ -204,6 +204,10 @@ TorPredApp::StartApplication (void)
       Ptr<PredConnection> conn = *it;
       NS_ASSERT (conn);
 
+      // remember the connection
+      cout << "remembering connection (" << m_ip << " -> " << conn->GetRemote() << ")" << endl;
+      PredConnection::RememberConnection(m_ip, conn->GetRemote(), conn);
+
       // if m_ip smaller then connect to remote node
       if (m_ip < conn->GetRemote () && conn->SpeaksCells ())
         {
@@ -1052,11 +1056,26 @@ PredConnection::GetRemote ()
 }
 
 map<Ipv4Address,string> PredConnection::remote_names;
+map<pair<Ipv4Address,Ipv4Address>, Ptr<PredConnection>> PredConnection::remote_connections;
 
 void
 PredConnection::RememberName (Ipv4Address address, string name)
 {
   PredConnection::remote_names[address] = name;
+}
+
+void
+PredConnection::RememberConnection (Ipv4Address from, Ipv4Address to, Ptr<PredConnection> conn)
+{
+  PredConnection::remote_connections[make_pair(from, to)] = conn;
+}
+
+Ptr<PredConnection>
+PredConnection::GetRemoteConn ()
+{
+  auto key = make_pair(GetRemote(), torapp->m_ip);
+  NS_ASSERT(remote_connections.find(key) != remote_connections.end());
+  return remote_connections[key];
 }
 
 string
@@ -1220,6 +1239,28 @@ PredConnection::SendConnLevelCell (Ptr<Packet> cell)
   // We do not handle a full transmission buffer here, this is expected
   // not to happen (might fail if feedback messages grow).
   NS_ASSERT(sent_bytes == (int) cell->GetSize());
+}
+
+void
+PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
+{
+  if (!SpeaksCells())
+  {
+    return;
+  }
+  
+  auto remote_conn = GetRemoteConn ();
+  Time delay = GetBaseRtt () / 2.0;
+  
+  NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Beaming connection-level cell to appear after " << delay.GetSeconds() << " seconds");
+
+  Simulator::Schedule(delay, &PredConnection::ReceiveBeamedConnLevelCell, remote_conn, cell);
+}
+
+void
+PredConnection::ReceiveBeamedConnLevelCell(Ptr<Packet> cell)
+{
+  torapp->controller->HandleFeedback (this, cell);
 }
 
 void
@@ -2119,19 +2160,7 @@ PredController::SendToNeighbors()
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    for (auto && fragment : MultiCellEncoder::encode(packet))
-    {
-      NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
-      conn->SendConnLevelCell(fragment);
-
-      dumper.dump("send-feedback",
-                  "time", Simulator::Now().GetSeconds(),
-                  "node", app->GetNodeName(),
-                  "conn", conn->GetRemoteName(),
-                  "direction", "to-pred",
-                  "bytes", (int) fragment->GetSize()
-      );
-    }
+    conn->BeamConnLevelCell (packet);
     
     conn_index++;
   }
@@ -2169,19 +2198,7 @@ PredController::SendToNeighbors()
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    for (auto && fragment : MultiCellEncoder::encode(packet))
-    {
-      NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
-      conn->SendConnLevelCell(fragment);
-
-      dumper.dump("send-feedback",
-                  "time", Simulator::Now().GetSeconds(),
-                  "node", app->GetNodeName(),
-                  "conn", conn->GetRemoteName(),
-                  "direction", "to-succ",
-                  "bytes", (int) fragment->GetSize()
-      );
-    }
+    conn->BeamConnLevelCell (packet);
     
     conn_index++;
   }

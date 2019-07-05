@@ -103,6 +103,7 @@ public:
   uint32_t ReadControl (vector<Ptr<Packet>> &);
 
   Ipv4Address GetRemote ();
+  Ptr<PredConnection> GetRemoteConn ();
   uint32_t GetOutbufSize ();
   uint32_t GetInbufSize ();
 
@@ -110,10 +111,21 @@ public:
   string GetRemoteName ();
   TorPredApp * GetTorApp() { return torapp; }
 
+  static void RememberConnection (Ipv4Address from, Ipv4Address to, Ptr<PredConnection> conn);
+
   // Get the (theoretical) base delay to the remote site
   Time GetBaseRtt ();
 
   void SendConnLevelCell (Ptr<Packet>);
+
+  // Schedule the reception of a cell at the remote site after the appropriate
+  // time span (network delay), WITHOUT using real network communication.
+  void BeamConnLevelCell (Ptr<Packet> cell);
+
+  // Trigger the reception of a connection-level cell that was "beamed".
+  // This has to be static because ns-3 doesn't offer callbacks that
+  // point at member functions AND are bound at the same time
+  void ReceiveBeamedConnLevelCell(Ptr<Packet> cell);
 
   size_t CountCircuits()
   {
@@ -156,6 +168,7 @@ private:
   EventId write_event;
 
   static map<Ipv4Address, string> remote_names;
+  static map<pair<Ipv4Address,Ipv4Address>, Ptr<PredConnection>> remote_connections;
 };
 
 
