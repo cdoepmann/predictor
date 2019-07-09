@@ -1250,7 +1250,7 @@ PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
   }
   
   auto remote_conn = GetRemoteConn ();
-  Time delay = GetBaseRtt () / 2.0;
+  Time delay = GetBaseRtt () / 2.0 + MilliSeconds(2); // TODO
   
   NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Beaming connection-level cell to appear after " << delay.GetSeconds() << " seconds");
 
