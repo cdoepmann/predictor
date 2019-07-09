@@ -35,7 +35,7 @@ map<int,uint64_t> leadtime_offsets;
 int main (int argc, char *argv[]) {
     uint32_t run = 1;
     // Time simTime = Time("60s");
-    Time simTime = Time("5s");
+    Time simTime = Time("7.5s");
     uint32_t rtt = 40;
 
     CommandLine cmd;
@@ -138,7 +138,7 @@ int main (int argc, char *argv[]) {
     Simulator::Stop (simTime);
 
     Simulator::Schedule(Seconds(0.01), &StatsCallback, &th, simTime);
-    Simulator::Schedule(Seconds(2.5), &remember_leadtime, &th, simTime);
+    Simulator::Schedule(Seconds(4), &remember_leadtime, &th, simTime);
 
     // Dump a few static facts
     dumper.dump("cell-size", "bytes", CELL_NETWORK_SIZE);
