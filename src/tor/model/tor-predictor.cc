@@ -1390,7 +1390,7 @@ PredController::Setup ()
     "s_softmax", 500, // TODO
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
-    "weights", vector<string>({"control_delta", "0.1", "send", "1", "store", "0", "receive", "1"}),
+    "weights", vector<string>({"control_delta", "5.0", "send", "10", "store", "0", "receive", "1"}),
     "n_in", inputs.size(),
     "input_circuits", inputs,
     "n_out", outputs.size(),
@@ -1549,7 +1549,7 @@ PredController::Optimize ()
 
           if (val < 0.0)
           {
-            NS_ASSERT(val > -0.001);
+            NS_ASSERT(val > -0.01);
             val = 0.0;
           }
           composition.push_back(val);

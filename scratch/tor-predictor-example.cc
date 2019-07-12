@@ -69,8 +69,8 @@ int main (int argc, char *argv[]) {
 
 
     /* TorApp defaults. Note, this also affects onion proxies. */
-    Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("12Mbps")));
-    Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("12Mbps")));
+    Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("100Mbps")));
+    Config::SetDefault ("ns3::TorBaseApp::BandwidthBurst", DataRateValue (DataRate ("100Mbps")));
     Config::SetDefault ("ns3::TorApp::WindowStart", IntegerValue (500));
     Config::SetDefault ("ns3::TorApp::WindowIncrement", IntegerValue (50));
 
@@ -112,8 +112,8 @@ int main (int argc, char *argv[]) {
     th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.6)) );
     th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.8)) );
 
-    th.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2Mb/s")));
-    th.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2Mb/s")));
+    // th.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2Mb/s")));
+    // th.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2Mb/s")));
 
     // th.PrintCircuits();
     th.BuildTopology(); // finally build topology, setup relays and seed circuits
