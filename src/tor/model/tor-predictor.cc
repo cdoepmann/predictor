@@ -1805,6 +1805,7 @@ PredController::CalculateSendPlan()
   auto conn_it = out_conns.begin();
 
   vector<double> dumped_rates;
+  vector<vector<double>> dumped_rate_trajectories;
 
   for (auto& traj : pred_v_out)
   {
@@ -1813,6 +1814,11 @@ PredController::CalculateSendPlan()
     double rate_pps = traj.Elements().at(0);
     DataRate rate = to_datarate(rate_pps);
     dumped_rates.push_back(rate_pps);
+    dumped_rate_trajectories.emplace_back();
+    for (auto& v : traj.Elements())
+    {
+      dumped_rate_trajectories.back().push_back(v);
+    }
 
     Ptr<PredConnection> conn = *conn_it;
 
@@ -1827,7 +1833,8 @@ PredController::CalculateSendPlan()
   dumper.dump("calculated-plan",
               "time", Simulator::Now().GetSeconds(),
               "node", app->GetNodeName(),
-              "conn_rates_pps", dumped_rates
+              "conn_rates_pps", dumped_rates,
+              "conn_rates_pps_traj", dumped_rate_trajectories
   );
 }
 
