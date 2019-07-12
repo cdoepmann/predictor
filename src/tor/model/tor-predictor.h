@@ -623,6 +623,17 @@ public:
     return sum;
   }
 
+  string Format()
+  {
+    stringstream ss;
+    ss << "[" << GetTime().GetSeconds() << "]";
+    for (auto& val : Elements())
+    {
+      ss << " " << val;
+    }
+    return ss.str();
+  }
+
   // Get the time step
   Time GetTimeStep() { return time_step; }
 
