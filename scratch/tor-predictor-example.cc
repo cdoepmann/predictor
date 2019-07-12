@@ -199,6 +199,34 @@ print_relay (TorStarHelper * th, const char * relay) {
       {
         cout << "[" << tcp->GetRxBuffer()->Size() << "," << tcp->GetRxBuffer()->MaxRxSequence() << "," << tcp->GetRxBuffer()->NextRxSequence() << "]";
       }
+
+      int bytes_tcptxbuf = 0;
+      if (auto tcp = DynamicCast<TcpSocketBase>(conn->GetSocket()))
+      {
+        bytes_tcptxbuf = tcp->GetTxBuffer()->Size();
+      }
+
+      int bytes_outbuf = conn->GetOutbufSize();
+      
+      int bytes_circqueues = 0;
+      auto first_circuit = conn->GetActiveCircuits ();
+      auto this_circuit = first_circuit;
+      do {
+        NS_ASSERT(this_circuit);
+        bytes_circqueues += (int) this_circuit->GetQueueSize(this_circuit->GetDirection(conn));
+        this_circuit = this_circuit->GetNextCirc(conn);
+      }
+      while (this_circuit != first_circuit);
+
+      dumper.dump("buffer-size-sampled",
+                  "time", Simulator::Now().GetSeconds(),
+                  "node", relay,
+                  "conn", conn->GetRemoteName(),
+                  "bytes_tcptxbuf", bytes_tcptxbuf,
+                  "bytes_outbuf", bytes_outbuf,
+                  "bytes_circqueues", bytes_circqueues,
+                  "bytes_total", bytes_tcptxbuf + bytes_outbuf + bytes_circqueues
+      );
     }
     else
     {
@@ -280,11 +308,16 @@ StatsCallback(TorStarHelper* th, Time simTime)
                   "node", exitApp->GetNodeName(),
                   "bytes", (int) exitCirc->GetBytesWritten(INBOUND)
       );
+      dumper.dump("sampled-backlog",
+                  "time", Simulator::Now().GetSeconds(),
+                  "circuit-id", *id,
+                  "bytes", (int) exitCirc->GetBytesWritten(INBOUND) - (int) proxyCirc->GetBytesWritten(INBOUND)
+      );
     }
     cout << endl;
     
     cout << "== " << Simulator::Now().GetSeconds() << " ==" << endl;
-    for (const char * relay : {"entry1", "btlnk", "exit1"})
+    for (const char * relay : {"entry1", "entry2", "entry3", "btlnk", "exit1", "exit2"})
     {
       if (use_predictor)
       {
