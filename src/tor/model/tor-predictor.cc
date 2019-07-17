@@ -510,11 +510,23 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   NS_ASSERT (conn);
 
   uint32_t newtx = socket->GetTxAvailable ();
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] newtx = " << (int) newtx);
   
   uint32_t bucket_allowed = m_writebucket.GetSize ();
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] bucket_allowed = " << (int) bucket_allowed);
 
   // Find out if this is an outgoing connection according to the optimization problem
   bool is_outconn = controller->IsOutConn(conn);
+  
+  if (is_outconn)
+  {
+    dumper.dump("connlevel-bucket-before-write",
+                  "time", Simulator::Now().GetSeconds(),
+                  "node", GetNodeName(),
+                  "conn", conn->GetRemoteName(),
+                  "bytes", (int) controller->conn_buckets[conn]
+    );
+  }
 
   // Additionally, limit the allowed sending data size/rate by the per-connection
   // token bucket, realizing the throttling defined by v_out.
@@ -533,11 +545,30 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
     // remember to not decrement the bucket later (there is none)
     decrement_per_conn_bucket = [] (int) { };
   }
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] bucket_allowed (incl. connlevel) = " << (int) bucket_allowed);
 
 
   int written_bytes = 0;
   uint32_t base = conn->SpeaksCells () ? CELL_NETWORK_SIZE : CELL_PAYLOAD_SIZE;
   uint32_t max_write = RoundRobin (base, bucket_allowed);
+  NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] max_write = " << (int) max_write);
+  
+  if (max_write > newtx)
+  {
+    dumper.dump("send-limited-by-txavail",
+                  "time", Simulator::Now().GetSeconds(),
+                  "node", GetNodeName(),
+                  "conn", conn->GetRemoteName(),
+                  "bytes", (int) (max_write-newtx)
+    );
+  }
+  dumper.dump("send-txavail-diff",
+                "time", Simulator::Now().GetSeconds(),
+                "node", GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "bytes", (int) max_write - (int) newtx
+  );
+
   max_write = max_write > newtx ? newtx : max_write;
 
   NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] writing at most " << max_write << " bytes into Conn");
@@ -563,6 +594,16 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
       /* try flushing more */
       conn->ScheduleWrite ();
     }
+
+  if (is_outconn)
+  {
+    dumper.dump("connlevel-bucket-after-write",
+                  "time", Simulator::Now().GetSeconds(),
+                  "node", GetNodeName(),
+                  "conn", conn->GetRemoteName(),
+                  "bytes", (int) controller->conn_buckets[conn]
+    );
+  }
 }
 
 
@@ -1213,6 +1254,7 @@ PredConnection::Write (uint32_t max_write)
   if (max_write > 0)
     {
       written_bytes = m_socket->Send (raw_data, max_write, 0);
+      NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] " << (int) written_bytes << " bytes actually written");
     }
   NS_ASSERT(written_bytes >= 0);
   NS_ASSERT(written_bytes == (int)max_write); // because, before calling Write(), this is capped at GetTxAvailable()
@@ -1730,6 +1772,13 @@ PredController::Optimize ()
     }
   }
 
+  // Dump optimization result
+  dumper.dump("measured-s-buffer-0",
+              "time", Simulator::Now().GetSeconds(),
+              "node", app->GetNodeName(),
+              "packets_per_conn", packets_per_conn
+  );
+
   // Call the optimizer
   executor.Compute([=]
     {
@@ -1828,6 +1877,8 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
   ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
 
+  DumpMemoryPrediction();
+
   // Trigger sending of new information to peers
   SendToNeighbors();
 
@@ -1880,6 +1931,24 @@ PredController::CalculateSendPlan()
               "node", app->GetNodeName(),
               "conn_rates_pps", dumped_rates,
               "conn_rates_pps_traj", dumped_rate_trajectories
+  );
+}
+
+void
+PredController::DumpMemoryPrediction()
+{
+  vector<vector<double>> dumped_trajectories;
+
+  for (auto& traj : pred_s_buffer)
+  {
+    dumped_trajectories.push_back(traj.Elements());
+  }
+
+  // Dump optimization result
+  dumper.dump("predicted-s-buffer",
+              "time", Simulator::Now().GetSeconds(),
+              "node", app->GetNodeName(),
+              "packets_traj", dumped_trajectories
   );
 }
 

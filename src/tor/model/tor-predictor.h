@@ -429,6 +429,8 @@ public:
   // connection.
   void CalculateSendPlan();
 
+  void DumpMemoryPrediction();
+  
   void DumpConnNames();
 
   // Assemble information to be sent to our neighbors, after optimization
