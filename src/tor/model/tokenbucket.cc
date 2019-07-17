@@ -63,7 +63,7 @@ TokenBucket::SetRate (DataRate rate, DataRate burst)
 
   // Refill the bucket to the new rate, but take into account that some time
   // of the current bucket interval may have passed already.
-  Refill ();
+  RefillPartial ();
 }
 
 void

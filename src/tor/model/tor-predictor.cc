@@ -6,6 +6,8 @@
 #include "tor-predictor.h"
 #include "pytalk.hpp"
 
+#include <limits>
+
 using namespace std;
 
 namespace ns3 {
@@ -520,11 +522,11 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
   if (is_outconn)
   {
     NS_ASSERT(controller->conn_buckets.find(conn) != controller->conn_buckets.end());
-    TokenBucket& conn_bucket = controller->conn_buckets[conn];
-    decrement_per_conn_bucket = [&conn_bucket] (int diff) { conn_bucket.Decrement(diff); };
+    uint64_t& conn_bucket = controller->conn_buckets[conn];
+    decrement_per_conn_bucket = [&conn_bucket] (int diff) { conn_bucket -= diff; };
 
     NS_LOG_LOGIC ("[" << GetNodeName() << ": connection " << conn->GetRemoteName () << "] Applying per-connection token bucket");
-    bucket_allowed = std::min(bucket_allowed, conn_bucket.GetSize());
+    bucket_allowed = (uint32_t) std::min((uint64_t)bucket_allowed, conn_bucket);
   }
   else
   {
@@ -1423,10 +1425,7 @@ PredController::Setup ()
 
   for (auto& conn : out_conns)
   {
-    conn_buckets[conn] = TokenBucket{MaxDataRate(), MaxDataRate(), MilliSeconds(1)};
-    Time offset = Seconds (rng->GetValue ());
-    conn_buckets[conn].SetRefilledCallback (MakeCallback (&PredConnection::ScheduleWriteWrapper, conn));
-    conn_buckets[conn].StartBucket(offset);
+    conn_buckets[conn] = std::numeric_limits<uint64_t>::max();
   }
 
   // Schedule the first optimizer event
@@ -1824,7 +1823,10 @@ PredController::CalculateSendPlan()
 
     NS_ASSERT(conn_buckets.find(conn) != conn_buckets.end());
 
-    conn_buckets[conn].SetRate(rate, rate);
+    conn_buckets[conn] = (uint64_t)(rate*time_step/8.0); // dividing by 8 converts to bytes
+
+    // trigger sending of new data
+    conn->ScheduleWrite ();
 
     ++conn_it;
   }

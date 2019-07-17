@@ -489,7 +489,7 @@ protected:
   DataRate max_datarate;
 
   // Token buckets for the per-connection rate limiting based on v_out
-  map<Ptr<PredConnection>, TokenBucket> conn_buckets;
+  map<Ptr<PredConnection>, uint64_t> conn_buckets;
 
   // Grant access to application for using the per-connection token buckets
   friend void TorPredApp::ConnWriteCallback(Ptr<Socket>, uint32_t);
