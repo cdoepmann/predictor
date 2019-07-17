@@ -407,6 +407,8 @@ public:
   // connection.
   void CalculateSendPlan();
 
+  void DumpConnNames();
+
   // Assemble information to be sent to our neighbors, after optimization
   void SendToNeighbors();
 

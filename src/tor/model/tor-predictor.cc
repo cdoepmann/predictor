@@ -1320,6 +1320,22 @@ PredController::AddOutputConnection (Ptr<PredConnection> conn)
 }
 
 void
+PredController::DumpConnNames()
+{
+  int conn_index = 0;
+
+  for (auto& conn : out_conns)
+  {
+    // remember the name of the out conn
+    dumper.dump("outconn-name",
+                "node", app->GetNodeName(),
+                "index", conn_index,
+                "name", conn->GetRemoteName());
+    conn_index++;
+  }
+}
+
+void
 PredController::Setup ()
 {
   // Get the maximum data rate
@@ -1431,6 +1447,10 @@ PredController::Setup ()
   // Schedule the first optimizer event
   // TODO: evaluate when starting the optimizer makes the most sense
   optimize_event = Simulator::Schedule(Seconds(0.1), &PredController::Optimize, this);
+
+  // Schedule logging the names of the connections (the other applications have
+  // to run their ::StartApplication() first).
+  Simulator::ScheduleNow(&PredController::DumpConnNames, this);
 
   // Since the batched executor does only return a plain pointer to the parsed
   // JSON doc, we need to free it here.
