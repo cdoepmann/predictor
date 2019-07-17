@@ -558,6 +558,7 @@ TorPredApp::ConnWriteCallback (Ptr<Socket> socket, uint32_t tx)
     {
       GlobalBucketsDecrement (0, written_bytes);
       decrement_per_conn_bucket(written_bytes);
+      conn->m_data_sent += written_bytes;
 
       /* try flushing more */
       conn->ScheduleWrite ();
@@ -985,6 +986,7 @@ PredConnection::PredConnection (TorPredApp* torapp, Ipv4Address ip, int conntype
 
   m_socket = 0;
   m_conntype = conntype;
+  m_data_sent = 0;
 }
 
 
@@ -1442,6 +1444,8 @@ PredController::Setup ()
   for (auto& conn : out_conns)
   {
     conn_buckets[conn] = std::numeric_limits<uint64_t>::max();
+
+    conn_last_sent[conn] = 0;
   }
 
   // Schedule the first optimizer event
@@ -1471,6 +1475,25 @@ PredController::Start ()
 void
 PredController::Optimize ()
 {
+  // Before doing anything else, measure and log how much data we have sent
+  // during the last time step
+  for (auto&& conn : out_conns)
+  {
+    auto last = conn_last_sent[conn];
+    auto current = conn->GetDataSent();
+
+    dumper.dump("data-sent-in-timestep",
+                "time-start", Simulator::Now().GetSeconds() - TimeStep().GetSeconds(),
+                "time-end", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "bytes", (int)(current-last)
+    );
+    
+    // remeber the current value
+    conn_last_sent[conn] = current;
+  }
+
   // Firstly, measure the necessary local information.
 
   // Get the circuits' queue lengthes

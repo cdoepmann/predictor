@@ -146,6 +146,28 @@ public:
     return count;
   };
 
+  uint64_t GetDataSent()
+  {
+    // uint64_t result = 0;
+
+    // auto first_circuit = GetActiveCircuits ();
+    // auto this_circuit = first_circuit;
+    // do {
+    //   NS_ASSERT(this_circuit);
+    //   auto direction = this_circuit->GetDirection(this);
+    //   result += this_circuit->GetBytesWritten(direction);
+      
+    //   this_circuit = this_circuit->GetNextCirc(this);
+    // }
+    // while (this_circuit != first_circuit);
+
+    // return result;
+
+    return m_data_sent;
+  };
+
+  uint64_t m_data_sent;
+
 protected:
 
 private:
@@ -497,6 +519,10 @@ protected:
 
   // Token buckets for the per-connection rate limiting based on v_out
   map<Ptr<PredConnection>, uint64_t> conn_buckets;
+
+  // Remember how much data had been sent over a connection at the time of the
+  // last optimization.
+  map<Ptr<PredConnection>, uint64_t> conn_last_sent;
 
   // Grant access to application for using the per-connection token buckets
   friend void TorPredApp::ConnWriteCallback(Ptr<Socket>, uint32_t);
