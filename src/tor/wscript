@@ -20,6 +20,7 @@ def build(bld):
         'model/cell-header.cc',
         'model/pseudo-socket.cc',
         'model/tokenbucket.cc',
+        'model/dummy-tcp.cc',
         'helper/tor-star-helper.cc',
         'helper/tor-dumbbell-helper.cc',
         ]
@@ -43,6 +44,7 @@ def build(bld):
         'model/cell-header.h',
         'model/pseudo-socket.h',
         'model/tokenbucket.h',
+        'model/dummy-tcp.h',
         'helper/tor-star-helper.h',
         'helper/tor-dumbbell-helper.h',
         ]

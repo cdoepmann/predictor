@@ -67,6 +67,10 @@ int main (int argc, char *argv[]) {
     Config::SetDefault ("ns3::TcpSocket::DelAckCount", UintegerValue (0));
     Config::SetDefault ("ns3::TcpSocket::TcpNoDelay", BooleanValue (true));
 
+    // disable TCP congestion control
+    Config::SetDefault ("ns3::TcpL4Protocol::RecoveryType", TypeIdValue (TcpDummyRecovery::GetTypeId ()));
+    Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpDummyCong::GetTypeId ()));
+
 
     /* TorApp defaults. Note, this also affects onion proxies. */
     Config::SetDefault ("ns3::TorBaseApp::BandwidthRate", DataRateValue (DataRate ("100Mbps")));
