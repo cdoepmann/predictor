@@ -35,10 +35,8 @@ public:
 
   virtual Ptr<TcpCongestionOps> Fork ();
 
-protected:
-  uint32_t SlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
-
-  void CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
+  virtual void CongestionStateSet (Ptr<TcpSocketState> tcb, const TcpSocketState::TcpCongState_t newState);
+  virtual void CwndEvent (Ptr<TcpSocketState> tcb, const TcpSocketState::TcpCAEvent_t event);
 
 };
 
