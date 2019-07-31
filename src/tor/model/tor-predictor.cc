@@ -1450,8 +1450,8 @@ PredController::Setup ()
     "setup",
     "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
-    "v_in_max_total", to_packets_sec(MaxDataRate ()),
-    "v_out_max_total", to_packets_sec(MaxDataRate ()),
+    "v_in_max_total", .8*to_packets_sec(MaxDataRate ()),
+    "v_out_max_total", .8*to_packets_sec(MaxDataRate ()),
     "s_softmax", 500, // TODO
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
