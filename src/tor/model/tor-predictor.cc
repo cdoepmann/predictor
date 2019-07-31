@@ -2254,6 +2254,22 @@ PredController::HandleInputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
     
     vector<Ptr<Trajectory>> cv_out = msg.GetAll(FeedbackTrajectoryKind::CvOut);
     NS_ASSERT(cv_out.size() == conn->CountCircuits());
+
+    // {
+    //   vector<vector<double>> data;
+    //   for (auto& traj : cv_out)
+    //   {
+    //     data.push_back(traj->Elements());
+    //   }
+
+    //   dumper.dump("got-cvin-feedback",
+    //               "time", Simulator::Now().GetSeconds(),
+    //               "node", app->GetNodeName(),
+    //               "conn", conn->GetRemoteName(),
+    //               "cvin-trajs", data
+    //   );
+    // }
+
     MergeTrajectories(pred_cv_in[conn_index], cv_out);
 }
 
@@ -2456,6 +2472,13 @@ PredController::SendToNeighbors()
 
     for (size_t circ_index = 0; circ_index < num_circuits; circ_index++)
     {
+      // dumper.dump("sending-cvout-traj",
+      //             "time", Simulator::Now().GetSeconds(),
+      //             "node", app->GetNodeName(),
+      //             "conn", conn->GetRemoteName(),
+      //             "index", (int) circ_index,
+      //             "cvout-traj", pred_cv_out[conn_index][circ_index].Elements()
+      // );
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] - cv_out length: " << pred_cv_out[conn_index][circ_index].Steps());
       msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
     }
