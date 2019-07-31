@@ -1448,6 +1448,7 @@ PredController::Setup ()
   // auto obj = 
   auto result = pyscript.call(
     "setup",
+    "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
     "v_in_max_total", to_packets_sec(MaxDataRate ()),
     "v_out_max_total", to_packets_sec(MaxDataRate ()),
@@ -1829,6 +1830,24 @@ PredController::Optimize ()
               "time", Simulator::Now().GetSeconds(),
               "node", app->GetNodeName(),
               "packets_per_conn", packets_per_conn
+  );
+
+  // dump the call
+  pyscript.dump(
+    "calling-optimizer",
+    "time", Simulator::Now().GetSeconds(),
+    "relay", app->GetNodeName (),
+    "s_buffer_0", packets_per_conn,
+    "s_circuit_0", packets_per_circuit,
+
+    // trajectories
+    "v_in_req", transpose_to_double_vectors(v_in_req),
+    "cv_in", cv_in,
+    "v_out_max", transpose_to_double_vectors(v_out_max),
+    "memory_load_target", transpose_to_double_vectors(memory_load_target),
+    "memory_load_source", transpose_to_double_vectors(memory_load_source),
+    "bandwidth_load_target", transpose_to_double_vectors(bandwidth_load_target),
+    "bandwidth_load_source", transpose_to_double_vectors(bandwidth_load_source)
   );
 
   // Call the optimizer
