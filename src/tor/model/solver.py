@@ -88,10 +88,10 @@ class Handler:
         #return {'debug': repr(setup_dict)}
         
         # print('# ' + self.relay)
-        self.ots = Wrap(f'({self.relay}) ots = optimal_traffic_scheduler', optimal_traffic_scheduler)(setup_dict)
+        self.ots = Wrap(f'({self.relay}/{kwargs["time"]}) ots = optimal_traffic_scheduler', optimal_traffic_scheduler)(setup_dict)
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}) ots.setup', self.ots.setup)(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.setup', self.ots.setup)(
             n_in = kwargs['n_in'],
             n_out = kwargs['n_out'],
             input_circuits = kwargs['input_circuits'],
@@ -112,7 +112,7 @@ class Handler:
             return np.array([res])
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source'])(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source'])(
             inner_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['s_circuit_0']),
             inner_nparray(kwargs['v_in_req']),
@@ -154,6 +154,7 @@ if __name__ == '__main__':
                 # print(repr(line))
 
                 obj = json.loads(line)
+                simtime = obj['time']
 
                 print('{}'.format(obj), end='', file=f)
 
@@ -176,6 +177,8 @@ if __name__ == '__main__':
             except Exception as e:
                 obj = {
                     'ok': False,
+                    'relay': handler.relay,
+                    'time': simtime,
                     'exception': f'{e}',
                     'stacktrace': traceback.format_exc(),
                 }
