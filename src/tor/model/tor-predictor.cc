@@ -1595,6 +1595,15 @@ PredController::Optimize ()
     for (auto& circ : conn->GetAllActiveCircuits())
     {
       double queue_size = circ->GetQueueSize(circ->GetDirection(conn));
+      if (!circ->GetOppositeConnection(conn)->SpeaksCells())
+      {
+        auto serversock = DynamicCast<PseudoServerSocket>(circ->GetOppositeConnection(conn)->GetSocket());
+        NS_ASSERT(serversock);
+        if (serversock->HasStarted())
+          queue_size = (100*MaxDataRate().GetBitRate()/8.0) * TimeStep().GetSeconds()*horizon;
+        else
+          queue_size = 0;
+      }
 
       packets_per_circuit.push_back(queue_size);
       this_conn += queue_size;
