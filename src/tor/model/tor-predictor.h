@@ -1023,7 +1023,11 @@ public:
   Ptr<Packet> MakePacket() {
     Ptr<Packet> packet = Create<Packet> ();
 
-    for (auto& kv : entries) {
+    // Add the entries in reverse because each of them is _prepended_ to the
+    // current packet.
+    for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
+      auto kv = *it;
+
       FeedbackKindHeader kind;
       kind.SetKind(kv.first);
 
