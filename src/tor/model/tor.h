@@ -40,6 +40,7 @@ public:
   virtual void PushCell (Ptr<Packet>, CellDirection);
   queue<Ptr<Packet> >* GetQueue (CellDirection);
   uint32_t GetQueueSize (CellDirection);
+  uint32_t GetQueueSizeBytes (CellDirection);
   uint32_t SendCell (CellDirection);
 
   Ptr<Connection> GetConnection (CellDirection);

@@ -896,6 +896,23 @@ Circuit::GetQueueSize (CellDirection direction)
 }
 
 uint32_t
+Circuit::GetQueueSizeBytes (CellDirection direction)
+{
+  queue<Ptr<Packet>> * source = (direction == OUTBOUND) ? this->n_cellQ : this->p_cellQ;
+  
+  // copy temporarily
+  queue<Ptr<Packet>> q{*source};
+
+  uint32_t result = 0;
+  while (q.size() > 0)
+  {
+    result += q.front()->GetSize();
+    q.pop();
+  }
+  return result;
+}
+
+uint32_t
 Circuit::GetPackageWindow ()
 {
   return package_window;

@@ -217,7 +217,7 @@ print_relay (TorStarHelper * th, const char * relay) {
       auto this_circuit = first_circuit;
       do {
         NS_ASSERT(this_circuit);
-        bytes_circqueues += (int) this_circuit->GetQueueSize(this_circuit->GetDirection(conn));
+        bytes_circqueues += (int) this_circuit->GetQueueSizeBytes(this_circuit->GetDirection(conn));
         this_circuit = this_circuit->GetNextCirc(conn);
       }
       while (this_circuit != first_circuit);
