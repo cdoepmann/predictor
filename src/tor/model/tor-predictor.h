@@ -146,6 +146,33 @@ public:
     return count;
   };
 
+  vector<Ptr<PredCircuit>> GetAllActiveCircuits()
+  {
+    vector<Ptr<PredCircuit>> result;
+
+    Ptr<PredCircuit> first_circuit = GetActiveCircuits ();
+
+    if (!first_circuit) {
+      return result;
+    }
+
+    result.push_back(first_circuit);
+
+    auto next_circuit = first_circuit->GetNextCirc(this);
+    while (next_circuit != first_circuit)
+    {
+      result.push_back(next_circuit);
+      next_circuit = next_circuit->GetNextCirc(this);
+    }
+
+    // Keep a consistent order independently of which circuit is currently at the front
+    std::sort(result.begin(), result.end(), [](Ptr<PredCircuit> a, Ptr<PredCircuit> b) {
+      return a->GetId() < b->GetId();
+    });
+
+    return result;
+  };
+
   uint64_t GetDataSent()
   {
     // uint64_t result = 0;
@@ -167,6 +194,13 @@ public:
   };
 
   uint64_t m_data_sent;
+
+  uint64_t GetDataReceived()
+  {
+    return m_data_received;
+  };
+
+  uint64_t m_data_received;
 
 protected:
 
@@ -430,6 +464,12 @@ public:
   void CalculateSendPlan();
 
   void DumpMemoryPrediction();
+
+  void DumpVinPrediction();
+
+  void DumpCvOutPrediction();
+  
+  void DumpCvInPrediction();
   
   void DumpConnNames();
 
@@ -525,6 +565,9 @@ protected:
   // Remember how much data had been sent over a connection at the time of the
   // last optimization.
   map<Ptr<PredConnection>, uint64_t> conn_last_sent;
+  map<Ptr<PredConnection>, uint64_t> conn_last_received;
+
+  map<Ptr<PredCircuit>, uint64_t> circ_last_received;
 
   // Grant access to application for using the per-connection token buckets
   friend void TorPredApp::ConnWriteCallback(Ptr<Socket>, uint32_t);

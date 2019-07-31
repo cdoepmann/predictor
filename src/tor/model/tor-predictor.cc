@@ -384,6 +384,7 @@ TorPredApp::ConnReadCallback (Ptr<Socket> socket)
     {
       // decrement buckets
       GlobalBucketsDecrement (read_bytes, 0);
+      conn->m_data_received += read_bytes;
 
       // try to read more
       if (socket->GetRxAvailable () > 0)
@@ -1028,6 +1029,7 @@ PredConnection::PredConnection (TorPredApp* torapp, Ipv4Address ip, int conntype
   m_socket = 0;
   m_conntype = conntype;
   m_data_sent = 0;
+  m_data_received = 0;
 }
 
 
@@ -1490,6 +1492,17 @@ PredController::Setup ()
     conn_last_sent[conn] = 0;
   }
 
+  for (auto& conn : in_conns)
+  {
+    conn_last_received[conn] = 0;
+
+    // Initialize the circuit-level counters
+    for (auto& circ : conn->GetAllActiveCircuits())
+    {
+      circ_last_received[circ] = 0;
+    }
+  }
+
   // Schedule the first optimizer event
   // TODO: evaluate when starting the optimizer makes the most sense
   optimize_event = Simulator::Schedule(Seconds(0.1), &PredController::Optimize, this);
@@ -1518,7 +1531,7 @@ void
 PredController::Optimize ()
 {
   // Before doing anything else, measure and log how much data we have sent
-  // during the last time step
+  // and received during the last time step
   for (auto&& conn : out_conns)
   {
     auto last = conn_last_sent[conn];
@@ -1534,6 +1547,45 @@ PredController::Optimize ()
     
     // remeber the current value
     conn_last_sent[conn] = current;
+  }
+
+  for (auto&& conn : in_conns)
+  {
+    auto last = conn_last_received[conn];
+    auto current = conn->GetDataReceived();
+
+    dumper.dump("data-received-in-timestep",
+                "time-start", Simulator::Now().GetSeconds() - TimeStep().GetSeconds(),
+                "time-end", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "bytes", (int)(current-last)
+    );
+
+    // remeber the current value
+    conn_last_received[conn] = current;
+
+    // do the same for each of the circuits
+    int circ_index = 0;
+
+    // Initialize the circuit-level counters
+    for (auto& circ : conn->GetAllActiveCircuits())
+    {
+      auto circ_last = circ_last_received[circ];
+      auto circ_current = (uint64_t) circ->GetBytesRead(circ->GetOppositeDirection(conn));
+
+      dumper.dump("circuit-data-received-in-timestep",
+                  "time-start", Simulator::Now().GetSeconds() - TimeStep().GetSeconds(),
+                  "time-end", Simulator::Now().GetSeconds(),
+                  "node", app->GetNodeName(),
+                  "conn", conn->GetRemoteName(),
+                  "local-circuit-index", circ_index,
+                  "circuit-id", (int) circ->GetId(),
+                  "bytes", (int)(circ_current-circ_last)
+      );
+      circ_last_received[circ] = circ_current;
+      circ_index++;
+    }
   }
 
   // Firstly, measure the necessary local information.
@@ -1878,6 +1930,9 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
 
   DumpMemoryPrediction();
+  DumpVinPrediction();
+  DumpCvOutPrediction();
+  DumpCvInPrediction();
 
   // Trigger sending of new information to peers
   SendToNeighbors();
@@ -2255,6 +2310,84 @@ PredController::GetOutConnIndex(Ptr<PredConnection> conn)
   NS_ABORT_MSG("outgoing connection unknown to controller");
 }
 
+void PredController::DumpVinPrediction()
+{
+  size_t conn_index;
+
+  NS_ASSERT(in_conns.size() == pred_v_in.size());
+
+  conn_index = 0;
+  for (auto&& conn : in_conns)
+  {
+    PredFeedbackMessage msg;
+
+    dumper.dump("calculated-vin",
+                "time", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "vin-traj-pps", pred_v_in[conn_index].Elements()
+    );
+
+    conn_index++;
+  }
+}
+
+void PredController::DumpCvOutPrediction()
+{
+  size_t conn_index;
+
+  NS_ASSERT(out_conns.size() == pred_cv_out.size());
+
+  conn_index = 0;
+  for (auto&& conn : out_conns)
+  {
+    PredFeedbackMessage msg;
+
+    vector<vector<double>> this_data;
+    for (auto& traj : pred_cv_out[conn_index])
+    {
+      this_data.push_back(traj.Elements());
+    }
+
+    dumper.dump("calculated-cvout",
+                "time", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "cvout-traj-share", this_data
+    );
+
+    conn_index++;
+  }
+}
+
+void PredController::DumpCvInPrediction()
+{
+  size_t conn_index;
+
+  NS_ASSERT(in_conns.size() == pred_cv_in.size());
+
+  conn_index = 0;
+  for (auto&& conn : in_conns)
+  {
+    PredFeedbackMessage msg;
+
+    vector<vector<double>> this_data;
+    for (auto& traj : pred_cv_in[conn_index])
+    {
+      this_data.push_back(traj.Elements());
+    }
+
+    dumper.dump("calculated-cvin",
+                "time", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "cvin-traj-share", this_data
+    );
+
+    conn_index++;
+  }
+}
+
 void
 PredController::SendToNeighbors()
 {
@@ -2271,6 +2404,13 @@ PredController::SendToNeighbors()
   for (auto&& conn : in_conns)
   {
     PredFeedbackMessage msg;
+
+    dumper.dump("calculated-vin-max",
+                "time", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "conn", conn->GetRemoteName(),
+                "vin-max-traj", pred_v_in_max[conn_index].Elements()
+    );
 
     msg.Add(FeedbackTrajectoryKind::VInMax, pred_v_in_max[conn_index]);
     msg.Add(FeedbackTrajectoryKind::BandwidthLoad, pred_bandwidth_load_local[0]);
