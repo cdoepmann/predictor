@@ -226,6 +226,7 @@ PseudoServerSocket::PseudoServerSocket ()
   m_leftToSend = 0;
   m_leftToRead = PACKET_PAYLOAD_SIZE;
   m_request = 0;
+  m_gotRequest = false;
 
   m_rng = CreateObject<ExponentialRandomVariable> ();
   m_rng->SetAttribute ("Mean", DoubleValue (20));
@@ -318,6 +319,7 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
 
       Time waitTime = MilliSeconds (m_rng->GetInteger ());
       m_notBefore = Simulator::Now() + waitTime;
+      m_gotRequest = true;
       Simulator::Schedule (waitTime, &PseudoServerSocket::NotifyDataRecv, this);
       Simulator::Schedule (waitTime, &PseudoServerSocket::m_triggerStartResponse, this);
     }
@@ -329,7 +331,11 @@ PseudoServerSocket::Send (Ptr<Packet> p, uint32_t flags)
   return p->GetSize ();
 }
 
-
+bool
+PseudoServerSocket::HasStarted()
+{
+  return m_gotRequest && Simulator::Now() >= m_notBefore;
+}
 
 
 

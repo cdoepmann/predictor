@@ -106,6 +106,8 @@ public:
   TracedCallback<> m_triggerStartResponse;
   typedef void (* TorStartResponse) ();
 
+  bool HasStarted();
+
 private:
   uint32_t m_leftToSend;
   uint32_t m_leftToRead;
@@ -116,6 +118,9 @@ private:
   // in order to enforce the think time as clients may try to Recv(...) before
   // they are notified (e.g. due to token bucket refilling).
   Time m_notBefore;
+
+  // Remember if a request has been received
+  bool m_gotRequest;
 };
 
 
