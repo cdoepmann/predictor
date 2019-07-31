@@ -1407,15 +1407,10 @@ PredController::Setup ()
     // ...and their circuits
     auto conn = *it;
     vector<uint16_t> circ_ids;
-    
-    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-    circ_ids.push_back(first_circuit->GetId());
-    
-    auto next_circuit = first_circuit->GetNextCirc(conn);
-    while (next_circuit != first_circuit)
+
+    for (auto& circ : conn->GetAllActiveCircuits())
     {
-      circ_ids.push_back(next_circuit->GetId());
-      next_circuit = next_circuit->GetNextCirc(conn);
+      circ_ids.push_back(circ->GetId());
     }
 
     inputs.push_back(circ_ids);
@@ -1430,15 +1425,10 @@ PredController::Setup ()
     // ...and their circuits
     auto conn = *it;
     vector<uint16_t> circ_ids;
-    
-    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-    circ_ids.push_back(first_circuit->GetId());
-    
-    auto next_circuit = first_circuit->GetNextCirc(conn);
-    while (next_circuit != first_circuit)
+
+    for (auto& circ : conn->GetAllActiveCircuits())
     {
-      circ_ids.push_back(next_circuit->GetId());
-      next_circuit = next_circuit->GetNextCirc(conn);
+      circ_ids.push_back(circ->GetId());
     }
 
     outputs.push_back(circ_ids);
@@ -1602,20 +1592,12 @@ PredController::Optimize ()
   {
     double this_conn = 0.0;
 
-    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-
-    double queue_size = first_circuit->GetQueueSize(first_circuit->GetDirection(conn));
-    packets_per_circuit.push_back(queue_size);
-    this_conn += queue_size;
-    
-    auto next_circuit = first_circuit->GetNextCirc(conn);
-    while (next_circuit != first_circuit)
+    for (auto& circ : conn->GetAllActiveCircuits())
     {
-      queue_size = next_circuit->GetQueueSize(next_circuit->GetDirection(conn));
+      double queue_size = circ->GetQueueSize(circ->GetDirection(conn));
+
       packets_per_circuit.push_back(queue_size);
       this_conn += queue_size;
-      
-      next_circuit = next_circuit->GetNextCirc(conn);
     }
 
     packets_per_conn.push_back(this_conn);
@@ -2456,21 +2438,12 @@ PredController::SendToNeighbors()
     msg.Add(FeedbackTrajectoryKind::MemoryLoad, pred_memory_load_local[0]);
 
     // collect the composition share of each circuit
-    // TODO: make sure that the order matches the receiver's order
-    Ptr<PredCircuit> first_circuit = conn->GetActiveCircuits ();
-    size_t circ_index = 0;
-    msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
-    
-    auto next_circuit = first_circuit->GetNextCirc(conn);
-    circ_index++;
+    size_t num_circuits = conn->CountCircuits();
 
-    while (next_circuit != first_circuit)
+    for (size_t circ_index = 0; circ_index < num_circuits; circ_index++)
     {
       NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] - cv_out length: " << pred_cv_out[conn_index][circ_index].Steps());
       msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
-
-      next_circuit = next_circuit->GetNextCirc(conn);
-      circ_index++;
     }
 
     // Assemble the trajectories
