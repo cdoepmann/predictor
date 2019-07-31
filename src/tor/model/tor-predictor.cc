@@ -2148,7 +2148,10 @@ PredController::MergeTrajectories(Trajectory& target, Trajectory& source)
   NS_LOG_LOGIC ("[" << app->GetNodeName() << "] (merging something different) time diff: " << (target_time-source.GetTime()).GetSeconds());
 
   // TODO: maybe take into account initial value of target
-  target = source.InterpolateToTime(GetNextOptimizationTime());
+  target = source;
+  // TODO: Do we really not need to interpolate here? Consider possibly varying
+  // feedback propagation delays...
+  // target = source.InterpolateToTime(GetNextOptimizationTime());
 }
 
 void
@@ -2181,7 +2184,9 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
   double steps = (target_time - source_time).GetSeconds() / TimeStep().GetSeconds();
   NS_ASSERT(std::abs(std::round(steps) - steps) < 0.001);
   NS_ASSERT(std::lround(steps) >= 0);
-  size_t start_index = (size_t) std::lround(steps);
+  // TODO: reassure we do not need to take the offset into account
+  // size_t start_index = (size_t) std::lround(steps);
+  size_t start_index = (size_t) 0;
 
   // NS_ASSERT(start_index < source_length);
   start_index = std::min(start_index, source_length-1);
