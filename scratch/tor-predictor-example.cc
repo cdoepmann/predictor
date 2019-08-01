@@ -36,7 +36,7 @@ int main (int argc, char *argv[]) {
     uint32_t run = 1;
     // Time simTime = Time("60s");
     Time simTime = Time("7.5s");
-    uint32_t rtt = 40;
+    uint32_t rtt = 80;
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
