@@ -1939,6 +1939,20 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   Time now = Simulator::Now();
   Time next_step = now + TimeStep();
 
+  // Save the raw optimizer response
+  {
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    doc->Accept(writer);
+
+    dumper.dump("optimizer-returned",
+                "time", Simulator::Now().GetSeconds(),
+                "node", app->GetNodeName(),
+                "response-json", buffer.GetString()
+    );
+  }
+
   // TODO: Have all stored from current time
   ParseIntoTrajectories((*doc)["v_in"], pred_v_in, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_in_max"], pred_v_in_max, now, in_conns.size());
