@@ -464,6 +464,10 @@ public:
   // connection.
   void CalculateSendPlan();
 
+  // Based on the predicted v_in_max values, calculate a concrete input plan per
+  // connection (used only for exits' pseudo server sockets).
+  void CalculateReadPlan();
+
   void DumpMemoryPrediction();
 
   void DumpVinPrediction();
@@ -473,10 +477,6 @@ public:
   void DumpCvInPrediction();
   
   void DumpConnNames();
-
-  // Adjust the bandwidth requested by the pseude-socket exit to match the exit's
-  // current v_out
-  void AdjustExitRequest();
 
   // Assemble information to be sent to our neighbors, after optimization
   void SendToNeighbors();
@@ -564,8 +564,12 @@ protected:
   // The maximum data rate of this relay
   DataRate max_datarate;
 
-  // Token buckets for the per-connection rate limiting based on v_out
+  // Token buckets for the per-connection output rate limiting based on v_out
   map<Ptr<PredConnection>, uint64_t> conn_buckets;
+
+  // Token buckets for the per-connection input rate limiting based on v_in_max
+  // (only applied by exit relays to pseudo server sockets)
+  map<Ptr<PredConnection>, uint64_t> conn_read_buckets;
 
   // Remember how much data had been sent over a connection at the time of the
   // last optimization.
@@ -576,6 +580,7 @@ protected:
 
   // Grant access to application for using the per-connection token buckets
   friend void TorPredApp::ConnWriteCallback(Ptr<Socket>, uint32_t);
+  friend void TorPredApp::ConnReadCallback(Ptr<Socket>);
 
   // (shared) pool executor to run the optimizations in parallel
   static BatchedExecutor executor;

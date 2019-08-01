@@ -349,16 +349,32 @@ TorPredApp::ConnReadCallback (Ptr<Socket> socket)
     {
       m_scheduleReadHead = conn;
     }
+  
+  // For exits, limit the amount of data that can be read from pseudo server sockets
+  // by applying the per-connection read bucket based on the previously predicted
+  // v_in_max value.
+
+  // Find out if this is an outgoing connection according to the optimization problem
+  bool is_inconn = controller->IsInConn(conn);
+  std::function<void(int)> decrement_per_conn_bucket;
+
+  if (is_inconn && !conn->SpeaksCells ())
+  {
+    NS_ASSERT(controller->conn_read_buckets.find(conn) != controller->conn_read_buckets.end());
+    uint64_t& conn_read_bucket = controller->conn_read_buckets[conn];
+    decrement_per_conn_bucket = [&conn_read_bucket] (int diff) { conn_read_bucket -= diff; };
+
+    max_read = (uint32_t) std::min((uint64_t)max_read, conn_read_bucket);
+  }
+  else
+  {
+    // remember to not decrement the bucket later (there is none)
+    decrement_per_conn_bucket = [] (int) { };
+  }
 
   if (max_read <= 0)
     {
       return;
-    }
-
-  if (!conn->SpeaksCells ())
-    {
-      // TODO: how to model reading from edge?
-      // max_read = min (conn->GetActiveCircuits ()->GetPackageWindow () * base,max_read);
     }
 
   vector<Ptr<Packet> > packet_list;
@@ -385,6 +401,7 @@ TorPredApp::ConnReadCallback (Ptr<Socket> socket)
       // decrement buckets
       GlobalBucketsDecrement (read_bytes, 0);
       conn->m_data_received += read_bytes;
+      decrement_per_conn_bucket((int) read_bytes);
 
       // try to read more
       if (socket->GetRxAvailable () > 0)
@@ -1503,6 +1520,7 @@ PredController::Setup ()
 
   for (auto& conn : in_conns)
   {
+    conn_read_buckets[conn] = std::numeric_limits<uint64_t>::max();
     conn_last_received[conn] = 0;
 
     // Initialize the circuit-level counters
@@ -1613,15 +1631,6 @@ PredController::Optimize ()
     for (auto& circ : conn->GetAllActiveCircuits())
     {
       double queue_size = circ->GetQueueSize(circ->GetDirection(conn));
-      if (!circ->GetOppositeConnection(conn)->SpeaksCells())
-      {
-        auto serversock = DynamicCast<PseudoServerSocket>(circ->GetOppositeConnection(conn)->GetSocket());
-        NS_ASSERT(serversock);
-        if (serversock->HasStarted())
-          queue_size = (100*MaxDataRate().GetBitRate()/8.0) * TimeStep().GetSeconds()*horizon;
-        else
-          queue_size = 0;
-      }
 
       packets_per_circuit.push_back(queue_size);
       this_conn += queue_size;
@@ -1637,18 +1646,6 @@ PredController::Optimize ()
   // data we are expected to receive from our predecessors (their v_out)
   vector<Trajectory> v_in_req;
 
-  // For exits (pseudo server sockets), set v_in_req to match our v_out. This is
-  // needed because v_in_req otherwise wouldn't be adjusted since the exit does
-  // not have a predecessor to receive v_out from
-  // for (auto&& conn : in_conns)
-  // {
-  //   if (!conn->SpeaksCells())
-  //   {
-  //     AdjustExitRequest();
-  //     break;
-  //   }
-  // }
-
   {
     // Use the following "idle" trajectory if we do not yet have data from other relays,
     // assuming that they do not send anything
@@ -1658,12 +1655,8 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
-    for (auto& conn : in_conns)
-    {
-      NS_LOG_LOGIC ("[" << app->GetNodeName() << "] " << Simulator::Now().GetSeconds() << " having conn " << conn->GetRemoteName());
-    }
-
     auto conn_it = in_conns.begin();
+    int inconn_index = 0;
     for (auto&& req : pred_v_in_req)
     {
       NS_ASSERT(conn_it != in_conns.end());
@@ -1672,26 +1665,19 @@ PredController::Optimize ()
       if (req.Steps() == 0)
       {
         // Firstly, determine if this is a server edge
-        if (/*false &&*/ !conn->SpeaksCells())
+        if (!conn->SpeaksCells())
         {
-          NS_LOG_LOGIC ("[" << app->GetNodeName() << "] " << Simulator::Now().GetSeconds() << " " << conn->GetRemoteName() << " calc v_in_req at exit");
           // This is a sending exit server socket. If it is sending already,
-          // assume that it wants to go as fast as possible
+          // it will do so at the speed of our v_in_max, because this is what
+          // we used to throttle the reading from the pseudo server socket.
           auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
           NS_ASSERT(serversock);
           if (serversock->HasStarted())
           {
-            NS_LOG_LOGIC ("[" << app->GetNodeName() << "]" << Simulator::Now().GetSeconds() << " - has started");
-            Trajectory busy{this, Simulator::Now()};
-            for (unsigned int i=0; i<Horizon(); i++)
-            {
-              busy.Elements().push_back(.7*to_packets_sec(MaxDataRate ()) / (double)in_conns.size());
-            }
-            v_in_req.push_back(busy);
+            v_in_req.push_back(pred_v_in_max[inconn_index]);
           }
           else
           {
-            NS_LOG_LOGIC ("[" << app->GetNodeName() << "]" << Simulator::Now().GetSeconds() << " - has not started");
             v_in_req.push_back(idle);
           }
         }
@@ -1708,6 +1694,7 @@ PredController::Optimize ()
       }
 
       conn_it++;
+      inconn_index++;
     }
   }
 
@@ -2032,6 +2019,7 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   SendToNeighbors();
 
   CalculateSendPlan();
+  CalculateReadPlan();
 
   // Since the batched executor does only return a plain pointer to the parsed
   // JSON doc, we need to free it here.
@@ -2084,78 +2072,33 @@ PredController::CalculateSendPlan()
 }
 
 void
-PredController::AdjustExitRequest()
+PredController::CalculateReadPlan()
 {
-  // any of our in_conns is a server pseudo socket
+  // Based on the predicted v_in_max values, calculate reading plans that define
+  // how much data we read (at the most) from each input connection.
+  //
+  // Note that these plans are only used by the exit relays when reading from
+  // the pseudo server sockets so they do not grow indefinitely!
 
-  // If we do not have a prediction yet, do nothing.
-  
-  if (pred_v_out_max.size() != out_conns.size())
-  {
-    NS_ASSERT (pred_v_out_max.size() == 0);
-    return;
-  }
-  if (pred_v_out_max[0].Steps() == 0)
-  {
-    return;
-  }
-
-  // count the exit pseudo sockets
-  size_t num_exits = 0;
-  size_t num_active_exits = 0;
-  for (auto&& conn : in_conns)
-  {
-    if (!conn->SpeaksCells())
-    {
-      auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
-      NS_ASSERT(serversock);
-      if (serversock->HasStarted())
-      {
-        num_active_exits++;
-      }
-      num_exits++;
-    }
-  }
-
-  // Right now, we can only handle the case that *all* input conns are exits.
-  // If needed later, we can adapt v_in_req differently
-  NS_ASSERT((int) num_exits == (int) in_conns.size());
-
-  // Calculate the "aggregate" v_out to use for the inputs and split it into
-  // the individual v_in_reqs.
-  // NOTE: This does not currently take into account where (= to which outconn
-  // each cicuit is going)
-  Trajectory default_v_in_req{this, pred_v_out_max[0].GetTime()};
-
-  const int horizon = pred_v_out_max[0].Steps();
-
-  for (int i=0; i<horizon; i++)
-  {
-    double this_step = 0.0;
-
-    for (auto&& traj : pred_v_out_max)
-    {
-      this_step += traj.Elements().at(i);
-    }
-
-    default_v_in_req.Elements().push_back(this_step / (double)num_active_exits);
-  }
-
-  // Save the adjusted trajectories
   auto conn_it = in_conns.begin();
-  for (auto& this_v_in_req : pred_v_in_req)
+
+  for (auto& traj : pred_v_in_max)
   {
     NS_ASSERT(conn_it != in_conns.end());
-    auto conn = *conn_it;
 
-    auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
-    NS_ASSERT(serversock);
-    if (serversock->HasStarted())
-    {
-      this_v_in_req = default_v_in_req;
-    }
+    double rate_pps = traj.Elements().at(0);
+    DataRate rate = to_datarate(rate_pps);
 
-    conn_it++;
+    Ptr<PredConnection> conn = *conn_it;
+
+    NS_ASSERT(conn_read_buckets.find(conn) != conn_read_buckets.end());
+
+    conn_read_buckets[conn] = (uint64_t)(rate*time_step/8.0); // dividing by 8 converts to bytes
+
+    // trigger receiving of new data
+    conn->ScheduleRead ();
+
+    ++conn_it;
   }
 }
 
