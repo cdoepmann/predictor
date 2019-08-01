@@ -474,6 +474,10 @@ public:
   
   void DumpConnNames();
 
+  // Adjust the bandwidth requested by the pseude-socket exit to match the exit's
+  // current v_out
+  void AdjustExitRequest();
+
   // Assemble information to be sent to our neighbors, after optimization
   void SendToNeighbors();
 

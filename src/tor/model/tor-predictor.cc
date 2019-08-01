@@ -1637,6 +1637,18 @@ PredController::Optimize ()
   // data we are expected to receive from our predecessors (their v_out)
   vector<Trajectory> v_in_req;
 
+  // For exits (pseudo server sockets), set v_in_req to match our v_out. This is
+  // needed because v_in_req otherwise wouldn't be adjusted since the exit does
+  // not have a predecessor to receive v_out from
+  // for (auto&& conn : in_conns)
+  // {
+  //   if (!conn->SpeaksCells())
+  //   {
+  //     AdjustExitRequest();
+  //     break;
+  //   }
+  // }
+
   {
     // Use the following "idle" trajectory if we do not yet have data from other relays,
     // assuming that they do not send anything
@@ -1646,16 +1658,56 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
+    for (auto& conn : in_conns)
+    {
+      NS_LOG_LOGIC ("[" << app->GetNodeName() << "] " << Simulator::Now().GetSeconds() << " having conn " << conn->GetRemoteName());
+    }
+
+    auto conn_it = in_conns.begin();
     for (auto&& req : pred_v_in_req)
     {
+      NS_ASSERT(conn_it != in_conns.end());
+      auto conn = *conn_it;
+      
       if (req.Steps() == 0)
       {
-        v_in_req.push_back(idle);
+        // Firstly, determine if this is a server edge
+        if (/*false &&*/ !conn->SpeaksCells())
+        {
+          NS_LOG_LOGIC ("[" << app->GetNodeName() << "] " << Simulator::Now().GetSeconds() << " " << conn->GetRemoteName() << " calc v_in_req at exit");
+          // This is a sending exit server socket. If it is sending already,
+          // assume that it wants to go as fast as possible
+          auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
+          NS_ASSERT(serversock);
+          if (serversock->HasStarted())
+          {
+            NS_LOG_LOGIC ("[" << app->GetNodeName() << "]" << Simulator::Now().GetSeconds() << " - has started");
+            Trajectory busy{this, Simulator::Now()};
+            for (unsigned int i=0; i<Horizon(); i++)
+            {
+              busy.Elements().push_back(.7*to_packets_sec(MaxDataRate ()) / (double)in_conns.size());
+            }
+            v_in_req.push_back(busy);
+          }
+          else
+          {
+            NS_LOG_LOGIC ("[" << app->GetNodeName() << "]" << Simulator::Now().GetSeconds() << " - has not started");
+            v_in_req.push_back(idle);
+          }
+        }
+        else
+        {
+          // Otherwise, the predecessor has not requested to send anything,
+          // assume it is idle.
+          v_in_req.push_back(idle);
+        }
       }
       else
       {
         v_in_req.push_back(req);
       }
+
+      conn_it++;
     }
   }
 
@@ -2029,6 +2081,82 @@ PredController::CalculateSendPlan()
               "conn_rates_pps", dumped_rates,
               "conn_rates_pps_traj", dumped_rate_trajectories
   );
+}
+
+void
+PredController::AdjustExitRequest()
+{
+  // any of our in_conns is a server pseudo socket
+
+  // If we do not have a prediction yet, do nothing.
+  
+  if (pred_v_out_max.size() != out_conns.size())
+  {
+    NS_ASSERT (pred_v_out_max.size() == 0);
+    return;
+  }
+  if (pred_v_out_max[0].Steps() == 0)
+  {
+    return;
+  }
+
+  // count the exit pseudo sockets
+  size_t num_exits = 0;
+  size_t num_active_exits = 0;
+  for (auto&& conn : in_conns)
+  {
+    if (!conn->SpeaksCells())
+    {
+      auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
+      NS_ASSERT(serversock);
+      if (serversock->HasStarted())
+      {
+        num_active_exits++;
+      }
+      num_exits++;
+    }
+  }
+
+  // Right now, we can only handle the case that *all* input conns are exits.
+  // If needed later, we can adapt v_in_req differently
+  NS_ASSERT((int) num_exits == (int) in_conns.size());
+
+  // Calculate the "aggregate" v_out to use for the inputs and split it into
+  // the individual v_in_reqs.
+  // NOTE: This does not currently take into account where (= to which outconn
+  // each cicuit is going)
+  Trajectory default_v_in_req{this, pred_v_out_max[0].GetTime()};
+
+  const int horizon = pred_v_out_max[0].Steps();
+
+  for (int i=0; i<horizon; i++)
+  {
+    double this_step = 0.0;
+
+    for (auto&& traj : pred_v_out_max)
+    {
+      this_step += traj.Elements().at(i);
+    }
+
+    default_v_in_req.Elements().push_back(this_step / (double)num_active_exits);
+  }
+
+  // Save the adjusted trajectories
+  auto conn_it = in_conns.begin();
+  for (auto& this_v_in_req : pred_v_in_req)
+  {
+    NS_ASSERT(conn_it != in_conns.end());
+    auto conn = *conn_it;
+
+    auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
+    NS_ASSERT(serversock);
+    if (serversock->HasStarted())
+    {
+      this_v_in_req = default_v_in_req;
+    }
+
+    conn_it++;
+  }
 }
 
 void
