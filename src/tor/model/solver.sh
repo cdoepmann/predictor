@@ -28,4 +28,5 @@ cd - 2>&1 > /dev/null
 # make MA27 solver available
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/christoph/forschung/paper-predictor/casadi/hsl-bin/lib
 
-cat - | PYTHONPATH=$SOLVER_REPO/OTS python3 $SCRIPT_DIR/solver.py # | tee -a /tmp/pytalk.rawout
+# cat - | PYTHONPATH=$SOLVER_REPO/OTS python3 $SCRIPT_DIR/solver.py # | tee -a /tmp/pytalk.rawout
+cat - | PYTHONPATH=$SOLVER_REPO/OTS python3 $SCRIPT_DIR/solver.py | tee -a /tmp/pytalk.rawout
