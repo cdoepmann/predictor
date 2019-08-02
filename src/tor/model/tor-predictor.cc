@@ -1263,15 +1263,41 @@ PredConnection::Write (uint32_t max_write)
       circ = GetActiveCircuits ();
       NS_ASSERT (circ);
 
-      direction = circ->GetDirection (this);
-      cell = circ->PopCell (direction);
+      // Check if this circuit is allowed to send a cell while adhering to the
+      // planned distribution between all the circuits of this connection (cv_out).
+      // Note that we "ceil" the values, that is, a circuit is allowed to send a
+      // cell as long as its bucket is non-zero, even if it is smaller than a
+      // cell. By doing so, we avoid starvation of small circuits (we cannot
+      // send partial cells here).
+      // If this is not an outgoing connection, do not apply any bucket, but use
+      // a temporary one that is always large enough.
+      uint64_t large_enough = numeric_limits<uint64_t>::max();
+      uint64_t & circ_bucket = (torapp->controller->IsOutConn(this)) ?
+                        torapp->controller->circ_buckets[this][circ] : large_enough;
 
-      if (cell)
+      if (circ_bucket > 0)
+      {
+        direction = circ->GetDirection (this);
+        cell = circ->PopCell (direction);
+
+        if (cell)
         {
-          datasize += cell->CopyData (&raw_data[datasize], cell->GetSize ());
+          uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
+          datasize += cell_size;
           flushed_some = true;
           NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
+
+          // Decrement the circuit-level bucket (but not below 0)
+          if (circ_bucket <= cell_size)
+          {
+            circ_bucket = 0;
+          }
+          else
+          {
+            circ_bucket -= cell_size;
+          }
         }
+      }
 
       SetActiveCircuits (circ->GetNextCirc (this));
 
@@ -2029,10 +2055,11 @@ PredController::OptimizeDone(rapidjson::Document * doc)
 void
 PredController::CalculateSendPlan()
 {
-  // Transfer the calculated send plan (v_out from the optimization step) into
-  // read-to-execute token buckets
+  // Transfer the calculated send plan (v_out and cv_out from the optimization
+  // step) into ready-to-execute token buckets per connection and per circuit
 
   auto conn_it = out_conns.begin();
+  int conn_index = 0;
 
   vector<double> dumped_rates;
   vector<vector<double>> dumped_rate_trajectories;
@@ -2054,12 +2081,56 @@ PredController::CalculateSendPlan()
 
     NS_ASSERT(conn_buckets.find(conn) != conn_buckets.end());
 
-    conn_buckets[conn] = (uint64_t)(rate*time_step/8.0); // dividing by 8 converts to bytes
+    uint64_t conn_bucket = (uint64_t)(rate*time_step/8.0); // dividing by 8 converts to bytes
+    conn_buckets[conn] = conn_bucket;
+
+    //
+    // Now that the limit for the whole connection is set, also calculate the
+    // share each circuit is allowed to use from it, based on cv_out
+    //
+
+    // Firstly, get the distribution for the current step
+    vector<double> distribution;
+    for (auto& traj : pred_cv_out[conn_index])
+    {
+      distribution.push_back(traj.Elements().at(0));
+    }
+    NS_ASSERT(distribution.size() == conn->CountCircuits());
+
+    // Just to be on the safe side, normalize the values such that they sum up
+    // to 1.0 so we utilize the full bandwidth alotted to the connection
+    {
+      double sum = 0.0;
+      for (auto& val : distribution)
+      {
+        sum += val;
+      }
+      double ratio = 1.0 / sum;
+
+      for (auto& val : distribution)
+      {
+        if (sum < 0.0001)
+          val = 1.0;
+        else
+          val *= ratio;
+      }
+    }
+
+    // Apply the ratios to the circuits
+    int circ_index = 0;
+    for (auto& circ : conn->GetAllActiveCircuits())
+    {
+      uint64_t circ_bucket = conn_bucket * distribution[circ_index];
+      circ_buckets[conn][circ] = circ_bucket;
+
+      circ_index++;
+    }
 
     // trigger sending of new data
     conn->ScheduleWrite ();
 
     ++conn_it;
+    ++conn_index;
   }
 
   // Dump optimization result

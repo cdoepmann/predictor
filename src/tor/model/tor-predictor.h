@@ -567,6 +567,10 @@ protected:
   // Token buckets for the per-connection output rate limiting based on v_out
   map<Ptr<PredConnection>, uint64_t> conn_buckets;
 
+  // Token buckets for per-circuit rate limiting of each connection, defined
+  // by the computed cv_out distribution
+  map<Ptr<PredConnection>, map<Ptr<PredCircuit>,uint64_t>> circ_buckets;
+
   // Token buckets for the per-connection input rate limiting based on v_in_max
   // (only applied by exit relays to pseudo server sockets)
   map<Ptr<PredConnection>, uint64_t> conn_read_buckets;
@@ -580,6 +584,7 @@ protected:
 
   // Grant access to application for using the per-connection token buckets
   friend void TorPredApp::ConnWriteCallback(Ptr<Socket>, uint32_t);
+  friend uint32_t PredConnection::Write(uint32_t max_write);
   friend void TorPredApp::ConnReadCallback(Ptr<Socket>);
 
   // (shared) pool executor to run the optimizations in parallel
