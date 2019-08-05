@@ -1506,7 +1506,7 @@ PredController::Setup ()
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
     // "weights", vector<string>({"control_delta", "25", "send", "10", "store", "1", "receive", "1"}),
-    "weights", vector<string>({"control_delta", "0", "send", "1", "store", "1", "receive", "1"}),
+    "weights", vector<string>({"control_delta", "1", "send", "1", "store", "1", "receive", "1"}),
     "n_in", inputs.size(),
     "input_circuits", inputs,
     "n_out", outputs.size(),
