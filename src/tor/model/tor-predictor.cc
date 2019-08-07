@@ -418,7 +418,7 @@ TorPredApp::PackageRelayCell (Ptr<PredConnection> conn, Ptr<Packet> cell)
 {
   NS_ASSERT (conn);
   NS_ASSERT (cell);
-  Ptr<PredCircuit> circ = conn->GetActiveCircuits (); // TODO why?, but ok (only one circ on this side (server)
+  Ptr<PredCircuit> circ = conn->GetActiveCircuits ();
   NS_ASSERT (circ);
 
   PackageRelayCellImpl (circ->GetId (), cell);
@@ -426,8 +426,6 @@ TorPredApp::PackageRelayCell (Ptr<PredConnection> conn, Ptr<Packet> cell)
   CellDirection direction = circ->GetOppositeDirection (conn);
   AppendCellToCircuitQueue (circ, cell, direction);
   NS_LOG_LOGIC ("[" << GetNodeName() << ": circuit " << circ->GetId () << "] Appended newly packaged cell to circ queue.");
-
-  // TODO: how to model reading from edge?
 }
 
 void
@@ -1645,7 +1643,6 @@ PredController::Optimize ()
 
   // Get the circuits' queue lengthes
   vector<double> packets_per_circuit;
-  // TODO: - Verify that the order of these circuits is correct!
 
   // Also, accumulate the values per connection
   vector<double> packets_per_conn;
@@ -2001,7 +1998,6 @@ PredController::transpose_to_double_vectors(vector<Trajectory> trajectories)
 void
 PredController::OptimizeDone(rapidjson::Document * doc)
 {
-  // TODO: Save the results (plans, etc.)
   Time now = Simulator::Now();
   Time next_step = now + TimeStep();
 

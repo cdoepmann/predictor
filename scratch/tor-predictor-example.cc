@@ -321,15 +321,16 @@ StatsCallback(TorStarHelper* th, Time simTime)
     cout << endl;
     
     cout << "== " << Simulator::Now().GetSeconds() << " ==" << endl;
-    for (const char * relay : {"entry1", "entry2", "entry3", "btlnk", "exit1", "exit2"})
+    th->GetTorAppsContainer();
+    for (string relay : th->GetAllRelayNames())
     {
       if (use_predictor)
       {
-        print_relay<TorPredApp> (th, relay);
+        print_relay<TorPredApp> (th, relay.c_str());
       }
       else
       {
-        print_relay<TorApp> (th, relay);
+        print_relay<TorApp> (th, relay.c_str());
       }
     }
     cout << endl;

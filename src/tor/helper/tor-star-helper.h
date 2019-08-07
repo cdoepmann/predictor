@@ -96,6 +96,16 @@ public:
 
   vector<int> circuitIds;
 
+  std::vector<std::string> GetAllRelayNames()
+  {
+    vector<string> result;
+    for (auto& entry : m_relays)
+    {
+      result.push_back(entry.first);
+    }
+    return result;
+  }
+
 protected:
   DataRate m_underlayRate;
   Time m_underlayLinkDelay;
