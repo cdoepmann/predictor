@@ -35,6 +35,8 @@ class PredController;
 class Trajectory;
 class MultiCellDecoder;
 
+// Convenience function to compare approximate ns3::Time equality
+bool is_same_time(const ns3::Time& x, const ns3::Time& y);
 
 class PredCircuit : public BaseCircuit
 {
@@ -641,6 +643,9 @@ public:
 
   // Interpolate this trajectory to fit the time of its first element to the given time
   Trajectory InterpolateToTime (Time target_time);
+
+  // Discard the beginning of the trajectory such that it matches the given new start time
+  void DiscardUntil (Time target_time);
 
   // Get a reference to the elements
   vector<double>& Elements() { return elements; }

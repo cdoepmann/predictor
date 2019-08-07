@@ -1760,6 +1760,7 @@ PredController::Optimize ()
       }
       else
       {
+        NS_ASSERT (is_same_time(req.GetTime(), Simulator::Now()));
         v_in_req.push_back(req);
       }
 
@@ -1800,6 +1801,9 @@ PredController::Optimize ()
 
         for (auto&& circ_traj : pred_cv_in[conn_index])
         {
+          circ_traj.DiscardUntil(Simulator::Now());
+          NS_ASSERT (is_same_time(circ_traj.GetTime(), Simulator::Now()));
+
           double val = circ_traj.Elements()[i];
 
           if (val < 0.0)
@@ -1838,6 +1842,8 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
+        NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         v_out_max.push_back(val);
       }
     }
@@ -1863,6 +1869,7 @@ PredController::Optimize ()
       }
       else
       {
+        NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         memory_load_target.push_back(val);
       }
     }
@@ -1888,6 +1895,7 @@ PredController::Optimize ()
       }
       else
       {
+        NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         memory_load_source.push_back(val);
       }
     }
@@ -1913,6 +1921,7 @@ PredController::Optimize ()
       }
       else
       {
+        NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         bandwidth_load_target.push_back(val);
       }
     }
@@ -1938,6 +1947,7 @@ PredController::Optimize ()
       }
       else
       {
+        NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         bandwidth_load_source.push_back(val);
       }
     }
@@ -2062,7 +2072,6 @@ PredController::OptimizeDone(rapidjson::Document * doc)
     );
   }
 
-  // TODO: Have all stored from current time
   ParseIntoTrajectories((*doc)["v_in"], pred_v_in, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_in_max"], pred_v_in_max, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
@@ -2751,6 +2760,37 @@ Trajectory Trajectory::InterpolateToTime (Time target_time)
   return result;
 }
 
+void Trajectory::DiscardUntil (Time target_time)
+{
+  if (is_same_time(target_time, first_time))
+  {
+    return;
+  }
+
+  // Find the beginning element
+  double steps = (target_time - first_time).GetSeconds() / time_step.GetSeconds();
+  NS_ASSERT(std::abs(std::round(steps) - steps) < 0.001);
+  NS_ASSERT(std::lround(steps) >= 0);
+  size_t start_index = (size_t) std::lround(steps);
+
+  NS_ASSERT(start_index < Steps());
+  NS_ASSERT(start_index > 0);
+
+  // Move elements to front
+  for (size_t i=start_index; i < Steps(); i++)
+  {
+    Elements()[i-start_index] = Elements()[i];
+  }
+
+  // Repeat the last element
+  for (size_t i=0; i < start_index; i++)
+  {
+    Elements()[Steps()-1-i] = Elements()[Steps()-1-start_index];
+  }
+
+  first_time = target_time;
+}
+
 string FormatFeedbackKind(FeedbackTrajectoryKind kind)
 {
   switch(kind)
@@ -2839,5 +2879,11 @@ HiddenDataTag::GetData (void) const
 }
 
 PyScript dumper{"/bin/cat"};
+
+bool is_same_time(const ns3::Time& x, const ns3::Time& y)
+{
+  double diff = x.GetSeconds() - y.GetSeconds();
+  return (diff > -0.001) && (diff < 0.001);
+}
 
 } //namespace ns3
