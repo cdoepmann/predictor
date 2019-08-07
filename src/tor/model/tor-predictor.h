@@ -299,6 +299,8 @@ public:
   // Handle an incoming connection-level cell
   void HandleDirectCell (Ptr<PredConnection> conn, Ptr<Packet> cell);
 
+  string GetMultiplexMode() { return m_multiplex_mode; }
+
 protected:
   virtual void DoDispose (void);
 
@@ -307,6 +309,9 @@ protected:
 
   // Decoder to re-assemble previously fragmented multi-cells
   map<Ptr<PredConnection>, MultiCellDecoder> multicell_decoders;
+
+  // Multiplexing mode if buckets are insufficient for a full cell
+  string m_multiplex_mode;
 };
 
 
@@ -509,6 +514,8 @@ public:
   // Get the time of the next optimization step
   Time GetNextOptimizationTime() { return ns3::TimeStep(optimize_event.GetTs()); }
 
+  string GetMultiplexMode() { return app->GetMultiplexMode(); }
+
 protected:
   // The application this controller belongs to
   Ptr<TorPredApp> app;
@@ -570,6 +577,11 @@ protected:
   // Token buckets for per-circuit rate limiting of each connection, defined
   // by the computed cv_out distribution
   map<Ptr<PredConnection>, map<Ptr<PredCircuit>,uint64_t>> circ_buckets;
+
+  // If a circuit bucket was not empty but did not suffice to send a complete cell
+  // either, the leftover is remembered and added to the bucket for the next
+  // time step so it is not lost ("delayed" multiplexing mode).
+  map<Ptr<PredConnection>, map<Ptr<PredCircuit>,uint64_t>> circ_buckets_leftover;
 
   // Token buckets for the per-connection input rate limiting based on v_in_max
   // (only applied by exit relays to pseudo server sockets)

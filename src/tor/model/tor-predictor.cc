@@ -22,6 +22,15 @@ TorPredApp::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::TorPredApp")
     .SetParent<TorBaseApp> ()
     .AddConstructor<TorPredApp> ()
+    .AddAttribute ("MultiplexingMode", "Mode of handling situations in which the per-circuit buckets for multiplexing outgoing circuits "
+                                       "do not suffice to send a full cell. Possible values: \"aggressive\" (send full cell as long as "
+                                       "the bucket is nonzero, even if its too small for the full cell), \"conservative\" (do not send "
+                                       "a cell in this case - may underutilize the connection), \"probabilistic\" (randomly decide whether "
+                                       "to send the cell, based on how large the overflow is), and \"delayed\" (do not send the cell, "
+                                       "but remember the leftover bucket for the next time step).",
+                   StringValue (string{"aggressive"}),
+                   MakeStringAccessor (&TorPredApp::m_multiplex_mode),
+                   MakeStringChecker ())
     .AddTraceSource ("NewSocket",
                      "Trace indicating that a new socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewSocket),
@@ -1263,10 +1272,10 @@ PredConnection::Write (uint32_t max_write)
 
       // Check if this circuit is allowed to send a cell while adhering to the
       // planned distribution between all the circuits of this connection (cv_out).
-      // Note that we "ceil" the values, that is, a circuit is allowed to send a
-      // cell as long as its bucket is non-zero, even if it is smaller than a
-      // cell. By doing so, we avoid starvation of small circuits (we cannot
-      // send partial cells here).
+      // Note that, by default in "aggressive" mode, we "ceil" the values, that is,
+      // a circuit is allowed to send a cell as long as its bucket is non-zero,
+      // even if it is smaller than a cell. By doing so, we avoid starvation of
+      // small circuits (we cannot send partial cells here).
       // If this is not an outgoing connection, do not apply any bucket, but use
       // a temporary one that is always large enough.
       uint64_t large_enough = numeric_limits<uint64_t>::max();
@@ -1275,24 +1284,54 @@ PredConnection::Write (uint32_t max_write)
 
       if (circ_bucket > 0)
       {
-        direction = circ->GetDirection (this);
-        cell = circ->PopCell (direction);
-
-        if (cell)
+        bool ok = true;
+        
+        if (torapp->GetMultiplexMode() != "aggressive")
         {
-          uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
-          datasize += cell_size;
-          flushed_some = true;
-          NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
-
-          // Decrement the circuit-level bucket (but not below 0)
-          if (circ_bucket <= cell_size)
+          if (circ_bucket < CELL_NETWORK_SIZE)
           {
-            circ_bucket = 0;
+            ok = false;
+            if (torapp->GetMultiplexMode() == "probabilistic")
+            {
+              Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
+              if (rng->GetValue() <= (double)circ_bucket / (double) CELL_NETWORK_SIZE)
+              {
+                ok = true;
+              }
+            }
           }
-          else
+        }
+
+        if (ok)
+        {
+          direction = circ->GetDirection (this);
+          cell = circ->PopCell (direction);
+
+          if (cell)
           {
-            circ_bucket -= cell_size;
+            uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
+            datasize += cell_size;
+            flushed_some = true;
+            NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
+
+            // Decrement the circuit-level bucket (but not below 0)
+            if (circ_bucket <= cell_size)
+            {
+              circ_bucket = 0;
+            }
+            else
+            {
+              circ_bucket -= cell_size;
+            }
+          }
+        }
+        else
+        {
+          // The bucket does not suffice for sending a complete cell.
+          if (torapp->GetMultiplexMode() == "delayed")
+          {
+            // Instead, remember the leftover budget for reusing it during the next time step.
+            torapp->controller->circ_buckets_leftover[this][circ] = circ_bucket;
           }
         }
       }
@@ -1442,6 +1481,14 @@ PredController::DumpConnNames()
 void
 PredController::Setup ()
 {
+  NS_ABORT_MSG_IF(
+    (GetMultiplexMode() != "aggressive") &&
+    (GetMultiplexMode() != "conservative") &&
+    (GetMultiplexMode() != "probabilistic") &&
+    (GetMultiplexMode() != "delayed"),
+    "invalid multiplexing mode"
+  );
+
   // Get the maximum data rate
   DataRateValue datarate_app;
   app->GetAttribute("BandwidthRate", datarate_app);
@@ -2118,6 +2165,15 @@ PredController::CalculateSendPlan()
     {
       uint64_t circ_bucket = conn_bucket * distribution[circ_index];
       circ_buckets[conn][circ] = circ_bucket;
+
+      if (GetMultiplexMode() == "delayed")
+      {
+        // Add leftover budgets from previous time steps that did not suffice
+        // for sending another full cell (note that the map is default-initialized
+        // as 0)
+        circ_buckets[conn][circ] += circ_buckets_leftover[conn][circ];
+        circ_buckets_leftover[conn][circ] = 0;
+      }
 
       circ_index++;
     }

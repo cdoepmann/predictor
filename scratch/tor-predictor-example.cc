@@ -37,6 +37,7 @@ int main (int argc, char *argv[]) {
     // Time simTime = Time("60s");
     Time simTime = Time("7.5s");
     uint32_t rtt = 80;
+    string predictor_multiplexing_mode{"aggressive"};
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
@@ -44,6 +45,7 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("time", "simulation time", simTime);
     cmd.AddValue("predictor", "use PredicTor", use_predictor);
     cmd.AddValue("vanilla", "use vanilla Tor", use_vanilla);
+    cmd.AddValue("predictor-multiplex", "multiplexing mode for PredicTor", predictor_multiplexing_mode);
     cmd.Parse(argc, argv);
 
     // TestTrajectory();
@@ -80,6 +82,8 @@ int main (int argc, char *argv[]) {
 
     // Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue(QueueSize("2048B")) );
     // Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (2048) );
+    
+    Config::SetDefault ("ns3::TorPredApp::MultiplexingMode", StringValue (predictor_multiplexing_mode));
 
     TorStarHelper th;
     // if (flavor == "pctcp")
