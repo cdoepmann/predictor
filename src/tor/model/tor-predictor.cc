@@ -31,6 +31,10 @@ TorPredApp::GetTypeId (void)
                    StringValue (string{"aggressive"}),
                    MakeStringAccessor (&TorPredApp::m_multiplex_mode),
                    MakeStringChecker ())
+    .AddAttribute ("FeedbackLoss", "Ratio of feedack messages that is lost randomly.",
+                   DoubleValue (0.0),
+                   MakeDoubleAccessor (&TorPredApp::m_feedback_loss),
+                   MakeDoubleChecker<double> (0.0, 1.0))
     .AddTraceSource ("NewSocket",
                      "Trace indicating that a new socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewSocket),
@@ -1391,6 +1395,13 @@ PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
 {
   if (!SpeaksCells())
   {
+    return;
+  }
+
+  Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
+  if (rng->GetValue() < torapp->GetFeedbackLoss())
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Dropping feedback message randomly.");
     return;
   }
   

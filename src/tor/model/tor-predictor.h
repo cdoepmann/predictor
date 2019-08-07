@@ -303,6 +303,8 @@ public:
 
   string GetMultiplexMode() { return m_multiplex_mode; }
 
+  double GetFeedbackLoss() { return m_feedback_loss; }
+
 protected:
   virtual void DoDispose (void);
 
@@ -314,6 +316,9 @@ protected:
 
   // Multiplexing mode if buckets are insufficient for a full cell
   string m_multiplex_mode;
+
+  // Ratio of feedack messages that is lost randomly
+  double m_feedback_loss;
 };
 
 
