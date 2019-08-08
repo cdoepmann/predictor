@@ -1414,6 +1414,12 @@ PredConnection::SendConnLevelCell (Ptr<Packet> cell)
     return;
   }
 
+  if (!m_controlsocket)
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Dropping connection-level cell before sending because the control connection has not (yet) been established");
+    return;
+  }
+
   int sent_bytes = m_controlsocket->Send(cell);
 
   // We do not handle a full transmission buffer here, this is expected
@@ -1426,6 +1432,16 @@ PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
 {
   if (!SpeaksCells())
   {
+    return;
+  }
+
+  // Do not beam cells before the (inband) control connection has been established.
+  // This is not really necessary at all, but is done to ensure that the feedback
+  // messages exchanged are the same between different runs with inband and
+  // out-of-band feedback.
+  if (!m_controlsocket)
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Dropping connection-level cell before sending because the control connection has not (yet) been established");
     return;
   }
 
@@ -1644,7 +1660,6 @@ PredController::Setup ()
   }
 
   // Schedule the first optimizer event
-  // TODO: evaluate when starting the optimizer makes the most sense
   optimize_event = Simulator::Schedule(Seconds(0.1), &PredController::Optimize, this);
 
   // Schedule logging the names of the connections (the other applications have
