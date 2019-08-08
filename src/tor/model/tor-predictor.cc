@@ -1771,6 +1771,7 @@ PredController::Optimize ()
       }
       else
       {
+        req.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(req.GetTime(), Simulator::Now()));
         v_in_req.push_back(req);
       }
