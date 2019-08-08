@@ -768,23 +768,6 @@ protected:
   vector<double> elements;
 };
 
-class HiddenDataTag : public Tag
-{
-public:
-  static TypeId GetTypeId (void);
-  virtual TypeId GetInstanceTypeId (void) const;
-  virtual uint32_t GetSerializedSize (void) const;
-  virtual void Serialize (TagBuffer i) const;
-  virtual void Deserialize (TagBuffer i);
-  virtual void Print (std::ostream &os) const;
-
-  // these are our accessors to our tag structure
-  void SetData (Ptr<Packet>);
-  Ptr<Packet> GetData (void) const;
-private:
-  vector<uint8_t> hidden_data;
-};
-
 // Helper classes to transfer data that does not fit into a single cell.
 class MultiCellDecoder {
 public:
@@ -793,16 +776,22 @@ public:
   void AddCell(Ptr<Packet> cell) {
     NS_ASSERT(!finished);
     NS_ASSERT(cell);
+
     cell = cell->Copy();
 
-    HiddenDataTag tag;
-    NS_ASSERT( cell->FindFirstMatchingByteTag (tag) );
-    cout << "Got tag: ";
-    cell->PrintByteTags(cout);
-    cout << endl;
-    packet = tag.GetData();
+    CellHeader h;
+    cell->RemoveHeader (h);
 
-    finished = true;
+    NS_ASSERT(h.GetType() == DIRECT_MULTI || h.GetType() == DIRECT_MULTI_END);
+    NS_ASSERT(h.GetLength() <= cell->GetSize());
+
+    size_t old_size = data.size();
+    data.resize(old_size + h.GetLength());
+    cell->CopyData(data.data() + old_size, h.GetLength());
+
+    if (h.GetType() == DIRECT_MULTI_END) {
+      finished = true;
+    }
   };
 
   bool IsReady() { return finished; }
@@ -810,15 +799,15 @@ public:
   Ptr<Packet> GetAndReset() {
     NS_ASSERT(finished);
 
-    Ptr<Packet> result = packet;
+    Ptr<Packet> result = Create<Packet> (data.data(), data.size());
     finished = false;
-    packet = nullptr;
+    data.clear();
 
     return result;
   }
 
 private:
-  Ptr<Packet> packet;
+  vector<uint8_t> data;
   bool finished;
 };
 
@@ -826,14 +815,38 @@ class MultiCellEncoder {
 public:
   // Create a series of smaller cells from a packet too large for a single cell
   static vector<Ptr<Packet>> encode(Ptr<Packet> large_packet) {
-    Ptr<Packet> dummy_packet = Create<Packet> (1);
-    HiddenDataTag tag;
-    tag.SetData (large_packet);
-
-    dummy_packet->AddByteTag(tag);
-    
+    large_packet = large_packet->Copy();
     vector<Ptr<Packet>> result;
-    result.push_back(dummy_packet);
+
+    while (large_packet->GetSize() > 0) {
+      Ptr<Packet> new_packet = Create<Packet>();
+
+      if (large_packet->GetSize() <= CELL_PAYLOAD_SIZE) {
+        new_packet = large_packet->Copy();
+      }
+      else {
+        new_packet = large_packet->CreateFragment(0, CELL_PAYLOAD_SIZE);
+      }
+      large_packet->RemoveAtStart(new_packet->GetSize());
+
+      CellHeader h;
+
+      if (large_packet->GetSize() > 0)
+        h.SetType (DIRECT_MULTI);
+      else
+        h.SetType (DIRECT_MULTI_END);
+
+      h.SetCircId (0);
+      h.SetCmd (RELAY_DATA);
+      h.SetLength (new_packet->GetSize ());
+
+      if (new_packet->GetSize() < CELL_PAYLOAD_SIZE){
+        new_packet->AddPaddingAtEnd(CELL_PAYLOAD_SIZE - new_packet->GetSize());
+      }
+      new_packet->AddHeader (h);
+
+      result.push_back(new_packet);
+    }
 
     return std::move(result);
   }
