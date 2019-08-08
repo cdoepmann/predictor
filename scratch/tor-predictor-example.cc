@@ -39,6 +39,7 @@ int main (int argc, char *argv[]) {
     uint32_t rtt = 80;
     string predictor_multiplexing_mode{"aggressive"};
     double predictor_feedback_loss = 0.0;
+    bool predictor_oob_feedback = true;
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
@@ -48,6 +49,7 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("vanilla", "use vanilla Tor", use_vanilla);
     cmd.AddValue("predictor-multiplex", "multiplexing mode for PredicTor", predictor_multiplexing_mode);
     cmd.AddValue("predictor-feedback-loss", "ratio of feedback messages randomly lost", predictor_feedback_loss);
+    cmd.AddValue("predictor-oob-feedback", "Do not really send feedback messages over the network, but schedule their reception out of band", predictor_oob_feedback);
     cmd.Parse(argc, argv);
 
     // TestTrajectory();
@@ -87,6 +89,7 @@ int main (int argc, char *argv[]) {
     
     Config::SetDefault ("ns3::TorPredApp::MultiplexingMode", StringValue (predictor_multiplexing_mode));
     Config::SetDefault ("ns3::TorPredApp::FeedbackLoss", DoubleValue (predictor_feedback_loss));
+    Config::SetDefault ("ns3::TorPredApp::OutOfBandFeedback", BooleanValue (predictor_oob_feedback));
 
     TorStarHelper th;
     // if (flavor == "pctcp")

@@ -35,6 +35,10 @@ TorPredApp::GetTypeId (void)
                    DoubleValue (0.0),
                    MakeDoubleAccessor (&TorPredApp::m_feedback_loss),
                    MakeDoubleChecker<double> (0.0, 1.0))
+    .AddAttribute ("OutOfBandFeedback", "Do not really send feedback messages over the network, but schedule their reception out of band.",
+                   BooleanValue (false), // TODO
+                   MakeBooleanAccessor (&TorPredApp::m_oob_feedback),
+                   MakeBooleanChecker ())
     .AddTraceSource ("NewSocket",
                      "Trace indicating that a new socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewSocket),
@@ -335,6 +339,7 @@ TorPredApp::ConnReadControlCallback (Ptr<Socket> socket)
 
   for (auto& cell : packet_list)
   {
+    NS_ASSERT (IsDirectCell (cell));
     HandleDirectCell(conn, cell);
   }
 }
@@ -1240,13 +1245,39 @@ PredConnection::Read (vector<Ptr<Packet> >* packet_list, uint32_t max_read)
 uint32_t
 PredConnection::ReadControl (vector<Ptr<Packet>>& packet_list)
 {
-  Ptr<Packet> packet;
-  while (packet = m_controlsocket->Recv ())
+  uint32_t available = m_controlsocket->GetRxAvailable();
+  if (available == 0)
   {
-    packet_list.push_back (packet);
+    return 0;
   }
 
-  return 0;
+  // make room for all the data that is available from the socket
+  size_t old_bufsize = control_inbuf.size();
+  control_inbuf.resize(old_bufsize + available);
+
+  // read the data into our buffer
+  int read_bytes = m_controlsocket->Recv (
+    control_inbuf.data() + old_bufsize,
+    available,
+    0
+  );
+
+  // determine number of complete cells
+  NS_ASSERT(SpeaksCells());
+  const uint32_t base = CELL_NETWORK_SIZE;
+  size_t num_packets = control_inbuf.size() / base;
+
+  // slice data into packets
+  for (size_t i=0; i<num_packets; i++)
+  {
+    Ptr<Packet> cell = Create<Packet> (control_inbuf.data() + i*base, base);
+    packet_list.push_back (cell);
+  }
+
+  // remove read data, but keep potential leftover
+  control_inbuf.erase(control_inbuf.begin(), control_inbuf.begin() + num_packets*base);
+
+  return read_bytes;
 }
 
 
@@ -1383,6 +1414,12 @@ PredConnection::SendConnLevelCell (Ptr<Packet> cell)
     return;
   }
 
+  if (!m_controlsocket)
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Dropping connection-level cell before sending because the control connection has not (yet) been established");
+    return;
+  }
+
   int sent_bytes = m_controlsocket->Send(cell);
 
   // We do not handle a full transmission buffer here, this is expected
@@ -1395,6 +1432,16 @@ PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
 {
   if (!SpeaksCells())
   {
+    return;
+  }
+
+  // Do not beam cells before the (inband) control connection has been established.
+  // This is not really necessary at all, but is done to ensure that the feedback
+  // messages exchanged are the same between different runs with inband and
+  // out-of-band feedback.
+  if (!m_controlsocket)
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Dropping connection-level cell before sending because the control connection has not (yet) been established");
     return;
   }
 
@@ -1613,7 +1660,6 @@ PredController::Setup ()
   }
 
   // Schedule the first optimizer event
-  // TODO: evaluate when starting the optimizer makes the most sense
   optimize_event = Simulator::Schedule(Seconds(0.1), &PredController::Optimize, this);
 
   // Schedule logging the names of the connections (the other applications have
@@ -1881,6 +1927,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         memory_load_target.push_back(val);
       }
@@ -1907,6 +1954,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         memory_load_source.push_back(val);
       }
@@ -1933,6 +1981,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         bandwidth_load_target.push_back(val);
       }
@@ -1959,6 +2008,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         bandwidth_load_source.push_back(val);
       }
@@ -2699,8 +2749,19 @@ PredController::SendToNeighbors()
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    conn->BeamConnLevelCell (packet);
-    
+    if (app->OutOfBandFeedback())
+    {
+      conn->BeamConnLevelCell (packet);
+    }
+    else
+    {
+      for (auto && fragment : MultiCellEncoder::encode(packet))
+      {
+        NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
+        conn->SendConnLevelCell(fragment);
+      }
+    }
+
     conn_index++;
   }
   
@@ -2735,7 +2796,18 @@ PredController::SendToNeighbors()
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    conn->BeamConnLevelCell (packet);
+    if (app->OutOfBandFeedback())
+    {
+      conn->BeamConnLevelCell (packet);
+    }
+    else
+    {
+      for (auto && fragment : MultiCellEncoder::encode(packet))
+      {
+        NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
+        conn->SendConnLevelCell(fragment);
+      }
+    }
     
     conn_index++;
   }
@@ -2822,73 +2894,6 @@ std::ostream & operator << (std::ostream & os, const FeedbackTrajectoryKind & ki
   os << FormatFeedbackKind(kind);
   return os;
 };
-
-
-TypeId 
-HiddenDataTag::GetTypeId (void)
-{
-  static TypeId tid = TypeId ("ns3::HiddenDataTag")
-    .SetParent<Tag> ()
-    .AddConstructor<HiddenDataTag> ()
-  ;
-  return tid;
-}
-
-TypeId 
-HiddenDataTag::GetInstanceTypeId (void) const
-{
-  return GetTypeId ();
-}
-
-uint32_t 
-HiddenDataTag::GetSerializedSize (void) const
-{
-  cout << "serialized size: " << sizeof(uint32_t) + hidden_data.size () << endl;
-  return sizeof(uint32_t) + hidden_data.size ();
-}
-
-void 
-HiddenDataTag::Serialize (TagBuffer i) const
-{
-  i.WriteU32 (hidden_data.size());
-  for (auto& byte : hidden_data)
-  {
-    i.WriteU8 (byte);
-  }
-}
-
-void 
-HiddenDataTag::Deserialize (TagBuffer i)
-{
-  uint32_t size = i.ReadU32 ();
-  hidden_data.resize (0);
-  hidden_data.resize (size);
-
-  for (uint32_t j=0; j<size; j++)
-  {
-    hidden_data[j] = i.ReadU8 ();
-  }
-}
-
-void 
-HiddenDataTag::Print (std::ostream &os) const
-{
-  os << "(" << (int)hidden_data.size() << " bytes of data)";
-}
-
-void 
-HiddenDataTag::SetData (Ptr<Packet> packet)
-{
-  hidden_data.resize(packet->GetSize());
-  packet->CopyData(hidden_data.data(), hidden_data.size());
-}
-
-Ptr<Packet>
-HiddenDataTag::GetData (void) const
-{
-  Ptr<Packet> result = Create<Packet> (hidden_data.data(), hidden_data.size());
-  return result;
-}
 
 PyScript dumper{"/bin/cat"};
 
