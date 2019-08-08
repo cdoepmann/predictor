@@ -305,6 +305,8 @@ public:
 
   double GetFeedbackLoss() { return m_feedback_loss; }
 
+  bool OutOfBandFeedback() { return m_oob_feedback; }
+
 protected:
   virtual void DoDispose (void);
 
@@ -319,6 +321,9 @@ protected:
 
   // Ratio of feedack messages that is lost randomly
   double m_feedback_loss;
+
+  // Do not really send feedback messages over the network, but schedule their reception out of band
+  bool m_oob_feedback;
 };
 
 

@@ -35,6 +35,10 @@ TorPredApp::GetTypeId (void)
                    DoubleValue (0.0),
                    MakeDoubleAccessor (&TorPredApp::m_feedback_loss),
                    MakeDoubleChecker<double> (0.0, 1.0))
+    .AddAttribute ("OutOfBandFeedback", "Do not really send feedback messages over the network, but schedule their reception out of band.",
+                   BooleanValue (false), // TODO
+                   MakeBooleanAccessor (&TorPredApp::m_oob_feedback),
+                   MakeBooleanChecker ())
     .AddTraceSource ("NewSocket",
                      "Trace indicating that a new socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewSocket),
@@ -2699,8 +2703,19 @@ PredController::SendToNeighbors()
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    conn->BeamConnLevelCell (packet);
-    
+    if (app->OutOfBandFeedback())
+    {
+      conn->BeamConnLevelCell (packet);
+    }
+    else
+    {
+      for (auto && fragment : MultiCellEncoder::encode(packet))
+      {
+        NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
+        conn->SendConnLevelCell(fragment);
+      }
+    }
+
     conn_index++;
   }
   
@@ -2735,7 +2750,18 @@ PredController::SendToNeighbors()
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
 
-    conn->BeamConnLevelCell (packet);
+    if (app->OutOfBandFeedback())
+    {
+      conn->BeamConnLevelCell (packet);
+    }
+    else
+    {
+      for (auto && fragment : MultiCellEncoder::encode(packet))
+      {
+        NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell fragment");
+        conn->SendConnLevelCell(fragment);
+      }
+    }
     
     conn_index++;
   }
