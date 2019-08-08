@@ -1927,6 +1927,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         memory_load_target.push_back(val);
       }
@@ -1953,6 +1954,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         memory_load_source.push_back(val);
       }
@@ -1979,6 +1981,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         bandwidth_load_target.push_back(val);
       }
@@ -2005,6 +2008,7 @@ PredController::Optimize ()
       }
       else
       {
+        val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         bandwidth_load_source.push_back(val);
       }
