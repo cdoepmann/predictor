@@ -440,7 +440,7 @@ public:
     app{app},
     horizon{20},
     time_step{MilliSeconds(40)},
-    pyscript{"/home/christoph/nstor/src/tor/model/solver.sh"}
+    pyscript{"./solver.sh"}
   {
     dumper.dump("time-step",
                 "node", app->GetNodeName(),

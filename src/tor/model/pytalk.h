@@ -63,6 +63,11 @@ class PyScript
 template <typename... Args>
 void PyScript::dump(const char *cmd, Args... args)
 {
+    if (!childproc.running()) {
+        std::cerr <<  "PyScript (dumper) not running (anymore)." << std::endl;
+        std::exit(1);
+    }
+
     using namespace rapidjson;
 
     StringBuffer sb;
@@ -83,6 +88,11 @@ void PyScript::dump(const char *cmd, Args... args)
 template <typename... Args>
 rapidjson::Document * PyScript::call(const char *cmd, Args... args)
 {
+    if (!childproc.running()) {
+        std::cerr <<  "PyScript not running (anymore)." << std::endl;
+        std::exit(1);
+    }
+
     using namespace rapidjson;
 
     StringBuffer sb;
