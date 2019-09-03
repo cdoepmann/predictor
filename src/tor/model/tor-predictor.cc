@@ -4,7 +4,6 @@
 #include "ns3/point-to-point-net-device.h"
 
 #include "tor-predictor.h"
-#include "pytalk.hpp"
 
 #include <limits>
 
@@ -2468,7 +2467,7 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
   Time target_time = GetNextOptimizationTime();
 
   Time source_time;
-  size_t source_length;
+  size_t source_length = 0;
   bool first = true;
 
   for (auto&& traj : source)
@@ -2477,6 +2476,7 @@ PredController::MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Traject
     {
       source_time = traj->GetTime();
       source_length = traj->Steps();
+      first = false;
     }
     else
     {
