@@ -176,6 +176,16 @@ int main (int argc, char *argv[]) {
 
     dumper.dump("result", "time", simTime.GetSeconds(), "total", total_bytes_completed);
 
+    if (use_predictor)
+    {
+      // Use any predictor app to get the average batch size of the shared executor
+      for (auto id = th.circuitIds.begin(); id != th.circuitIds.end(); ++id) {
+        double val = DynamicCast<TorPredApp>(th.GetProxyApp(*id))->controller->GetAverageExecutorBatchSize();
+        dumper.dump("average-executor-batch-size", "tasks-per-call", val);
+        break;
+      }
+    }
+
     Simulator::Destroy ();
     return 0;
 }

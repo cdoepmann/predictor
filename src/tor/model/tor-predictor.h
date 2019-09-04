@@ -331,6 +331,8 @@ protected:
 // at the same simulation time
 class BatchedExecutor {
 public:
+  BatchedExecutor() : num_computations_total{0}, num_tasks_total{0} { };
+
   // Add a task for computation
   void Compute(std::function<rapidjson::Document*()> worker, Callback<void,rapidjson::Document*> cb) {
     calls.push_back(std::make_pair(worker, cb));
@@ -347,11 +349,15 @@ public:
     std::mutex input_mutex;
     std::mutex output_mutex;
 
+    // Remember the batch size
+    num_computations_total++;
+    num_tasks_total += calls.size();
+
     // Make sure the results vector is not re-allocated during the computation,
     // so the references stay valid
     results.reserve(calls.size());
 
-    for (int i=0; i<8; i++) {
+    for (int i=0; i<(int)std::thread::hardware_concurrency(); i++) {
       threads.push_back(
         std::thread{
           [&input_mutex,&output_mutex,this] {
@@ -410,6 +416,10 @@ public:
     results.clear ();
   }
 
+  double GetAverageBatchSize() {
+    return (double)num_tasks_total / (double)num_computations_total;
+  }
+
 protected:
   // The list of computations to carry out
   std::deque<
@@ -429,6 +439,9 @@ protected:
   
   // The event that will trigger the parallel processing
   EventId compute_event;
+
+  uint64_t num_computations_total;
+  uint64_t num_tasks_total;
 };
 
 extern PyScript dumper;
@@ -527,6 +540,12 @@ public:
   Time GetNextOptimizationTime() { return ns3::TimeStep(optimize_event.GetTs()); }
 
   string GetMultiplexMode() { return app->GetMultiplexMode(); }
+
+  // Get a measure of parallelism of the BatchedExecutor
+  double GetAverageExecutorBatchSize ()
+  {
+    return executor.GetAverageBatchSize();
+  }
 
 protected:
   // The application this controller belongs to
