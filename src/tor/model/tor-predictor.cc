@@ -2046,9 +2046,9 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["v_in_max"], pred_v_in_max, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
-  ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size());
-  ParseIntoTrajectories((*doc)["s_circuit"], pred_s_circuit, next_step, num_circuits);
-  ParseIntoTrajectories((*doc)["s_buffer_source"], pred_s_buffer_source, next_step, in_conns.size());
+  ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size(), 1);
+  ParseIntoTrajectories((*doc)["s_circuit"], pred_s_circuit, next_step, num_circuits, 1);
+  ParseIntoTrajectories((*doc)["s_buffer_source"], pred_s_buffer_source, next_step, in_conns.size(), 1);
 
   ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
   ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
@@ -2218,7 +2218,7 @@ PredController::DumpMemoryPrediction()
 }
 
 void
-PredController::ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj)
+PredController::ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj, size_t skip_steps)
 {
   NS_ASSERT(array.IsArray());
   NS_ASSERT(array.Size() > 0);
@@ -2232,7 +2232,7 @@ PredController::ParseIntoTrajectories(const rapidjson::Value& array, vector<Traj
     target.push_back(Trajectory{this, first_time});
   }
 
-  for (size_t step=0; step<array.Size(); step++) {
+  for (size_t step=skip_steps; step<array.Size(); step++) {
     NS_ASSERT(array[step].IsArray());
     NS_ASSERT(array[step].Size() == num_traj);
 

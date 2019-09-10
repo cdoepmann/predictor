@@ -635,7 +635,7 @@ protected:
 
   // Parse rapidjson object into a vector of trajectories, checking the number
   // of parsed trajectories
-  void ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj);
+  void ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj, size_t skip_steps=0);
 
   // Parse rapidjson object containing the special multidimensional composition
   // matrix into a vector of vectors of trajectories
