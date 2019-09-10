@@ -112,15 +112,13 @@ class Handler:
             return np.array([res])
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 'bandwidth_load_target', 'memory_load_target', 'bandwidth_load_source', 'memory_load_source'])(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 'memory_load_target', 'memory_load_source'])(
             inner_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['s_circuit_0']),
             inner_nparray(kwargs['v_in_req']),
             process_cv_in(kwargs['cv_in']),
             inner_nparray(kwargs['v_out_max']),
-            inner_nparray(kwargs['bandwidth_load_target']),
             inner_nparray(kwargs['memory_load_target']),
-            inner_nparray(kwargs['bandwidth_load_source']),
             inner_nparray(kwargs['memory_load_source']),
         )
 
