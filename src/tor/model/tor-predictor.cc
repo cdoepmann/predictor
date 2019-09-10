@@ -1619,14 +1619,13 @@ PredController::Setup ()
   for (size_t i=0; i<in_conns.size(); i++)
   {
     pred_v_in_req.push_back(Trajectory{this, Simulator::Now()});
-    pred_memory_load_source.push_back(Trajectory{this, Simulator::Now()});
+    pred_s_buffer_source.push_back(Trajectory{this, Simulator::Now()});
     pred_cv_in.push_back(vector<Trajectory>{});
   }
 
   for (size_t i=0; i<out_conns.size(); i++)
   {
     pred_v_out_max.push_back(Trajectory{this, Simulator::Now()});
-    pred_memory_load_target.push_back(Trajectory{this, Simulator::Now()});
   }
 
   // Set up the per-connection token buckets, initially assuming no restrictions
@@ -1903,8 +1902,8 @@ PredController::Optimize ()
     }
   }
 
-  // future development of the successors' memory load
-  vector<Trajectory> memory_load_target;
+  // future development of the predecessors' buffers
+  vector<Trajectory> s_buffer_source;
 
   {
     // Use the following "idle" trajectory if we do not yet have data from other relays,
@@ -1915,44 +1914,17 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
-    for (auto&& val : pred_memory_load_target)
+    for (auto&& val : pred_s_buffer_source)
     {
       if (val.Steps() == 0)
       {
-        memory_load_target.push_back(idle);
+        s_buffer_source.push_back(idle);
       }
       else
       {
         val.DiscardUntil(Simulator::Now());
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
-        memory_load_target.push_back(val);
-      }
-    }
-  }
-
-  // future development of the predecessors' memory load
-  vector<Trajectory> memory_load_source;
-
-  {
-    // Use the following "idle" trajectory if we do not yet have data from other relays,
-    // assuming that they are idle anything
-    Trajectory idle{this, Simulator::Now()};
-    for (unsigned int i=0; i<Horizon(); i++)
-    {
-      idle.Elements().push_back(0.0);
-    }
-
-    for (auto&& val : pred_memory_load_source)
-    {
-      if (val.Steps() == 0)
-      {
-        memory_load_source.push_back(idle);
-      }
-      else
-      {
-        val.DiscardUntil(Simulator::Now());
-        NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
-        memory_load_source.push_back(val);
+        s_buffer_source.push_back(val);
       }
     }
   }
@@ -1976,8 +1948,7 @@ PredController::Optimize ()
     "v_in_req", transpose_to_double_vectors(v_in_req),
     "cv_in", cv_in,
     "v_out_max", transpose_to_double_vectors(v_out_max),
-    "memory_load_target", transpose_to_double_vectors(memory_load_target),
-    "memory_load_source", transpose_to_double_vectors(memory_load_source)
+    "s_buffer_source", transpose_to_double_vectors(s_buffer_source)
   );
 
   // Call the optimizer
@@ -1994,8 +1965,7 @@ PredController::Optimize ()
         "v_in_req", transpose_to_double_vectors(v_in_req),
         "cv_in", cv_in,
         "v_out_max", transpose_to_double_vectors(v_out_max),
-        "memory_load_target", transpose_to_double_vectors(memory_load_target),
-        "memory_load_source", transpose_to_double_vectors(memory_load_source)
+        "s_buffer_source", transpose_to_double_vectors(s_buffer_source)
       );
     },
     MakeCallback(&PredController::OptimizeDone, this)
@@ -2078,9 +2048,7 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
   ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size());
   ParseIntoTrajectories((*doc)["s_circuit"], pred_s_circuit, next_step, num_circuits);
-  ParseIntoTrajectories((*doc)["memory_load_target"], pred_memory_load_target, next_step, out_conns.size());
-  ParseIntoTrajectories((*doc)["memory_load_source"], pred_memory_load_source, next_step, in_conns.size());
-  ParseIntoTrajectories((*doc)["memory_load"], pred_memory_load_local, next_step, 1);
+  ParseIntoTrajectories((*doc)["s_buffer_source"], pred_s_buffer_source, next_step, in_conns.size());
 
   ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
   ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
@@ -2479,8 +2447,8 @@ PredController::HandleInputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
     Ptr<Trajectory> v_out = msg.Get(FeedbackTrajectoryKind::VOut);
     MergeTrajectories(pred_v_in_req[conn_index], *v_out);
 
-    Ptr<Trajectory> memory_load = msg.Get(FeedbackTrajectoryKind::MemoryLoad);
-    MergeTrajectories(pred_memory_load_source[conn_index], *memory_load);
+    Ptr<Trajectory> s_buffer = msg.Get(FeedbackTrajectoryKind::SBuffer);
+    MergeTrajectories(pred_s_buffer_source[conn_index], *s_buffer);
     
     vector<Ptr<Trajectory>> cv_out = msg.GetAll(FeedbackTrajectoryKind::CvOut);
     NS_ASSERT(cv_out.size() == conn->CountCircuits());
@@ -2513,9 +2481,6 @@ PredController::HandleOutputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
 
     Ptr<Trajectory> v_in_max = msg.Get(FeedbackTrajectoryKind::VInMax);
     MergeTrajectories(pred_v_out_max[conn_index], *v_in_max);
-
-    Ptr<Trajectory> memory_load = msg.Get(FeedbackTrajectoryKind::MemoryLoad);
-    MergeTrajectories(pred_memory_load_target[conn_index], *memory_load);
 }
 
 bool
@@ -2671,7 +2636,6 @@ PredController::SendToNeighbors()
     );
 
     msg.Add(FeedbackTrajectoryKind::VInMax, pred_v_in_max[conn_index]);
-    msg.Add(FeedbackTrajectoryKind::MemoryLoad, pred_memory_load_local[0]);
 
     // Assemble the trajectories
     Ptr<Packet> packet = msg.MakePacket();
@@ -2701,7 +2665,7 @@ PredController::SendToNeighbors()
     PredFeedbackMessage msg;
 
     msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out[conn_index]);
-    msg.Add(FeedbackTrajectoryKind::MemoryLoad, pred_memory_load_local[0]);
+    msg.Add(FeedbackTrajectoryKind::SBuffer, pred_s_buffer[conn_index]);
 
     // collect the composition share of each circuit
     size_t num_circuits = conn->CountCircuits();
@@ -2810,7 +2774,7 @@ string FormatFeedbackKind(FeedbackTrajectoryKind kind)
     case FeedbackTrajectoryKind::VInMax: return "VInMax";
     case FeedbackTrajectoryKind::VOut: return "VOut";
     case FeedbackTrajectoryKind::CvOut: return "CvOut";
-    case FeedbackTrajectoryKind::MemoryLoad: return "MemoryLoad";
+    case FeedbackTrajectoryKind::SBuffer: return "SBuffer";
   }
 
   NS_ABORT_MSG("Unknown feedback trajectory type: " << (int) kind);
