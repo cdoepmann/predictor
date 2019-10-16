@@ -2048,7 +2048,6 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
   ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size(), 1);
   ParseIntoTrajectories((*doc)["s_circuit"], pred_s_circuit, next_step, num_circuits, 1);
-  ParseIntoTrajectories((*doc)["s_buffer_source"], pred_s_buffer_source, next_step, in_conns.size(), 1);
 
   ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
   ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
