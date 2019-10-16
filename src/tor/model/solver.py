@@ -8,6 +8,7 @@ import copy
 
 import numpy as np
 from optimal_traffic_scheduler import optimal_traffic_scheduler
+from casadi import DM
 
 from copy import deepcopy
 
@@ -126,13 +127,15 @@ class Handler:
                 return {k: make_serializable(v) for k,v in x.items()}
             if isinstance(x, np.ndarray):
                 return x.tolist()
+            if isinstance(x, DM):
+                return np.array(x).tolist()
             if isinstance(x, list):
                 return [make_serializable(v) for v in x]
             return x
 
         # print(repr(self.ots.predict[-1]))
         # print("pre-obj:", self.ots.predict[-1])
-        return make_serializable(make_serializable(self.ots.predict[-1]))
+        return make_serializable(make_serializable(self.ots.predict))
 
 
 if __name__ == '__main__':
@@ -165,8 +168,9 @@ if __name__ == '__main__':
                     obj = dict()
 
                 obj['ok'] = True
-                # raise Exception("oh my gawd!")
-                # print("obj:", obj)
+                obj['relay'] = handler.relay
+                obj['time'] = simtime
+
                 print("::: PyTalk Output :::")
                 print(json.dumps(obj))
                 sys.stdout.flush()
