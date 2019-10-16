@@ -107,10 +107,10 @@ class Handler:
 
         def process_cv_in(orig):
             res = []
-            for h in orig:
-                for con in h:
-                    res.append(np.array(con).reshape(-1,1))
-            return np.array([res])
+            for step in orig:
+                new_step = [np.array(x) for x in step]
+                res.append(new_step)
+            return res
 
         # print('# ' + self.relay)
         Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 's_buffer_source'])(

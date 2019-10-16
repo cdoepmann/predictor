@@ -2308,44 +2308,29 @@ PredController::ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<
 {
   NS_ASSERT(array.IsArray());
   NS_ASSERT(array.Size() > 0);
-
-  NS_ASSERT(array[0].IsArray());
-  const size_t num_elements = array[0].Size();
-
-  NS_ASSERT(num_elements > 0);
-  NS_ASSERT(num_elements % connections == 0);
-  size_t num_steps = num_elements / connections;
-
-  map<size_t,size_t> conn_to_circnum;
+  size_t num_steps = array.Size();
   
   target.clear();
 
   for(size_t conn=0; conn<connections; conn++) {
-    NS_ASSERT(array[0][conn].IsArray());
-
-    conn_to_circnum[conn] = array[0][conn].Size();
+    // Add vector for this connection, now accessible via target[conn]
     target.push_back(vector<Trajectory>{});
 
-    for (size_t i=0; i<conn_to_circnum[conn]; i++) {
-      target[conn].push_back(Trajectory{this,first_time});
-    }
-  }
+    // For each of the circuits on this connection, ...
+    NS_ASSERT(array[0][conn].IsArray());
+    for (size_t circuit=0; circuit<array[0][conn].Size(); circuit++) {
+      // create a trajectory
+      Trajectory traj{this,first_time};
 
-  for (size_t step=0; step<num_steps; step++) {
-    for (size_t conn=0; conn<connections; conn++) {
-      NS_ASSERT(array[0][step*connections+conn].IsArray());
-
-      // Ensure the number of circuits per connection is constant over time
-      NS_ASSERT(array[0][step*connections+conn].Size() == conn_to_circnum[conn]);
-
-      for (size_t circ=0; circ<array[0][step*connections+conn].Size(); circ++) {
-        NS_ASSERT(array[0][step*connections+conn][circ].IsArray());
-        NS_ASSERT(array[0][step*connections+conn][circ].Size() == 1);
-        NS_ASSERT(array[0][step*connections+conn][circ][0].IsDouble());
-        double val = array[0][step*connections+conn][circ][0].GetDouble();
-        
-        target[conn][circ].Elements().push_back(val);
+      // add all of the circuit's future values
+      for (size_t step=0; step<num_steps; step++) {
+        traj.Elements().push_back(
+          array[step][conn][circuit].GetDouble()
+        );
       }
+
+      // and add the trajectory to the connection vector
+      target[conn].push_back(traj);
     }
   }
 }
