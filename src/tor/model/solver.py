@@ -105,6 +105,9 @@ class Handler:
         def inner_nparray(l):
             return [np.array([x]).T for x in l]
 
+        def outer_nparray(l):
+            return np.array([l]).T
+
         def process_cv_in(orig):
             res = []
             for step in orig:
@@ -114,8 +117,8 @@ class Handler:
 
         # print('# ' + self.relay)
         Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 's_buffer_source'])(
-            inner_nparray(kwargs['s_buffer_0']),
-            inner_nparray(kwargs['s_circuit_0']),
+            outer_nparray(kwargs['s_buffer_0']),
+            outer_nparray(kwargs['s_circuit_0']),
             inner_nparray(kwargs['v_in_req']),
             process_cv_in(kwargs['cv_in']),
             inner_nparray(kwargs['v_out_max']),
