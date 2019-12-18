@@ -1608,8 +1608,6 @@ PredController::Setup ()
     "scaling", 50,
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
-    // "weights", vector<string>({"control_delta", "25", "send", "10", "store", "1", "receive", "1"}),
-    "weights", vector<string>({"control_delta", "1", "send", "1", "store", "1", "receive", "1"}),
     "n_in", inputs.size(),
     "input_circuits", inputs,
     "n_out", outputs.size(),
@@ -1880,6 +1878,8 @@ PredController::Optimize ()
               "packets_per_conn", packets_per_conn
   );
 
+  double control_delta = 1.0;
+
   // dump the call
   pyscript.dump(
     "calling-optimizer",
@@ -1891,7 +1891,8 @@ PredController::Optimize ()
     // trajectories
     "cv_in", cv_in,
     "v_out_max", transpose_to_double_vectors(v_out_max),
-    "s_buffer_source", transpose_to_double_vectors(s_buffer_source)
+    "s_buffer_source", transpose_to_double_vectors(s_buffer_source),
+    "control_delta", control_delta
   );
 
   // Call the optimizer
@@ -1907,7 +1908,8 @@ PredController::Optimize ()
         // trajectories
         "cv_in", cv_in,
         "v_out_max", transpose_to_double_vectors(v_out_max),
-        "s_buffer_source", transpose_to_double_vectors(s_buffer_source)
+        "s_buffer_source", transpose_to_double_vectors(s_buffer_source),
+        "control_delta", control_delta
       );
     },
     MakeCallback(&PredController::OptimizeDone, this)
