@@ -1602,8 +1602,10 @@ PredController::Setup ()
     "setup",
     "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
-    "v_in_max_total", .8*to_packets_sec(MaxDataRate ()),
-    "v_out_max_total", .8*to_packets_sec(MaxDataRate ()),
+    "v_in_max_total", .8*to_packets_sec(MaxDataRate ()),  // TODO
+    "v_out_max_total", .8*to_packets_sec(MaxDataRate ()), // TODO
+    "s_c_max_total", 20,
+    "scaling", 50,
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
     // "weights", vector<string>({"control_delta", "25", "send", "10", "store", "1", "receive", "1"}),

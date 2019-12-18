@@ -76,7 +76,7 @@ class Handler:
         self.relay = kwargs['relay']
 
         setup_dict = dict()
-        for k in ['v_in_max_total','v_out_max_total','dt','N_steps']:
+        for k in ['v_in_max_total','v_out_max_total','s_c_max_total','scaling','dt','N_steps']:
             setup_dict[k] = kwargs[k]
 
         # parse weights
