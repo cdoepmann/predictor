@@ -369,7 +369,7 @@ TorPredApp::ConnReadCallback (Ptr<Socket> socket)
   
   // For exits, limit the amount of data that can be read from pseudo server sockets
   // by applying the per-connection read bucket based on the previously predicted
-  // v_in_max value.
+  // v_in value.
 
   // Find out if this is an outgoing connection according to the optimization problem
   bool is_inconn = controller->IsInConn(conn);
@@ -1987,7 +1987,6 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   }
 
   ParseIntoTrajectories((*doc)["v_in"], pred_v_in, now, in_conns.size());
-  ParseIntoTrajectories((*doc)["v_in_max"], pred_v_in_max, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
   ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size(), 1);
@@ -2114,7 +2113,7 @@ PredController::CalculateSendPlan()
 void
 PredController::CalculateReadPlan()
 {
-  // Based on the predicted v_in_max values, calculate reading plans that define
+  // Based on the predicted v_in values, calculate reading plans that define
   // how much data we read (at the most) from each input connection.
   //
   // Note that these plans are only used by the exit relays when reading from
@@ -2122,7 +2121,7 @@ PredController::CalculateReadPlan()
 
   auto conn_it = in_conns.begin();
 
-  for (auto& traj : pred_v_in_max)
+  for (auto& traj : pred_v_in)
   {
     NS_ASSERT(conn_it != in_conns.end());
 
@@ -2404,8 +2403,8 @@ PredController::HandleOutputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
     PredFeedbackMessage msg{cell};
     size_t conn_index = GetOutConnIndex(conn);
 
-    Ptr<Trajectory> v_in_max = msg.Get(FeedbackTrajectoryKind::VInMax);
-    MergeTrajectories(pred_v_out_max[conn_index], *v_in_max);
+    Ptr<Trajectory> v_in = msg.Get(FeedbackTrajectoryKind::VIn);
+    MergeTrajectories(pred_v_out_max[conn_index], *v_in);
 }
 
 bool
@@ -2542,10 +2541,10 @@ PredController::SendToNeighbors()
   size_t conn_index;
 
   //
-  // Send v_in_max to each predecessor, so she can set her v_out_max
+  // Send v_in to each predecessor, so she can set her v_out_max
   //
 
-  NS_ASSERT(in_conns.size() == pred_v_in_max.size());
+  NS_ASSERT(in_conns.size() == pred_v_in.size());
   
   // predecessor
   conn_index = 0;
@@ -2553,14 +2552,7 @@ PredController::SendToNeighbors()
   {
     PredFeedbackMessage msg;
 
-    dumper.dump("calculated-vin-max",
-                "time", Simulator::Now().GetSeconds(),
-                "node", app->GetNodeName(),
-                "conn", conn->GetRemoteName(),
-                "vin-max-traj", pred_v_in_max[conn_index].Elements()
-    );
-
-    msg.Add(FeedbackTrajectoryKind::VInMax, pred_v_in_max[conn_index]);
+    msg.Add(FeedbackTrajectoryKind::VIn, pred_v_in[conn_index]);
 
     // Assemble the trajectories
     Ptr<Packet> packet = msg.MakePacket();
@@ -2695,7 +2687,7 @@ string FormatFeedbackKind(FeedbackTrajectoryKind kind)
 {
   switch(kind)
   {
-    case FeedbackTrajectoryKind::VInMax: return "VInMax";
+    case FeedbackTrajectoryKind::VIn: return "VIn";
     case FeedbackTrajectoryKind::CvOut: return "CvOut";
     case FeedbackTrajectoryKind::SBuffer: return "SBuffer";
   }
