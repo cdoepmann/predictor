@@ -116,10 +116,9 @@ class Handler:
             return res
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'v_in_req', 'cv_in', 'v_out_max', 's_buffer_source'])(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'cv_in', 'v_out_max', 's_buffer_source'])(
             outer_nparray(kwargs['s_buffer_0']),
             outer_nparray(kwargs['s_circuit_0']),
-            inner_nparray(kwargs['v_in_req']),
             process_cv_in(kwargs['cv_in']),
             inner_nparray(kwargs['v_out_max']),
             inner_nparray(kwargs['s_buffer_source']),

@@ -1618,7 +1618,6 @@ PredController::Setup ()
   // These are not needed, but the indices need to exist.
   for (size_t i=0; i<in_conns.size(); i++)
   {
-    pred_v_in_req.push_back(Trajectory{this, Simulator::Now()});
     pred_s_buffer_source.push_back(Trajectory{this, Simulator::Now()});
     pred_cv_in.push_back(vector<Trajectory>{});
   }
@@ -1765,63 +1764,6 @@ PredController::Optimize ()
   // Collect the trajectories necessary for optimizing
   //
 
-  // data we are expected to receive from our predecessors (their v_out)
-  vector<Trajectory> v_in_req;
-
-  {
-    // Use the following "idle" trajectory if we do not yet have data from other relays,
-    // assuming that they do not send anything
-    Trajectory idle{this, Simulator::Now()};
-    for (unsigned int i=0; i<Horizon(); i++)
-    {
-      idle.Elements().push_back(0.0);
-    }
-
-    auto conn_it = in_conns.begin();
-    int inconn_index = 0;
-    for (auto&& req : pred_v_in_req)
-    {
-      NS_ASSERT(conn_it != in_conns.end());
-      auto conn = *conn_it;
-      
-      if (req.Steps() == 0)
-      {
-        // Firstly, determine if this is a server edge
-        if (!conn->SpeaksCells())
-        {
-          // This is a sending exit server socket. If it is sending already,
-          // it will do so at the speed of our v_in_max, because this is what
-          // we used to throttle the reading from the pseudo server socket.
-          auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
-          NS_ASSERT(serversock);
-          if (serversock->HasStarted())
-          {
-            v_in_req.push_back(pred_v_in_max[inconn_index]);
-          }
-          else
-          {
-            v_in_req.push_back(idle);
-          }
-        }
-        else
-        {
-          // Otherwise, the predecessor has not requested to send anything,
-          // assume it is idle.
-          v_in_req.push_back(idle);
-        }
-      }
-      else
-      {
-        req.DiscardUntil(Simulator::Now());
-        NS_ASSERT (is_same_time(req.GetTime(), Simulator::Now()));
-        v_in_req.push_back(req);
-      }
-
-      conn_it++;
-      inconn_index++;
-    }
-  }
-
   // composition of each input connection
   vector<vector<vector<double>>> cv_in;
   
@@ -1945,7 +1887,6 @@ PredController::Optimize ()
     "s_circuit_0", packets_per_circuit,
 
     // trajectories
-    "v_in_req", transpose_to_double_vectors(v_in_req),
     "cv_in", cv_in,
     "v_out_max", transpose_to_double_vectors(v_out_max),
     "s_buffer_source", transpose_to_double_vectors(s_buffer_source)
@@ -1962,7 +1903,6 @@ PredController::Optimize ()
         "s_circuit_0", packets_per_circuit,
 
         // trajectories
-        "v_in_req", transpose_to_double_vectors(v_in_req),
         "cv_in", cv_in,
         "v_out_max", transpose_to_double_vectors(v_out_max),
         "s_buffer_source", transpose_to_double_vectors(s_buffer_source)
@@ -2428,9 +2368,6 @@ PredController::HandleInputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
     PredFeedbackMessage msg{cell};
     size_t conn_index = GetInConnIndex(conn);
 
-    Ptr<Trajectory> v_out = msg.Get(FeedbackTrajectoryKind::VOut);
-    MergeTrajectories(pred_v_in_req[conn_index], *v_out);
-
     Ptr<Trajectory> s_buffer = msg.Get(FeedbackTrajectoryKind::SBuffer);
     MergeTrajectories(pred_s_buffer_source[conn_index], *s_buffer);
     
@@ -2648,7 +2585,6 @@ PredController::SendToNeighbors()
   {
     PredFeedbackMessage msg;
 
-    msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out[conn_index]);
     msg.Add(FeedbackTrajectoryKind::SBuffer, pred_s_buffer[conn_index]);
 
     // collect the composition share of each circuit
@@ -2756,7 +2692,6 @@ string FormatFeedbackKind(FeedbackTrajectoryKind kind)
   switch(kind)
   {
     case FeedbackTrajectoryKind::VInMax: return "VInMax";
-    case FeedbackTrajectoryKind::VOut: return "VOut";
     case FeedbackTrajectoryKind::CvOut: return "CvOut";
     case FeedbackTrajectoryKind::SBuffer: return "SBuffer";
   }
