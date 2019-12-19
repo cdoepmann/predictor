@@ -117,23 +117,9 @@ TorPredApp::AddCircuit (int id, Ipv4Address n_ip, int n_conntype, Ipv4Address p_
 Ptr<PredConnection>
 TorPredApp::AddConnection (Ipv4Address ip, int conntype)
 {
-  // find existing or create new connection
-  Ptr<PredConnection> conn;
-  vector<Ptr<PredConnection> >::iterator it;
-  for (it = connections.begin (); it != connections.end (); ++it)
-    {
-      if ((*it)->GetRemote () == ip)
-        {
-          conn = *it;
-          break;
-        }
-    }
-
-  if (!conn)
-    {
-      conn = Create<PredConnection> (this, ip, conntype);
-      connections.push_back (conn);
-    }
+  // Always create a new connection
+  Ptr<PredConnection> conn = Create<PredConnection> (this, ip, conntype);
+  connections.push_back (conn);
 
   return conn;
 }
@@ -1604,7 +1590,7 @@ PredController::Setup ()
     "relay", app->GetNodeName (),
     "v_in_max_total", .8*to_packets_sec(MaxDataRate ()),  // TODO
     "v_out_max_total", .8*to_packets_sec(MaxDataRate ()), // TODO
-    "s_c_max_total", 20,
+    "s_c_max_total", 100,
     "scaling", 50,
     "dt", TimeStep().GetSeconds(),
     "N_steps", (int) Horizon(),
@@ -1878,7 +1864,7 @@ PredController::Optimize ()
               "packets_per_conn", packets_per_conn
   );
 
-  double control_delta = 1.0;
+  double control_delta = 0.0;
 
   // dump the call
   pyscript.dump(
