@@ -70,7 +70,7 @@ int main (int argc, char *argv[]) {
       // Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue(QueueSize("4096B")) );
 
     Config::SetDefault("ns3::TcpSocket::InitialCwnd", UintegerValue(5));
-    Config::SetDefault ("ns3::TcpSocket::DelAckCount", UintegerValue (0));
+    // Config::SetDefault ("ns3::TcpSocket::DelAckCount", UintegerValue (0));
     Config::SetDefault ("ns3::TcpSocket::TcpNoDelay", BooleanValue (true));
 
     // disable TCP congestion control
