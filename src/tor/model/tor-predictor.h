@@ -116,6 +116,8 @@ public:
 
   static void RememberConnection (Ipv4Address from, Ipv4Address to, Ptr<PredConnection> conn);
 
+  static void RememberLocalConnection (Ptr<Socket> socket, Ptr<PredConnection> conn);
+
   // Get the (theoretical) base delay to the remote site
   Time GetBaseRtt ();
 
@@ -228,6 +230,9 @@ private:
 
   static map<Ipv4Address, string> remote_names;
   static map<pair<Ipv4Address,Ipv4Address>, Ptr<PredConnection>> remote_connections;
+
+public:
+  static map<pair<InetSocketAddress,InetSocketAddress>, Ptr<PredConnection>> local_connections; // (local_addr, remote_addr) -> local_conn
 };
 
 

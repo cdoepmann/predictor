@@ -224,6 +224,9 @@ TorPredApp::StartApplication (void)
           conn->SetSocket (socket);
           m_triggerNewSocket(this, OUTBOUND, socket);
 
+          // Remember our local connection object
+          PredConnection::RememberLocalConnection(socket, conn);
+
           Ptr<Socket> control_socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
           control_socket->Bind ();
           control_socket->Connect (Address (InetSocketAddress (conn->GetRemote (), 9002)));
@@ -635,6 +638,8 @@ TorPredApp::HandleAccept (Ptr<Socket> s, const Address& from)
   vector<Ptr<PredConnection> >::iterator it;
   for (it = connections.begin (); it != connections.end (); ++it)
     {
+      // Since we require here that the connection be not established yet,
+      // this works with multiple connections from the same remote IP.
       if ((*it)->GetRemote () == ip && !(*it)->GetSocket () )
         {
           conn = *it;
@@ -645,6 +650,8 @@ TorPredApp::HandleAccept (Ptr<Socket> s, const Address& from)
   NS_ASSERT (conn);
   conn->SetSocket (s);
   m_triggerNewSocket(this, INBOUND, s);
+
+  PredConnection::RememberLocalConnection(s, conn);
 
   s->SetRecvCallback (MakeCallback (&TorPredApp::ConnReadCallback, this));
   // s->SetSendCallback (MakeCallback(&TorPredApp::ConnWriteCallback, this));
@@ -1139,6 +1146,7 @@ PredConnection::GetRemote ()
 
 map<Ipv4Address,string> PredConnection::remote_names;
 map<pair<Ipv4Address,Ipv4Address>, Ptr<PredConnection>> PredConnection::remote_connections;
+map<pair<InetSocketAddress,InetSocketAddress>, Ptr<PredConnection>> PredConnection::local_connections;
 
 void
 PredConnection::RememberName (Ipv4Address address, string name)
@@ -1152,12 +1160,48 @@ PredConnection::RememberConnection (Ipv4Address from, Ipv4Address to, Ptr<PredCo
   PredConnection::remote_connections[make_pair(from, to)] = conn;
 }
 
+void
+PredConnection::RememberLocalConnection (Ptr<Socket> socket, Ptr<PredConnection> conn)
+{
+  ns3::Address local_raw_addr;
+  socket->GetSockName (local_raw_addr);
+  NS_ASSERT (!local_raw_addr.IsInvalid());
+  auto local_addr = InetSocketAddress::ConvertFrom (local_raw_addr);
+
+  ns3::Address remote_raw_addr;
+  socket->GetPeerName (remote_raw_addr);
+  NS_ASSERT (!remote_raw_addr.IsInvalid());
+  auto remote_addr = InetSocketAddress::ConvertFrom (remote_raw_addr);
+
+  auto key = std::make_pair(local_addr, remote_addr);
+  NS_ASSERT (local_connections.find(key) == local_connections.end());
+  local_connections[key] = conn;
+}
+
 Ptr<PredConnection>
 PredConnection::GetRemoteConn ()
 {
-  auto key = make_pair(GetRemote(), torapp->m_ip);
-  NS_ASSERT(remote_connections.find(key) != remote_connections.end());
-  return remote_connections[key];
+  Ptr<Socket> socket = GetSocket();
+
+  ns3::Address local_raw_addr;
+  socket->GetPeerName (local_raw_addr); // Reversed direction!
+  NS_ASSERT (!local_raw_addr.IsInvalid());
+  auto local_addr = InetSocketAddress::ConvertFrom (local_raw_addr);
+
+  ns3::Address remote_raw_addr;
+  socket->GetSockName (remote_raw_addr); // Reversed direction!
+  NS_ASSERT (!remote_raw_addr.IsInvalid());
+  auto remote_addr = InetSocketAddress::ConvertFrom (remote_raw_addr);
+
+  auto key = std::make_pair(local_addr, remote_addr);
+  
+  if (local_connections.find(key) == local_connections.end())
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << "/" << GetRemoteName() << "] cannot get remote connection (yet)");
+    return nullptr;
+  }
+  
+  return local_connections[key];
 }
 
 string
@@ -1438,6 +1482,11 @@ PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
   }
   
   auto remote_conn = GetRemoteConn ();
+  if (!remote_conn)
+  {
+    NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Cannot beam cell (yet). Dropping it.");
+    return;
+  }
   Time delay = GetBaseRtt () / 2.0 - MilliSeconds(2); // TODO
   
   NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Beaming connection-level cell to appear after " << delay.GetSeconds() << " seconds");
