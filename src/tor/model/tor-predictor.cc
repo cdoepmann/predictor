@@ -1227,7 +1227,15 @@ PredConnection::GetRemoteName ()
 
   map<Ipv4Address,string>::const_iterator it = PredConnection::remote_names.find(GetRemote ());
   NS_ASSERT(it != PredConnection::remote_names.end() );
-  return it->second;
+  string name{it->second};
+
+  // Add the circuit ID to the connection name
+  auto circs = GetAllActiveCircuits();
+  NS_ASSERT_MSG (circs.size() == 1, "connection does not have exactly one circuit");
+  stringstream result;
+  result << name << "." << circs[0]->GetId();
+
+  return result.str();
 }
 
 
