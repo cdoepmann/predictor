@@ -1914,6 +1914,33 @@ PredController::Optimize ()
     }
   }
 
+  // disable inactive (pseudo server) inputs
+  vector<double> v_in_max;
+
+  {
+    double full_blast = .8*to_packets_sec(MaxDataRate ()) /*TODO*/;
+
+    for(auto&& conn : in_conns)
+    {
+      bool enable = true;
+
+      auto pseudo_server = DynamicCast<PseudoServerSocket>(conn->GetSocket());
+      if(pseudo_server && !pseudo_server->HasStarted())
+      {
+        enable = false;
+      }
+
+      if(enable)
+      {
+        v_in_max.push_back(full_blast);
+      }
+      else
+      {
+        v_in_max.push_back(0.0);
+      }
+    }
+  }
+
   // Dump optimization result
   dumper.dump("measured-s-buffer-0",
               "time", Simulator::Now().GetSeconds(),
@@ -1935,7 +1962,8 @@ PredController::Optimize ()
     "cv_in", cv_in,
     "v_out_max", transpose_to_double_vectors(v_out_max),
     "s_buffer_source", transpose_to_double_vectors(s_buffer_source),
-    "control_delta", control_delta
+    "control_delta", control_delta,
+    "v_in_max", v_in_max
   );
 
   // Call the optimizer
@@ -1952,7 +1980,8 @@ PredController::Optimize ()
         "cv_in", cv_in,
         "v_out_max", transpose_to_double_vectors(v_out_max),
         "s_buffer_source", transpose_to_double_vectors(s_buffer_source),
-        "control_delta", control_delta
+        "control_delta", control_delta,
+        "v_in_max", v_in_max
       );
     },
     MakeCallback(&PredController::OptimizeDone, this)
