@@ -101,18 +101,9 @@ class Handler:
         def outer_nparray(l):
             return np.array([l]).T
 
-        def process_cv_in(orig):
-            res = []
-            for step in orig:
-                new_step = [np.array(x) for x in step]
-                res.append(new_step)
-            return res
-
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 's_circuit_0', 'cv_in', 'v_out_max', 's_buffer_source', 'control_delta', 'v_in_max'])(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 'v_out_max', 's_buffer_source', 'control_delta', 'v_in_max'])(
             outer_nparray(kwargs['s_buffer_0']),
-            outer_nparray(kwargs['s_circuit_0']),
-            process_cv_in(kwargs['cv_in']),
             inner_nparray(kwargs['v_out_max']),
             inner_nparray(kwargs['s_buffer_source']),
             kwargs['control_delta'],

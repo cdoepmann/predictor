@@ -306,8 +306,6 @@ public:
   // Handle an incoming connection-level cell
   void HandleDirectCell (Ptr<PredConnection> conn, Ptr<Packet> cell);
 
-  string GetMultiplexMode() { return m_multiplex_mode; }
-
   double GetFeedbackLoss() { return m_feedback_loss; }
 
   bool OutOfBandFeedback() { return m_oob_feedback; }
@@ -320,9 +318,6 @@ protected:
 
   // Decoder to re-assemble previously fragmented multi-cells
   map<Ptr<PredConnection>, MultiCellDecoder> multicell_decoders;
-
-  // Multiplexing mode if buckets are insufficient for a full cell
-  string m_multiplex_mode;
 
   // Ratio of feedack messages that is lost randomly
   double m_feedback_loss;
@@ -506,10 +501,6 @@ public:
   void DumpMemoryPrediction();
 
   void DumpVinPrediction();
-
-  void DumpCvOutPrediction();
-  
-  void DumpCvInPrediction();
   
   void DumpConnNames();
 
@@ -543,8 +534,6 @@ public:
 
   // Get the time of the next optimization step
   Time GetNextOptimizationTime() { return ns3::TimeStep(optimize_event.GetTs()); }
-
-  string GetMultiplexMode() { return app->GetMultiplexMode(); }
 
   // Get a measure of parallelism of the BatchedExecutor
   double GetAverageExecutorBatchSize ()
@@ -610,15 +599,6 @@ protected:
   // Token buckets for the per-connection output rate limiting based on v_out
   map<Ptr<PredConnection>, uint64_t> conn_buckets;
 
-  // Token buckets for per-circuit rate limiting of each connection, defined
-  // by the computed cv_out distribution
-  map<Ptr<PredConnection>, map<Ptr<PredCircuit>,uint64_t>> circ_buckets;
-
-  // If a circuit bucket was not empty but did not suffice to send a complete cell
-  // either, the leftover is remembered and added to the bucket for the next
-  // time step so it is not lost ("delayed" multiplexing mode).
-  map<Ptr<PredConnection>, map<Ptr<PredCircuit>,uint64_t>> circ_buckets_leftover;
-
   // Token buckets for the per-connection input rate limiting based on v_in_max
   // (only applied by exit relays to pseudo server sockets)
   map<Ptr<PredConnection>, uint64_t> conn_read_buckets;
@@ -642,11 +622,6 @@ protected:
   // of parsed trajectories
   void ParseIntoTrajectories(const rapidjson::Value& array, vector<Trajectory>& target, Time first_time, size_t expected_traj, size_t skip_steps=0);
 
-  // Parse rapidjson object containing the special multidimensional composition
-  // matrix into a vector of vectors of trajectories
-  void ParseCvOutIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t expected_traj_outer);
-  void ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t connections);
-
   // Merge two trajectories
   void MergeTrajectories(Trajectory& target, Trajectory& source);
   void MergeTrajectories(vector<Trajectory>& target, vector<Ptr<Trajectory>>& source);
@@ -655,11 +630,7 @@ protected:
   vector<Trajectory> pred_v_out;
   vector<Trajectory> pred_v_out_max;
   vector<Trajectory> pred_s_buffer;
-  vector<Trajectory> pred_s_circuit;
   vector<Trajectory> pred_s_buffer_source;
-
-  vector<vector<Trajectory>> pred_cv_in;
-  vector<vector<Trajectory>> pred_cv_out;
 };
 
 
@@ -977,7 +948,7 @@ private:
 
 // Stores the meaning of what a serialized trajectory denotes (symbol), as
 // regarded by the *sender*.
-enum class FeedbackTrajectoryKind : uint8_t {VIn, CvOut, SBuffer};
+enum class FeedbackTrajectoryKind : uint8_t {VIn, SBuffer};
 
 string FormatFeedbackKind(FeedbackTrajectoryKind kind);
 

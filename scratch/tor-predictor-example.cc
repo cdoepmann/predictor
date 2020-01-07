@@ -37,7 +37,6 @@ int main (int argc, char *argv[]) {
     // Time simTime = Time("60s");
     Time simTime = Time("7.5s");
     uint32_t rtt = 80;
-    string predictor_multiplexing_mode{"aggressive"};
     double predictor_feedback_loss = 0.0;
     bool predictor_oob_feedback = true;
 
@@ -47,7 +46,6 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("time", "simulation time", simTime);
     cmd.AddValue("predictor", "use PredicTor", use_predictor);
     cmd.AddValue("vanilla", "use vanilla Tor", use_vanilla);
-    cmd.AddValue("predictor-multiplex", "multiplexing mode for PredicTor", predictor_multiplexing_mode);
     cmd.AddValue("predictor-feedback-loss", "ratio of feedback messages randomly lost", predictor_feedback_loss);
     cmd.AddValue("predictor-oob-feedback", "Do not really send feedback messages over the network, but schedule their reception out of band", predictor_oob_feedback);
     cmd.Parse(argc, argv);
@@ -87,7 +85,6 @@ int main (int argc, char *argv[]) {
     // Config::SetDefault ("ns3::QueueBase::MaxSize", QueueSizeValue(QueueSize("2048B")) );
     // Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (2048) );
     
-    Config::SetDefault ("ns3::TorPredApp::MultiplexingMode", StringValue (predictor_multiplexing_mode));
     Config::SetDefault ("ns3::TorPredApp::FeedbackLoss", DoubleValue (predictor_feedback_loss));
     Config::SetDefault ("ns3::TorPredApp::OutOfBandFeedback", BooleanValue (predictor_oob_feedback));
 

@@ -21,15 +21,6 @@ TorPredApp::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::TorPredApp")
     .SetParent<TorBaseApp> ()
     .AddConstructor<TorPredApp> ()
-    .AddAttribute ("MultiplexingMode", "Mode of handling situations in which the per-circuit buckets for multiplexing outgoing circuits "
-                                       "do not suffice to send a full cell. Possible values: \"aggressive\" (send full cell as long as "
-                                       "the bucket is nonzero, even if its too small for the full cell), \"conservative\" (do not send "
-                                       "a cell in this case - may underutilize the connection), \"probabilistic\" (randomly decide whether "
-                                       "to send the cell, based on how large the overflow is), and \"delayed\" (do not send the cell, "
-                                       "but remember the leftover bucket for the next time step).",
-                   StringValue (string{"aggressive"}),
-                   MakeStringAccessor (&TorPredApp::m_multiplex_mode),
-                   MakeStringChecker ())
     .AddAttribute ("FeedbackLoss", "Ratio of feedack messages that is lost randomly.",
                    DoubleValue (0.0),
                    MakeDoubleAccessor (&TorPredApp::m_feedback_loss),
@@ -1342,70 +1333,15 @@ PredConnection::Write (uint32_t max_write)
       circ = GetActiveCircuits ();
       NS_ASSERT (circ);
 
-      // Check if this circuit is allowed to send a cell while adhering to the
-      // planned distribution between all the circuits of this connection (cv_out).
-      // Note that, by default in "aggressive" mode, we "ceil" the values, that is,
-      // a circuit is allowed to send a cell as long as its bucket is non-zero,
-      // even if it is smaller than a cell. By doing so, we avoid starvation of
-      // small circuits (we cannot send partial cells here).
-      // If this is not an outgoing connection, do not apply any bucket, but use
-      // a temporary one that is always large enough.
-      uint64_t large_enough = numeric_limits<uint64_t>::max();
-      uint64_t & circ_bucket = (torapp->controller->IsOutConn(this)) ?
-                        torapp->controller->circ_buckets[this][circ] : large_enough;
+      direction = circ->GetDirection (this);
+      cell = circ->PopCell (direction);
 
-      if (circ_bucket > 0)
+      if (cell)
       {
-        bool ok = true;
-        
-        if (torapp->GetMultiplexMode() != "aggressive")
-        {
-          if (circ_bucket < CELL_NETWORK_SIZE)
-          {
-            ok = false;
-            if (torapp->GetMultiplexMode() == "probabilistic")
-            {
-              Ptr<UniformRandomVariable> rng = CreateObject<UniformRandomVariable> ();
-              if (rng->GetValue() <= (double)circ_bucket / (double) CELL_NETWORK_SIZE)
-              {
-                ok = true;
-              }
-            }
-          }
-        }
-
-        if (ok)
-        {
-          direction = circ->GetDirection (this);
-          cell = circ->PopCell (direction);
-
-          if (cell)
-          {
-            uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
-            datasize += cell_size;
-            flushed_some = true;
-            NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
-
-            // Decrement the circuit-level bucket (but not below 0)
-            if (circ_bucket <= cell_size)
-            {
-              circ_bucket = 0;
-            }
-            else
-            {
-              circ_bucket -= cell_size;
-            }
-          }
-        }
-        else
-        {
-          // The bucket does not suffice for sending a complete cell.
-          if (torapp->GetMultiplexMode() == "delayed")
-          {
-            // Instead, remember the leftover budget for reusing it during the next time step.
-            torapp->controller->circ_buckets_leftover[this][circ] = circ_bucket;
-          }
-        }
+        uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
+        datasize += cell_size;
+        flushed_some = true;
+        NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
       }
 
       SetActiveCircuits (circ->GetNextCirc (this));
@@ -1581,14 +1517,6 @@ PredController::DumpConnNames()
 void
 PredController::Setup ()
 {
-  NS_ABORT_MSG_IF(
-    (GetMultiplexMode() != "aggressive") &&
-    (GetMultiplexMode() != "conservative") &&
-    (GetMultiplexMode() != "probabilistic") &&
-    (GetMultiplexMode() != "delayed"),
-    "invalid multiplexing mode"
-  );
-
   // Get the maximum data rate
   DataRateValue datarate_app;
   app->GetAttribute("BandwidthRate", datarate_app);
@@ -1662,7 +1590,6 @@ PredController::Setup ()
   for (size_t i=0; i<in_conns.size(); i++)
   {
     pred_s_buffer_source.push_back(Trajectory{this, Simulator::Now()});
-    pred_cv_in.push_back(vector<Trajectory>{});
   }
 
   for (size_t i=0; i<out_conns.size(); i++)
@@ -1782,10 +1709,7 @@ PredController::Optimize ()
 
   // Firstly, measure the necessary local information.
 
-  // Get the circuits' queue lengthes
-  vector<double> packets_per_circuit;
-
-  // Also, accumulate the values per connection
+  // Get the connections' queue lengthes
   vector<double> packets_per_conn;
 
   for (auto&& conn : out_conns)
@@ -1795,8 +1719,6 @@ PredController::Optimize ()
     for (auto& circ : conn->GetAllActiveCircuits())
     {
       double queue_size = circ->GetQueueSize(circ->GetDirection(conn));
-
-      packets_per_circuit.push_back(queue_size);
       this_conn += queue_size;
     }
 
@@ -1806,59 +1728,6 @@ PredController::Optimize ()
   //
   // Collect the trajectories necessary for optimizing
   //
-
-  // composition of each input connection
-  vector<vector<vector<double>>> cv_in;
-  
-  for (unsigned int i=0; i<Horizon(); i++)
-  {
-    vector<vector<double>> this_step;
-
-    size_t conn_index = 0;
-    for (auto&& conn : in_conns)
-    {
-      // Do we have data from the predecessor relay?
-      if (pred_cv_in[conn_index].size() == 0)
-      {
-        // We do not yet have info on the composition of this connection.
-        // Assume a uniform distribution
-        size_t n_circuit_in = conn->CountCircuits();
-
-        vector<double> composition;
-        for (size_t i=0; i<n_circuit_in; i++)
-        {
-          composition.push_back (1.0 / n_circuit_in);
-        }
-
-        this_step.push_back(composition);
-      }
-      else
-      {
-        // Use the information we got from the predecessor relay.
-        vector<double> composition;
-
-        for (auto&& circ_traj : pred_cv_in[conn_index])
-        {
-          circ_traj.DiscardUntil(Simulator::Now());
-          NS_ASSERT (is_same_time(circ_traj.GetTime(), Simulator::Now()));
-
-          double val = circ_traj.Elements()[i];
-
-          if (val < 0.0)
-          {
-            NS_ASSERT(val > -0.01);
-            val = 0.0;
-          }
-          composition.push_back(val);
-        }
-
-        this_step.push_back(composition);
-      }
-
-      conn_index++;
-    }
-    cv_in.push_back(this_step);
-  }
 
   // maximum outgoing data rate we were given by the successor
   vector<Trajectory> v_out_max;
@@ -1956,10 +1825,8 @@ PredController::Optimize ()
     "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
     "s_buffer_0", packets_per_conn,
-    "s_circuit_0", packets_per_circuit,
 
     // trajectories
-    "cv_in", cv_in,
     "v_out_max", transpose_to_double_vectors(v_out_max),
     "s_buffer_source", transpose_to_double_vectors(s_buffer_source),
     "control_delta", control_delta,
@@ -1974,10 +1841,8 @@ PredController::Optimize ()
         "time", Simulator::Now().GetSeconds(),
         "relay", app->GetNodeName (),
         "s_buffer_0", packets_per_conn,
-        "s_circuit_0", packets_per_circuit,
 
         // trajectories
-        "cv_in", cv_in,
         "v_out_max", transpose_to_double_vectors(v_out_max),
         "s_buffer_source", transpose_to_double_vectors(s_buffer_source),
         "control_delta", control_delta,
@@ -2062,15 +1927,9 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
   ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size(), 1);
-  ParseIntoTrajectories((*doc)["s_circuit"], pred_s_circuit, next_step, num_circuits, 1);
-
-  ParseCvInIntoTrajectories((*doc)["cv_in"], pred_cv_in, now, in_conns.size());
-  ParseCvOutIntoTrajectories((*doc)["cv_out"], pred_cv_out, now, out_conns.size());
 
   DumpMemoryPrediction();
   DumpVinPrediction();
-  DumpCvOutPrediction();
-  DumpCvInPrediction();
 
   // Trigger sending of new information to peers
   SendToNeighbors();
@@ -2086,8 +1945,8 @@ PredController::OptimizeDone(rapidjson::Document * doc)
 void
 PredController::CalculateSendPlan()
 {
-  // Transfer the calculated send plan (v_out and cv_out from the optimization
-  // step) into ready-to-execute token buckets per connection and per circuit
+  // Transfer the calculated send plan (v_out from the optimization step)
+  // into ready-to-execute token buckets per connection
 
   auto conn_it = out_conns.begin();
   int conn_index = 0;
@@ -2114,57 +1973,6 @@ PredController::CalculateSendPlan()
 
     uint64_t conn_bucket = (uint64_t)(rate*time_step/8.0); // dividing by 8 converts to bytes
     conn_buckets[conn] = conn_bucket;
-
-    //
-    // Now that the limit for the whole connection is set, also calculate the
-    // share each circuit is allowed to use from it, based on cv_out
-    //
-
-    // Firstly, get the distribution for the current step
-    vector<double> distribution;
-    for (auto& traj : pred_cv_out[conn_index])
-    {
-      distribution.push_back(traj.Elements().at(0));
-    }
-    NS_ASSERT(distribution.size() == conn->CountCircuits());
-
-    // Just to be on the safe side, normalize the values such that they sum up
-    // to 1.0 so we utilize the full bandwidth alotted to the connection
-    {
-      double sum = 0.0;
-      for (auto& val : distribution)
-      {
-        sum += val;
-      }
-      double ratio = 1.0 / sum;
-
-      for (auto& val : distribution)
-      {
-        if (sum < 0.0001)
-          val = 1.0;
-        else
-          val *= ratio;
-      }
-    }
-
-    // Apply the ratios to the circuits
-    int circ_index = 0;
-    for (auto& circ : conn->GetAllActiveCircuits())
-    {
-      uint64_t circ_bucket = conn_bucket * distribution[circ_index];
-      circ_buckets[conn][circ] = circ_bucket;
-
-      if (GetMultiplexMode() == "delayed")
-      {
-        // Add leftover budgets from previous time steps that did not suffice
-        // for sending another full cell (note that the map is default-initialized
-        // as 0)
-        circ_buckets[conn][circ] += circ_buckets_leftover[conn][circ];
-        circ_buckets_leftover[conn][circ] = 0;
-      }
-
-      circ_index++;
-    }
 
     // trigger sending of new data
     conn->ScheduleWrite ();
@@ -2268,88 +2076,6 @@ PredController::ParseIntoTrajectories(const rapidjson::Value& array, vector<Traj
 }
 
 void
-PredController::ParseCvOutIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t expected_traj_outer)
-{
-  NS_ASSERT(array.IsArray());
-  NS_ASSERT(array.Size() > 0);
-
-  NS_ASSERT(array[0].IsArray());
-  const size_t num_conns = array[0].Size();
-  cout << num_conns << " " << expected_traj_outer << endl;
-  NS_ASSERT(num_conns == expected_traj_outer);
-
-  target.clear();
-
-  map<size_t,size_t> conn_to_circnum;
-
-  // For each of the connections, add a vector that contains all of the respective circuits...
-  for (size_t conn=0; conn<num_conns; conn++) {
-    target.push_back(vector<Trajectory>{});
-    
-    /// ...and initialize a trajectory for each of its circuits
-    NS_ASSERT(array[0][conn].IsArray());
-    conn_to_circnum[conn] = array[0][conn].Size();
-
-    for (size_t i=0; i<conn_to_circnum[conn]; i++) {
-      target[conn].push_back(Trajectory{this,first_time});
-    }
-  }
-
-  for (size_t step=0; step<array.Size(); step++) {
-    NS_ASSERT(array[step].IsArray());
-    NS_ASSERT(array[step].Size() == num_conns);
-
-    for (size_t conn=0; conn<num_conns; conn++) {
-      NS_ASSERT(array[step][conn].IsArray());
-
-      // Ensure the number of circuits per connection is constant over time
-      NS_ASSERT(array[step][conn].Size() == conn_to_circnum[conn]);
-
-      for (size_t circ=0; circ<array[step][conn].Size(); circ++) {
-        NS_ASSERT(array[step][conn][circ].IsArray());
-        NS_ASSERT(array[step][conn][circ].Size() == 1);
-        NS_ASSERT(array[step][conn][circ][0].IsDouble());
-        double val = array[step][conn][circ][0].GetDouble();
-        
-        target[conn][circ].Elements().push_back(val);
-      }
-    }
-  }
-}
-
-void
-PredController::ParseCvInIntoTrajectories(const rapidjson::Value& array, vector<vector<Trajectory>>& target, Time first_time, size_t connections)
-{
-  NS_ASSERT(array.IsArray());
-  NS_ASSERT(array.Size() > 0);
-  size_t num_steps = array.Size();
-  
-  target.clear();
-
-  for(size_t conn=0; conn<connections; conn++) {
-    // Add vector for this connection, now accessible via target[conn]
-    target.push_back(vector<Trajectory>{});
-
-    // For each of the circuits on this connection, ...
-    NS_ASSERT(array[0][conn].IsArray());
-    for (size_t circuit=0; circuit<array[0][conn].Size(); circuit++) {
-      // create a trajectory
-      Trajectory traj{this,first_time};
-
-      // add all of the circuit's future values
-      for (size_t step=0; step<num_steps; step++) {
-        traj.Elements().push_back(
-          array[step][conn][circuit].GetDouble()
-        );
-      }
-
-      // and add the trajectory to the connection vector
-      target[conn].push_back(traj);
-    }
-  }
-}
-
-void
 PredController::MergeTrajectories(Trajectory& target, Trajectory& source)
 {
   Time target_time = GetNextOptimizationTime();
@@ -2445,26 +2171,6 @@ PredController::HandleInputFeedback(Ptr<PredConnection> conn, Ptr<Packet> cell)
 
     Ptr<Trajectory> s_buffer = msg.Get(FeedbackTrajectoryKind::SBuffer);
     MergeTrajectories(pred_s_buffer_source[conn_index], *s_buffer);
-    
-    vector<Ptr<Trajectory>> cv_out = msg.GetAll(FeedbackTrajectoryKind::CvOut);
-    NS_ASSERT(cv_out.size() == conn->CountCircuits());
-
-    // {
-    //   vector<vector<double>> data;
-    //   for (auto& traj : cv_out)
-    //   {
-    //     data.push_back(traj->Elements());
-    //   }
-
-    //   dumper.dump("got-cvin-feedback",
-    //               "time", Simulator::Now().GetSeconds(),
-    //               "node", app->GetNodeName(),
-    //               "conn", conn->GetRemoteName(),
-    //               "cvin-trajs", data
-    //   );
-    // }
-
-    MergeTrajectories(pred_cv_in[conn_index], cv_out);
 }
 
 void
@@ -2551,62 +2257,6 @@ void PredController::DumpVinPrediction()
   }
 }
 
-void PredController::DumpCvOutPrediction()
-{
-  size_t conn_index;
-
-  NS_ASSERT(out_conns.size() == pred_cv_out.size());
-
-  conn_index = 0;
-  for (auto&& conn : out_conns)
-  {
-    PredFeedbackMessage msg;
-
-    vector<vector<double>> this_data;
-    for (auto& traj : pred_cv_out[conn_index])
-    {
-      this_data.push_back(traj.Elements());
-    }
-
-    dumper.dump("calculated-cvout",
-                "time", Simulator::Now().GetSeconds(),
-                "node", app->GetNodeName(),
-                "conn", conn->GetRemoteName(),
-                "cvout-traj-share", this_data
-    );
-
-    conn_index++;
-  }
-}
-
-void PredController::DumpCvInPrediction()
-{
-  size_t conn_index;
-
-  NS_ASSERT(in_conns.size() == pred_cv_in.size());
-
-  conn_index = 0;
-  for (auto&& conn : in_conns)
-  {
-    PredFeedbackMessage msg;
-
-    vector<vector<double>> this_data;
-    for (auto& traj : pred_cv_in[conn_index])
-    {
-      this_data.push_back(traj.Elements());
-    }
-
-    dumper.dump("calculated-cvin",
-                "time", Simulator::Now().GetSeconds(),
-                "node", app->GetNodeName(),
-                "conn", conn->GetRemoteName(),
-                "cvin-traj-share", this_data
-    );
-
-    conn_index++;
-  }
-}
-
 void
 PredController::SendToNeighbors()
 {
@@ -2655,23 +2305,7 @@ PredController::SendToNeighbors()
 
     msg.Add(FeedbackTrajectoryKind::SBuffer, pred_s_buffer[conn_index]);
 
-    // collect the composition share of each circuit
-    size_t num_circuits = conn->CountCircuits();
-
-    for (size_t circ_index = 0; circ_index < num_circuits; circ_index++)
-    {
-      // dumper.dump("sending-cvout-traj",
-      //             "time", Simulator::Now().GetSeconds(),
-      //             "node", app->GetNodeName(),
-      //             "conn", conn->GetRemoteName(),
-      //             "index", (int) circ_index,
-      //             "cvout-traj", pred_cv_out[conn_index][circ_index].Elements()
-      // );
-      NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] - cv_out length: " << pred_cv_out[conn_index][circ_index].Steps());
-      msg.Add(FeedbackTrajectoryKind::CvOut, pred_cv_out[conn_index][circ_index]);
-    }
-
-    // Assemble the trajectories
+    // Assemble the message
     Ptr<Packet> packet = msg.MakePacket();
 
     NS_LOG_LOGIC ("[" << app->GetNodeName() << ": connection " << conn->GetRemoteName () << "] Sending connection-level cell");
@@ -2760,7 +2394,6 @@ string FormatFeedbackKind(FeedbackTrajectoryKind kind)
   switch(kind)
   {
     case FeedbackTrajectoryKind::VIn: return "VIn";
-    case FeedbackTrajectoryKind::CvOut: return "CvOut";
     case FeedbackTrajectoryKind::SBuffer: return "SBuffer";
   }
 
