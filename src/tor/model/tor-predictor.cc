@@ -1959,6 +1959,12 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
   ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size(), 1);
 
+  // Clean slightly negative values
+  for(auto& traj : pred_v_out)
+  {
+    traj.MakeNonNegativeChecked();
+  }
+
   DumpMemoryPrediction();
   DumpVinPrediction();
 

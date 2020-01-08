@@ -743,6 +743,29 @@ public:
     return ss.str();
   }
 
+  void MakeNonNegative()
+  {
+    for (auto& val : Elements())
+    {
+      if (val < 0.0)
+      {
+        val = 0.0;
+      }
+    }
+  }
+
+  void MakeNonNegativeChecked()
+  {
+    for (auto& val : Elements())
+    {
+      if (val < 0.0)
+      {
+        NS_ASSERT(val > -0.001);
+        val = 0.0;
+      }
+    }
+  }
+
   // Get the time step
   Time GetTimeStep() { return time_step; }
 
