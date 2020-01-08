@@ -668,6 +668,11 @@ public:
     return GetTime(Steps() - 1);
   }
 
+  void AdjustTimeBySteps(int steps_offset)
+  {
+    first_time += steps_offset*time_step;
+  }
+
   // Get the value of the trajectory at a given time
   double GetValue(Time time)
   {
@@ -1061,9 +1066,11 @@ public:
     auto entry = make_pair(key, value);
     entries.push_back(entry);
   }
-  void Add(FeedbackTrajectoryKind key, Trajectory& value) {
+  void Add(FeedbackTrajectoryKind key, Trajectory& value, int timestep_offset) {
     // this relies on the copy constructor of Trajectory
-    Add(key, Create<Trajectory> (value));
+    auto traj = Create<Trajectory> (value);
+    traj->AdjustTimeBySteps(timestep_offset);
+    Add(key, traj);
   }
 
   // Get the first contained trajectory of a given type

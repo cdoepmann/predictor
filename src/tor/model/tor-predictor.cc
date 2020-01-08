@@ -1992,7 +1992,7 @@ PredController::OptimizeDone(rapidjson::Document * doc)
   ParseIntoTrajectories((*doc)["v_in"], pred_v_in, now, in_conns.size());
   ParseIntoTrajectories((*doc)["v_out"], pred_v_out, now, out_conns.size());
   ParseIntoTrajectories((*doc)["v_out_max"], pred_v_out_max, now, out_conns.size());
-  ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, next_step, out_conns.size(), 1);
+  ParseIntoTrajectories((*doc)["s_buffer"], pred_s_buffer, now, out_conns.size(), 1);
 
   // Clean slightly negative values
   for(auto& traj : pred_v_out)
@@ -2349,7 +2349,7 @@ PredController::SendToNeighbors()
   {
     PredFeedbackMessage msg;
 
-    msg.Add(FeedbackTrajectoryKind::VIn, pred_v_in[conn_index]);
+    msg.Add(FeedbackTrajectoryKind::VIn, pred_v_in[conn_index], -1);
 
     // Assemble the trajectories
     Ptr<Packet> packet = msg.MakePacket();
@@ -2378,8 +2378,8 @@ PredController::SendToNeighbors()
   {
     PredFeedbackMessage msg;
 
-    msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out[conn_index]);
-    msg.Add(FeedbackTrajectoryKind::SBuffer, pred_s_buffer[conn_index]);
+    msg.Add(FeedbackTrajectoryKind::VOut, pred_v_out[conn_index], +1);
+    msg.Add(FeedbackTrajectoryKind::SBuffer, pred_s_buffer[conn_index], +1);
 
     // Assemble the message
     Ptr<Packet> packet = msg.MakePacket();
