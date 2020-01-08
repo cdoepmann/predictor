@@ -1549,6 +1549,15 @@ PredController::Setup ()
     inputs.push_back(circ_ids);
   }
 
+  vector<string> input_types;
+  for (auto& conn : in_conns)
+  {
+    if (!conn->SpeaksCells())
+      input_types.push_back("exit");
+    else
+      input_types.push_back("node");
+  }
+
   // collect the output connections...
   vector<vector<uint16_t>> outputs;
   num_circuits = 0;
@@ -1582,7 +1591,8 @@ PredController::Setup ()
     "n_in", inputs.size(),
     "input_circuits", inputs,
     "n_out", outputs.size(),
-    "output_circuits", outputs
+    "output_circuits", outputs,
+    "input_type", input_types
   );
 
   // Initialize some trajectories to be set by later optimization.

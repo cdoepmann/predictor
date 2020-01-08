@@ -90,6 +90,7 @@ class Handler:
             n_out = kwargs['n_out'],
             input_circuits = kwargs['input_circuits'],
             output_circuits = kwargs['output_circuits'],
+            input_type = kwargs['input_type']
         )
 
         return setup_dict
@@ -102,12 +103,13 @@ class Handler:
             return np.array([l]).T
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 'v_out_max', 's_buffer_source', 'v_out_source', 'control_delta'])(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 'v_out_max', 's_buffer_source', 'v_out_source', 'control_delta', 'debugging'])(
             outer_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['v_out_max']),
             inner_nparray(kwargs['s_buffer_source']),
             inner_nparray(kwargs['v_out_source']),
             kwargs['control_delta'],
+            False,
         )
 
         def make_serializable(x):
