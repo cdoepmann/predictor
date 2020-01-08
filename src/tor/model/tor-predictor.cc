@@ -1826,11 +1826,44 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
+    // Use the following "infinite" trajectory for pseudo sockets that are
+    // currently active and have a virtually infinite amount of data ready.
+    Trajectory infinite{this, Simulator::Now()};
+    for (unsigned int i=0; i<Horizon(); i++)
+    {
+      infinite.Elements().push_back(60*to_packets_sec(MaxDataRate ()));
+    }
+
+    auto conn_it = in_conns.begin();
     for (auto&& val : pred_s_buffer_source)
     {
+      NS_ASSERT(conn_it != in_conns.end());
+      auto conn = *conn_it;
+      
       if (val.Steps() == 0)
       {
-        s_buffer_source.push_back(idle);
+        // Firstly, determine if this is a server edge
+        if (!conn->SpeaksCells())
+        {
+          // This is a sending exit server socket. If it is sending already,
+          // assume that it has a virtually infinite amount of data remaining.
+          auto serversock = DynamicCast<PseudoServerSocket>(conn->GetSocket());
+          NS_ASSERT(serversock);
+          if (serversock->HasStarted())
+          {
+            s_buffer_source.push_back(infinite);
+          }
+          else
+          {
+            s_buffer_source.push_back(idle);
+          }
+        }
+        else
+        {
+          // Otherwise, the predecessor has not told us about its buffers yet,
+          // assume it is idle.
+          s_buffer_source.push_back(idle);
+        }
       }
       else
       {
@@ -1838,6 +1871,8 @@ PredController::Optimize ()
         NS_ASSERT (is_same_time(val.GetTime(), Simulator::Now()));
         s_buffer_source.push_back(val);
       }
+
+      conn_it++;
     }
   }
 
