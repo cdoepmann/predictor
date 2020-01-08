@@ -102,12 +102,12 @@ class Handler:
             return np.array([l]).T
 
         # print('# ' + self.relay)
-        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 'v_out_max', 's_buffer_source', 'control_delta', 'v_in_max'])(
+        Wrap(f'({self.relay}/{kwargs["time"]}) ots.solve', self.ots.solve, argnames=['s_buffer_0', 'v_out_max', 's_buffer_source', 'v_out_source', 'control_delta'])(
             outer_nparray(kwargs['s_buffer_0']),
             inner_nparray(kwargs['v_out_max']),
             inner_nparray(kwargs['s_buffer_source']),
+            inner_nparray(kwargs['v_out_source']),
             kwargs['control_delta'],
-            outer_nparray(kwargs['v_in_max']),
         )
 
         def make_serializable(x):
