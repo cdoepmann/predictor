@@ -629,6 +629,7 @@ protected:
   vector<Trajectory> pred_v_in;
   vector<Trajectory> pred_v_out;
   vector<Trajectory> pred_v_out_max;
+  vector<Trajectory> pred_v_out_source;
   vector<Trajectory> pred_s_buffer;
   vector<Trajectory> pred_s_buffer_source;
 };
@@ -948,7 +949,7 @@ private:
 
 // Stores the meaning of what a serialized trajectory denotes (symbol), as
 // regarded by the *sender*.
-enum class FeedbackTrajectoryKind : uint8_t {VIn, SBuffer};
+enum class FeedbackTrajectoryKind : uint8_t {VIn, VOut, SBuffer};
 
 string FormatFeedbackKind(FeedbackTrajectoryKind kind);
 
