@@ -36,7 +36,15 @@ TorPredApp::GetTypeId (void)
     .AddTraceSource ("NewServerSocket",
                      "Trace indicating that a new pseudo server socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewPseudoServerSocket),
-                     "ns3::TorPredApp::TorNewPseudoServerSocketCallback");
+                     "ns3::TorPredApp::TorNewPseudoServerSocketCallback")
+    .AddTraceSource ("ByteEnteredNetwork",
+                     "Trace indicating that an exit sent a byte of data, identified by its index, into the network.",
+                     MakeTraceSourceAccessor (&TorPredApp::m_triggerByteEnteredNetwork),
+                     "ns3::TorPredApp::TorByteEnteredNetworkCallback")
+    /*.AddTraceSource ("ByteLeftNetwork",
+                     "Trace indicating that an eentry received a byte of data, identified by its index, from the network.",
+                     MakeTraceSourceAccessor (&TorPredApp::m_triggerByteLeftNetwork),
+                     "ns3::TorPredApp::TorByteLeftNetworkCallback")*/;
   return tid;
 }
 
@@ -1332,6 +1340,7 @@ PredConnection::Write (uint32_t max_write)
     {
       circ = GetActiveCircuits ();
       NS_ASSERT (circ);
+      int circid = circ->GetId();
 
       direction = circ->GetDirection (this);
       cell = circ->PopCell (direction);
@@ -1339,8 +1348,21 @@ PredConnection::Write (uint32_t max_write)
       if (cell)
       {
         uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
+
+        // check if just packaged
+        auto opp_con = circ->GetOppositeConnection(direction);
+        if (!opp_con->SpeaksCells())
+        {
+          // notify about byte entering the network
+          for (uint64_t i=0; i<(uint64_t)cell_size; i++)
+          {
+            torapp->m_triggerByteEnteredNetwork(torapp, circid, data_index_last_sent[circid] + i);
+          }
+        }
+
         datasize += cell_size;
         flushed_some = true;
+        data_index_last_sent[circid] += cell_size;
         NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
       }
 

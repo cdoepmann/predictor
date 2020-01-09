@@ -31,6 +31,8 @@ bool use_pctcp = false;
 //   }
 // }
 
+void ByteEnteredNetworkCallback(int, string context, Ptr<TorBaseApp> app, int circid, uint64_t data_index);
+
 map<int,uint64_t> leadtime_offsets;
 
 int main (int argc, char *argv[]) {
@@ -154,6 +156,16 @@ int main (int argc, char *argv[]) {
     // client->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("1MB/s"));
     // client->GetDevice(0)->GetChannel()->GetDevice(0)->GetObject<PointToPointNetDevice>()->SetDataRate(DataRate("1MB/s"));
 
+    // register callbacks for latency measurements
+    for (string relay : th.GetAllRelayNames())
+    {
+      if (use_predictor)
+      {
+        auto app = DynamicCast<TorPredApp> (th.GetTorApp(relay));
+        app->TraceConnect("ByteEnteredNetwork", "xxx", MakeBoundCallback(&ByteEnteredNetworkCallback, 0));
+      }
+    }
+
     ApplicationContainer relays = th.GetTorAppsContainer();
     relays.Start (Seconds (0.0));
     relays.Stop (simTime);
@@ -196,6 +208,16 @@ int main (int argc, char *argv[]) {
 
     Simulator::Destroy ();
     return 0;
+}
+
+void ByteEnteredNetworkCallback(int, string context, Ptr<TorBaseApp> app, int circid, uint64_t data_index)
+{
+  dumper.dump("byted-entered-network",
+    "time", Simulator::Now().GetSeconds(),
+    "node", app->GetNodeName(),
+    "circid", circid,
+    "data_index", data_index
+  );
 }
 
 void
