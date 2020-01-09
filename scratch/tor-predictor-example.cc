@@ -12,6 +12,7 @@ void remember_leadtime(TorStarHelper*, Time);
 
 bool use_predictor = false;
 bool use_vanilla = false;
+bool use_pctcp = false;
 
 // void TestTrajectory()
 // {
@@ -46,6 +47,7 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("time", "simulation time", simTime);
     cmd.AddValue("predictor", "use PredicTor", use_predictor);
     cmd.AddValue("vanilla", "use vanilla Tor", use_vanilla);
+    cmd.AddValue("pctcp", "use PCTCP", use_pctcp);
     cmd.AddValue("predictor-feedback-loss", "ratio of feedback messages randomly lost", predictor_feedback_loss);
     cmd.AddValue("predictor-oob-feedback", "Do not really send feedback messages over the network, but schedule their reception out of band", predictor_oob_feedback);
     cmd.Parse(argc, argv);
@@ -53,7 +55,12 @@ int main (int argc, char *argv[]) {
     // TestTrajectory();
     // return 0;
 
-    NS_ABORT_MSG_UNLESS(use_predictor ^ use_vanilla, "Exactly one out of --predictor or --vanilla must be specified");
+    NS_ABORT_MSG_UNLESS(
+      ( use_predictor && !use_vanilla && !use_pctcp) ||
+      (!use_predictor &&  use_vanilla && !use_pctcp) ||
+      (!use_predictor && !use_vanilla &&  use_pctcp),
+      "Exactly one out of --predictor, --vanilla, or --pctcp must be specified"
+    );
 
     SeedManager::SetSeed (12);
     SeedManager::SetRun (run);
@@ -101,6 +108,10 @@ int main (int argc, char *argv[]) {
     if (use_predictor)
     {
       th.SetTorAppType("ns3::TorPredApp");
+    }
+    else if (use_pctcp)
+    {
+      th.SetTorAppType("ns3::TorPctcpApp");
     }
     // th.EnablePcap(true);
 
