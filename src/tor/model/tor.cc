@@ -33,7 +33,15 @@ TorApp::GetTypeId (void)
     .AddTraceSource ("NewServerSocket",
                      "Trace indicating that a new pseudo server socket has been installed.",
                      MakeTraceSourceAccessor (&TorApp::m_triggerNewPseudoServerSocket),
-                     "ns3::TorApp::TorNewPseudoServerSocketCallback");
+                     "ns3::TorApp::TorNewPseudoServerSocketCallback")
+    .AddTraceSource ("BytesEnteredNetwork",
+                     "Trace indicating that an exit sent a byte of data, identified by its index, into the network.",
+                     MakeTraceSourceAccessor (&TorApp::m_triggerBytesEnteredNetwork),
+                     "ns3::TorPredApp::TorBytesEnteredNetworkCallback")
+    .AddTraceSource ("BytesLeftNetwork",
+                     "Trace indicating that an eentry received a byte of data, identified by its index, from the network.",
+                     MakeTraceSourceAccessor (&TorApp::m_triggerBytesLeftNetwork),
+                     "ns3::TorPredApp::TorBytesLeftNetworkCallback");
   return tid;
 }
 
@@ -377,6 +385,7 @@ TorApp::ReceiveRelayCell (Ptr<Connection> conn, Ptr<Packet> cell)
   CellDirection direction = circ->GetOppositeDirection (conn);
   Ptr<Connection> target_conn = circ->GetConnection (direction);
   NS_ASSERT (target_conn);
+  target_conn->CountFinalReception(circ->GetId(), cell->GetSize());
 
   AppendCellToCircuitQueue (circ, cell, direction);
 }
@@ -1110,6 +1119,17 @@ Connection::Read (vector<Ptr<Packet> >* packet_list, uint32_t max_read)
   return read_bytes;
 }
 
+void
+Connection::CountFinalReception(int circid, uint32_t length)
+{
+  if (!SpeaksCells() && DynamicCast<PseudoClientSocket>(GetSocket()))
+  {
+    // notify about bytes leaving the network
+    torapp->m_triggerBytesLeftNetwork(torapp, circid, data_index_last_delivered[circid] + 1, data_index_last_delivered[circid] + (uint64_t)length);
+    data_index_last_delivered[circid] += (uint64_t) length;
+  }
+}
+
 
 uint32_t
 Connection::Write (uint32_t max_write)
@@ -1137,11 +1157,25 @@ Connection::Write (uint32_t max_write)
 
       direction = circ->GetDirection (this);
       cell = circ->PopCell (direction);
+      int circid = circ->GetId();
 
       if (cell)
         {
-          datasize += cell->CopyData (&raw_data[datasize], cell->GetSize ());
+          uint32_t cell_size = cell->CopyData (&raw_data[datasize], cell->GetSize ());
+
+          // check if just packaged
+          auto opp_con = circ->GetOppositeConnection(direction);
+          if (!opp_con->SpeaksCells() && DynamicCast<PseudoServerSocket>(opp_con->GetSocket()))
+          {
+            // notify about bytes entering the network
+            torapp->m_triggerBytesEnteredNetwork(torapp, circid, data_index_last_seen[circid] + 1, data_index_last_seen[circid] + cell_size);
+          }
+
+          datasize += cell_size;
+
           flushed_some = true;
+
+          data_index_last_seen[circid] += cell_size;
           NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": Connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
         }
 

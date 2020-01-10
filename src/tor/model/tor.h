@@ -132,6 +132,12 @@ public:
   string GetRemoteName ();
   TorApp * GetTorApp() { return torapp; }
 
+  // index within each circuit's data stream that was last sent
+  map<int,uint64_t> data_index_last_seen;
+  map<int,uint64_t> data_index_last_delivered;
+
+  void CountFinalReception(int circid, uint32_t length);
+
 private:
   TorApp* torapp;
   Ipv4Address remote;
@@ -213,6 +219,22 @@ public:
                  Ptr<PseudoServerSocket>      // the new pseudo socket itself
                  > m_triggerNewPseudoServerSocket;
   typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBaseApp>, int, Ptr<PseudoServerSocket>);
+
+  // Callback to trigger when a cell has been sent into the network by an exit
+  TracedCallback<Ptr<TorBaseApp>, // this app
+                 int,             // circuit id
+                 uint64_t,        // byte index in circuit (start)
+                 uint64_t         // byte index in circuit (end)
+                 > m_triggerBytesEnteredNetwork;
+  typedef void (* TorBytesEnteredNetworkCallback) (Ptr<TorBaseApp>, int, uint64_t, uint64_t);
+
+  // Callback to trigger when a cell has been received from the network by an entry
+  TracedCallback<Ptr<TorBaseApp>, // this app
+                 int,             // circuit id
+                 uint64_t,        // byte index in circuit (start)
+                 uint64_t         // byte index in circuit (end)
+                 > m_triggerBytesLeftNetwork;
+  typedef void (* TorBytesLeftNetworkCallback) (Ptr<TorBaseApp>, int, uint64_t, uint64_t);
 
 protected:
   virtual void DoDispose (void);

@@ -167,6 +167,11 @@ int main (int argc, char *argv[]) {
         app->TraceConnectWithoutContext("BytesEnteredNetwork", MakeCallback(&BytesEnteredNetworkCallback));
         app->TraceConnectWithoutContext("BytesLeftNetwork", MakeCallback(&BytesLeftNetworkCallback));
       }
+      else {
+        auto app = DynamicCast<TorApp> (th.GetTorApp(relay)); // also works for TorPctcpApp
+        app->TraceConnectWithoutContext("BytesEnteredNetwork", MakeCallback(&BytesEnteredNetworkCallback));
+        app->TraceConnectWithoutContext("BytesLeftNetwork", MakeCallback(&BytesLeftNetworkCallback));
+      }
     }
 
     ApplicationContainer relays = th.GetTorAppsContainer();
