@@ -31,7 +31,9 @@ bool use_pctcp = false;
 //   }
 // }
 
-void ByteEnteredNetworkCallback(int, string context, Ptr<TorBaseApp> app, int circid, uint64_t data_index);
+void BytesEnteredNetworkCallback(Ptr<TorBaseApp> app, int circid, uint64_t from, uint64_t to);
+
+void BytesLeftNetworkCallback(Ptr<TorBaseApp> app, int circid, uint64_t from, uint64_t to);
 
 map<int,uint64_t> leadtime_offsets;
 
@@ -162,7 +164,8 @@ int main (int argc, char *argv[]) {
       if (use_predictor)
       {
         auto app = DynamicCast<TorPredApp> (th.GetTorApp(relay));
-        app->TraceConnect("ByteEnteredNetwork", "xxx", MakeBoundCallback(&ByteEnteredNetworkCallback, 0));
+        app->TraceConnectWithoutContext("BytesEnteredNetwork", MakeCallback(&BytesEnteredNetworkCallback));
+        app->TraceConnectWithoutContext("BytesLeftNetwork", MakeCallback(&BytesLeftNetworkCallback));
       }
     }
 
@@ -210,13 +213,25 @@ int main (int argc, char *argv[]) {
     return 0;
 }
 
-void ByteEnteredNetworkCallback(int, string context, Ptr<TorBaseApp> app, int circid, uint64_t data_index)
+void BytesEnteredNetworkCallback(Ptr<TorBaseApp> app, int circid, uint64_t from, uint64_t to)
 {
-  dumper.dump("byted-entered-network",
+  dumper.dump("bytes-entered-network",
     "time", Simulator::Now().GetSeconds(),
     "node", app->GetNodeName(),
     "circid", circid,
-    "data_index", data_index
+    "bytes_from", from,
+    "bytes_to", to
+  );
+}
+
+void BytesLeftNetworkCallback(Ptr<TorBaseApp> app, int circid, uint64_t from, uint64_t to)
+{
+  dumper.dump("bytes-left-network",
+    "time", Simulator::Now().GetSeconds(),
+    "node", app->GetNodeName(),
+    "circid", circid,
+    "bytes_from", from,
+    "bytes_to", to
   );
 }
 

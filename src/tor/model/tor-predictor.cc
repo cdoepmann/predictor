@@ -37,14 +37,14 @@ TorPredApp::GetTypeId (void)
                      "Trace indicating that a new pseudo server socket has been installed.",
                      MakeTraceSourceAccessor (&TorPredApp::m_triggerNewPseudoServerSocket),
                      "ns3::TorPredApp::TorNewPseudoServerSocketCallback")
-    .AddTraceSource ("ByteEnteredNetwork",
+    .AddTraceSource ("BytesEnteredNetwork",
                      "Trace indicating that an exit sent a byte of data, identified by its index, into the network.",
-                     MakeTraceSourceAccessor (&TorPredApp::m_triggerByteEnteredNetwork),
-                     "ns3::TorPredApp::TorByteEnteredNetworkCallback")
-    /*.AddTraceSource ("ByteLeftNetwork",
+                     MakeTraceSourceAccessor (&TorPredApp::m_triggerBytesEnteredNetwork),
+                     "ns3::TorPredApp::TorBytesEnteredNetworkCallback")
+    .AddTraceSource ("BytesLeftNetwork",
                      "Trace indicating that an eentry received a byte of data, identified by its index, from the network.",
-                     MakeTraceSourceAccessor (&TorPredApp::m_triggerByteLeftNetwork),
-                     "ns3::TorPredApp::TorByteLeftNetworkCallback")*/;
+                     MakeTraceSourceAccessor (&TorPredApp::m_triggerBytesLeftNetwork),
+                     "ns3::TorPredApp::TorBytesLeftNetworkCallback");
   return tid;
 }
 
@@ -1351,18 +1351,21 @@ PredConnection::Write (uint32_t max_write)
 
         // check if just packaged
         auto opp_con = circ->GetOppositeConnection(direction);
-        if (!opp_con->SpeaksCells())
+        if (!opp_con->SpeaksCells() && DynamicCast<PseudoServerSocket>(opp_con->GetSocket()))
         {
-          // notify about byte entering the network
-          for (uint64_t i=0; i<(uint64_t)cell_size; i++)
-          {
-            torapp->m_triggerByteEnteredNetwork(torapp, circid, data_index_last_sent[circid] + i);
-          }
+          // notify about bytes entering the network
+          torapp->m_triggerBytesEnteredNetwork(torapp, circid, data_index_last_seen[circid], data_index_last_seen[circid] + cell_size - 1);
+        }
+        else if (!SpeaksCells() && DynamicCast<PseudoClientSocket>(GetSocket()))
+        {
+          // notify about bytes leaving the network
+          torapp->m_triggerBytesLeftNetwork(torapp, circid, data_index_last_seen[circid], data_index_last_seen[circid] + cell_size - 1);
         }
 
         datasize += cell_size;
         flushed_some = true;
-        data_index_last_sent[circid] += cell_size;
+
+        data_index_last_seen[circid] += cell_size;
         NS_LOG_LOGIC ("[" << torapp->GetNodeName () << ": connection " << GetRemoteName () << "] Actually sending one cell from circuit " << circ->GetId ());
       }
 

@@ -208,7 +208,7 @@ public:
   uint64_t m_data_received;
 
   // index within each circuit's data stream that was last sent
-  map<int,uint64_t> data_index_last_sent;
+  map<int,uint64_t> data_index_last_seen;
 
 protected:
 
@@ -303,12 +303,21 @@ public:
                  > m_triggerNewPseudoServerSocket;
   typedef void (* TorNewPseudoServerSocketCallback) (Ptr<TorBaseApp>, int, Ptr<PseudoServerSocket>);
 
-  // Callback to trigger after a new pseudo server socket is added
+  // Callback to trigger when a cell has been sent into the network by an exit
   TracedCallback<Ptr<TorBaseApp>, // this app
                  int,             // circuit id
-                 uint64_t         // byte index in circuit
-                 > m_triggerByteEnteredNetwork;
-  typedef void (* TorByteEnteredNetworkCallback) (Ptr<TorBaseApp>, int, uint64_t);
+                 uint64_t,        // byte index in circuit (start)
+                 uint64_t         // byte index in circuit (end)
+                 > m_triggerBytesEnteredNetwork;
+  typedef void (* TorBytesEnteredNetworkCallback) (Ptr<TorBaseApp>, int, uint64_t, uint64_t);
+
+  // Callback to trigger when a cell has been received from the network by an entry
+  TracedCallback<Ptr<TorBaseApp>, // this app
+                 int,             // circuit id
+                 uint64_t,        // byte index in circuit (start)
+                 uint64_t         // byte index in circuit (end)
+                 > m_triggerBytesLeftNetwork;
+  typedef void (* TorBytesLeftNetworkCallback) (Ptr<TorBaseApp>, int, uint64_t, uint64_t);
 
   // The controller used for our optimization-based scheduling
   Ptr<PredController> controller;
