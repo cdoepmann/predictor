@@ -209,6 +209,9 @@ public:
 
   // index within each circuit's data stream that was last sent
   map<int,uint64_t> data_index_last_seen;
+  map<int,uint64_t> data_index_last_delivered;
+
+  void CountFinalReception(int circid, uint32_t length);
 
 protected:
 

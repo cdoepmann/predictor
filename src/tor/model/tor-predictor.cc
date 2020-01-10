@@ -463,6 +463,7 @@ TorPredApp::ReceiveRelayCell (Ptr<PredConnection> conn, Ptr<Packet> cell)
   CellDirection direction = circ->GetOppositeDirection (conn);
   Ptr<PredConnection> target_conn = circ->GetConnection (direction);
   NS_ASSERT (target_conn);
+  target_conn->CountFinalReception(circ->GetId(), cell->GetSize());
 
   AppendCellToCircuitQueue (circ, cell, direction);
 }
@@ -1316,6 +1317,16 @@ PredConnection::ReadControl (vector<Ptr<Packet>>& packet_list)
   return read_bytes;
 }
 
+void
+PredConnection::CountFinalReception(int circid, uint32_t length)
+{
+  if (!SpeaksCells() && DynamicCast<PseudoClientSocket>(GetSocket()))
+  {
+    // notify about bytes leaving the network
+    torapp->m_triggerBytesLeftNetwork(torapp, circid, data_index_last_delivered[circid] + 1, data_index_last_delivered[circid] + (uint64_t)length);
+    data_index_last_delivered[circid] += (uint64_t) length;
+  }
+}
 
 uint32_t
 PredConnection::Write (uint32_t max_write)
@@ -1354,12 +1365,7 @@ PredConnection::Write (uint32_t max_write)
         if (!opp_con->SpeaksCells() && DynamicCast<PseudoServerSocket>(opp_con->GetSocket()))
         {
           // notify about bytes entering the network
-          torapp->m_triggerBytesEnteredNetwork(torapp, circid, data_index_last_seen[circid], data_index_last_seen[circid] + cell_size - 1);
-        }
-        else if (!SpeaksCells() && DynamicCast<PseudoClientSocket>(GetSocket()))
-        {
-          // notify about bytes leaving the network
-          torapp->m_triggerBytesLeftNetwork(torapp, circid, data_index_last_seen[circid], data_index_last_seen[circid] + cell_size - 1);
+          torapp->m_triggerBytesEnteredNetwork(torapp, circid, data_index_last_seen[circid] + 1, data_index_last_seen[circid] + cell_size);
         }
 
         datasize += cell_size;
