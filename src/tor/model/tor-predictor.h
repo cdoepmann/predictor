@@ -473,7 +473,7 @@ class PredController : public Object {
 public:
   PredController (Ptr<TorPredApp> app) : 
     app{app},
-    horizon{20},
+    horizon{10},
     time_step{MilliSeconds(40)},
     pyscript{"./solver.sh"}
   {
