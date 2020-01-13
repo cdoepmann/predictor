@@ -1802,7 +1802,29 @@ PredController::Optimize ()
           NS_ASSERT(serversock);
           if (serversock->HasStarted())
           {
-            v_out_source.push_back(pred_v_in[inconn_index]);
+            // We have to take into account the amount of data that is still
+            // available in the socket and "cap" v_in accordingly so it becomes
+            // idle when the socket is emptied.
+            Trajectory capped_v_in{this, Simulator::Now()};
+            double current_buffer = serversock->GetRxAvailable();
+
+            for (double rate : pred_v_in[inconn_index].Elements())
+            {
+              double consumed_packets = rate * TimeStep().GetSeconds();
+
+              if (consumed_packets <= current_buffer) {
+                capped_v_in.Elements().push_back(rate);
+              }
+              else {
+                // Buffer does not suffice to realize this rate.
+                // Reduce the rate such that it only uses the available buffer
+                rate = current_buffer / TimeStep().GetSeconds();
+                consumed_packets = rate * TimeStep().GetSeconds();
+                capped_v_in.Elements().push_back(rate);
+              }
+              current_buffer = std::max(0.0, current_buffer-consumed_packets);
+            }
+            v_out_source.push_back(capped_v_in);
           }
           else
           {
@@ -1867,15 +1889,8 @@ PredController::Optimize ()
       idle.Elements().push_back(0.0);
     }
 
-    // Use the following "infinite" trajectory for pseudo sockets that are
-    // currently active and have a virtually infinite amount of data ready.
-    Trajectory infinite{this, Simulator::Now()};
-    for (unsigned int i=0; i<Horizon(); i++)
-    {
-      infinite.Elements().push_back(60*to_packets_sec(MaxDataRate ()));
-    }
-
     auto conn_it = in_conns.begin();
+    int inconn_index = 0;
     for (auto&& val : pred_s_buffer_source)
     {
       NS_ASSERT(conn_it != in_conns.end());
@@ -1892,7 +1907,26 @@ PredController::Optimize ()
           NS_ASSERT(serversock);
           if (serversock->HasStarted())
           {
-            s_buffer_source.push_back(infinite);
+            double infinite = 60*to_packets_sec(MaxDataRate ());
+            Trajectory socket_bytes_remaining {this, Simulator::Now()};
+            socket_bytes_remaining.Elements().push_back(std::min(infinite, (double)serversock->GetRxAvailable()));
+
+            double last_buffer_size = serversock->GetRxAvailable();
+            for (unsigned int i=1; i<Horizon(); i++)
+            {
+              if (pred_v_in[inconn_index].Elements().size() > i-1) {
+                double prediction = last_buffer_size + pred_v_in[inconn_index].Elements()[i-1]*TimeStep().GetSeconds();
+                socket_bytes_remaining.Elements().push_back(std::min(std::max(prediction, 0.0), infinite));
+
+                last_buffer_size += pred_v_in[inconn_index].Elements()[i-1]*TimeStep().GetSeconds();
+              }
+              else
+              {
+                socket_bytes_remaining.Elements().push_back(0.0);
+              }
+            }
+
+            s_buffer_source.push_back(socket_bytes_remaining);
           }
           else
           {
@@ -1914,6 +1948,7 @@ PredController::Optimize ()
       }
 
       conn_it++;
+      inconn_index++;
     }
   }
 

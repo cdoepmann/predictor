@@ -124,9 +124,11 @@ int main (int argc, char *argv[]) {
     th.SetUnderlayRate(DataRate("10Mbps"));
 
     Ptr<ConstantRandomVariable> m_bulkRequest = CreateObject<ConstantRandomVariable>();
-    m_bulkRequest->SetAttribute("Constant", DoubleValue(pow(2,30)));
+    m_bulkRequest->SetAttribute("Constant", DoubleValue(200*1024));
+    Ptr<ConstantRandomVariable> m_infiniteRequest = CreateObject<ConstantRandomVariable>();
+    m_infiniteRequest->SetAttribute("Constant", DoubleValue(pow(2, 30)));
     Ptr<ConstantRandomVariable> m_bulkThink = CreateObject<ConstantRandomVariable>();
-    m_bulkThink->SetAttribute("Constant", DoubleValue(0));
+    m_bulkThink->SetAttribute("Constant", DoubleValue(2));
 
     Ptr<UniformRandomVariable> m_startTime = CreateObject<UniformRandomVariable> ();
     m_startTime->SetAttribute ("Min", DoubleValue (0.1));
@@ -134,10 +136,12 @@ int main (int argc, char *argv[]) {
     // th.SetStartTimeStream (m_startTime); // default start time when no PseudoClientSocket specified
 
     /* state scenario/ add circuits inline */
-    th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.4)) );
-    th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(5.6)) );
-    th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(7.3)) );
-
+    th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.4)) );
+    th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.5)) );
+    th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.8)) );
+    // th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.4)) );
+    // th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(4.6)) );
+    // th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(6.8)) );
     // th.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2Mb/s")));
     // th.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2Mb/s")));
 
