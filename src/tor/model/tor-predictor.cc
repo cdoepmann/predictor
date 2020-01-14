@@ -2133,7 +2133,7 @@ PredController::CalculateSendPlan()
 
     NS_ASSERT(conn_buckets.find(conn) != conn_buckets.end());
 
-    uint64_t conn_bucket = (uint64_t)(rate*time_step/8.0); // dividing by 8 converts to bytes
+    uint64_t conn_bucket = (uint64_t)(ceil(rate*time_step)/8.0); // dividing by 8 converts to bytes
     conn_buckets[conn] = conn_bucket;
 
     // trigger sending of new data
