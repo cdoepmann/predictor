@@ -1763,6 +1763,7 @@ PredController::Optimize ()
       double queue_size = circ->GetQueueSize(circ->GetDirection(conn));
       this_conn += queue_size;
     }
+    this_conn += (double)conn->GetOutbufSize() / (double)CELL_NETWORK_SIZE;
 
     packets_per_conn.push_back(this_conn);
   }
