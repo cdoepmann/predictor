@@ -1806,7 +1806,7 @@ PredController::Optimize ()
             // available in the socket and "cap" v_in accordingly so it becomes
             // idle when the socket is emptied.
             Trajectory capped_v_in{this, Simulator::Now()};
-            double current_buffer = serversock->GetRxAvailable();
+            double current_buffer = serversock->GetRxAvailable() / CELL_NETWORK_SIZE;
 
             for (double rate : pred_v_in[inconn_index].Elements())
             {
@@ -1909,16 +1909,30 @@ PredController::Optimize ()
           {
             double infinite = 60*to_packets_sec(MaxDataRate ());
             Trajectory socket_bytes_remaining {this, Simulator::Now()};
-            socket_bytes_remaining.Elements().push_back(std::min(infinite, (double)serversock->GetRxAvailable()));
+            double last_buffer_size;
+            {
+              double candidate = (double)serversock->GetRxAvailable() / CELL_NETWORK_SIZE;
+              last_buffer_size = candidate;
+              candidate = std::min(infinite, candidate);
+              if (candidate >= 1.0/CELL_NETWORK_SIZE && candidate <= 1.0)
+              {
+                candidate = ceil(candidate);
+              }
+              socket_bytes_remaining.Elements().push_back(candidate);
+            }
 
-            double last_buffer_size = serversock->GetRxAvailable();
             for (unsigned int i=1; i<Horizon(); i++)
             {
-              if (pred_v_in[inconn_index].Elements().size() > i-1) {
-                double prediction = last_buffer_size + pred_v_in[inconn_index].Elements()[i-1]*TimeStep().GetSeconds();
-                socket_bytes_remaining.Elements().push_back(std::min(std::max(prediction, 0.0), infinite));
+              if (v_out_source[inconn_index].Elements().size() > i-1) {
+                double prediction = last_buffer_size - v_out_source[inconn_index].Elements()[i-1]*TimeStep().GetSeconds();
+                double candidate = std::min(std::max(prediction, 0.0), infinite);
+                if (candidate >= 1.0/CELL_NETWORK_SIZE && candidate <= 1.0)
+                {
+                  candidate = ceil(candidate);
+                }
+                socket_bytes_remaining.Elements().push_back(candidate);
 
-                last_buffer_size += pred_v_in[inconn_index].Elements()[i-1]*TimeStep().GetSeconds();
+                last_buffer_size -= v_out_source[inconn_index].Elements()[i-1]*TimeStep().GetSeconds();
               }
               else
               {
@@ -2233,7 +2247,7 @@ PredController::MergeTrajectories(Trajectory& target, Trajectory& source)
   target = source;
   // TODO: Do we really not need to interpolate here? Consider possibly varying
   // feedback propagation delays...
-  // target = source.InterpolateToTime(GetNextOptimizationTime());
+  target = source.InterpolateToTime(GetNextOptimizationTime());
 }
 
 void
