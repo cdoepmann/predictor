@@ -1613,8 +1613,8 @@ PredController::Setup ()
     "setup",
     "time", Simulator::Now().GetSeconds(),
     "relay", app->GetNodeName (),
-    "v_in_max_total", .8*to_packets_sec(MaxDataRate ()),  // TODO
-    "v_out_max_total", .8*to_packets_sec(MaxDataRate ()), // TODO
+    "v_in_max_total", .85*to_packets_sec(MaxDataRate ()),  // TODO
+    "v_out_max_total", .85*to_packets_sec(MaxDataRate ()), // TODO
     "s_c_max_total", 100,
     "scaling", 50,
     "dt", TimeStep().GetSeconds(),
