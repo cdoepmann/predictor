@@ -44,6 +44,7 @@ int main (int argc, char *argv[]) {
     uint32_t rtt = 80;
     double predictor_feedback_loss = 0.0;
     bool predictor_oob_feedback = true;
+    bool bulk_only = false;
 
     CommandLine cmd;
     cmd.AddValue("run", "run number", run);
@@ -54,6 +55,7 @@ int main (int argc, char *argv[]) {
     cmd.AddValue("pctcp", "use PCTCP", use_pctcp);
     cmd.AddValue("predictor-feedback-loss", "ratio of feedback messages randomly lost", predictor_feedback_loss);
     cmd.AddValue("predictor-oob-feedback", "Do not really send feedback messages over the network, but schedule their reception out of band", predictor_oob_feedback);
+    cmd.AddValue("bulk-only", "construct a different scenario where no server stops sending", bulk_only);
     cmd.Parse(argc, argv);
 
     // TestTrajectory();
@@ -136,12 +138,18 @@ int main (int argc, char *argv[]) {
     // th.SetStartTimeStream (m_startTime); // default start time when no PseudoClientSocket specified
 
     /* state scenario/ add circuits inline */
-    th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.4)) );
-    th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.5)) );
-    th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.8)) );
-    // th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.4)) );
-    // th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(4.6)) );
-    // th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(6.8)) );
+    if (!bulk_only)
+    {
+      th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.4)) );
+      th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_bulkRequest, m_bulkThink, Seconds(0.5)) );
+      th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.8)) );
+    }
+    else
+    {
+      th.AddCircuit(1,"entry1","btlnk","exit1", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.4)) );
+      th.AddCircuit(2,"entry2","btlnk","exit1", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(0.8)) );
+      th.AddCircuit(3,"entry3","btlnk","exit2", CreateObject<PseudoClientSocket> (m_infiniteRequest, m_bulkThink, Seconds(1.2)) );
+    }
     // th.SetRelayAttribute("btlnk", "BandwidthRate", DataRateValue(DataRate("2Mb/s")));
     // th.SetRelayAttribute("btlnk", "BandwidthBurst", DataRateValue(DataRate("2Mb/s")));
 
