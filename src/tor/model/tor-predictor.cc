@@ -1466,6 +1466,13 @@ PredConnection::BeamConnLevelCell (Ptr<Packet> cell)
   
   NS_LOG_LOGIC ("[" << torapp->GetNodeName() << ": connection " << GetRemoteName () << "] Beaming connection-level cell to appear after " << delay.GetSeconds() << " seconds");
 
+  dumper.dump("sent-feedback-message",
+              "time", Simulator::Now().GetSeconds(),
+              "from-relay", torapp->GetNodeName(),
+              "to-relay", GetRemoteConn()->GetTorApp()->GetNodeName(),
+              "conn", GetRemoteName(),
+              "bytes", (int)(cell->GetSize()));
+
   Simulator::Schedule(delay, &PredConnection::ReceiveBeamedConnLevelCell, remote_conn, cell);
 }
 
