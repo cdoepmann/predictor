@@ -178,6 +178,10 @@ int main (int argc, char *argv[]) {
       }
     }
 
+    // Dump a few characteristics of the scenario
+    dumper.dump("all-relays", "names", th.GetAllRelayNames());
+    dumper.dump("all-circuits", "ids", th.circuitIds);
+
     ApplicationContainer relays = th.GetTorAppsContainer();
     relays.Start (Seconds (0.0));
     relays.Stop (simTime);
