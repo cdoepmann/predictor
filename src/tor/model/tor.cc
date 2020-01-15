@@ -1066,11 +1066,38 @@ string
 Connection::GetRemoteName ()
 {
   if (Ipv4Mask ("255.0.0.0").IsMatch (GetRemote (), Ipv4Address ("127.0.0.1")) )
-    return "pseudo";
+  {
+    stringstream ss;
+    // GetRemote().Print(ss);
+    ss << GetActiveCircuits()->GetId();
+    if(DynamicCast<PseudoServerSocket>(GetSocket()))
+    {
+      ss << "-server";
+    }
+    else
+    {
+      NS_ASSERT(DynamicCast<PseudoClientSocket>(GetSocket()));
+      ss << "-client";
+    }
+    
+    return string("pseudo-") + ss.str();
+  }
 
   map<Ipv4Address,string>::const_iterator it = Connection::remote_names.find(GetRemote ());
   NS_ASSERT(it != Connection::remote_names.end() );
-  return it->second;
+  string name{it->second};
+  
+  stringstream result;
+  result << name;
+
+  // Add the circuit ID to the connection name if it there is only one circuit
+  auto first_circuit = GetActiveCircuits();
+  if (first_circuit && (first_circuit->GetNextCirc(this) == first_circuit))
+  {
+    result << "." << first_circuit->GetId();
+  }
+
+  return result.str();
 }
 
 
