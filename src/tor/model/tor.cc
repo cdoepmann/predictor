@@ -183,8 +183,8 @@ TorApp::StartApplication (void)
           Ptr<Socket> socket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
           socket->Bind ();
           socket->Connect (Address (InetSocketAddress (conn->GetRemote (), InetSocketAddress::ConvertFrom (m_local).GetPort ())));
-          // socket->SetSendCallback (MakeCallback(&TorApp::ConnWriteCallback, this));
-          socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
+          socket->SetSendCallback (MakeCallback(&TorApp::ConnWriteCallback, this));
+          // socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
           socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
           conn->SetSocket (socket);
           m_triggerNewSocket(this, OUTBOUND, socket);
@@ -195,8 +195,8 @@ TorApp::StartApplication (void)
           if (conn->GetType () == SERVEREDGE)
             {
               Ptr<Socket> socket = CreateObject<PseudoServerSocket> ();
-              socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
-              // socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
+              // socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
+              socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
               m_triggerNewSocket(this, OUTBOUND, socket);
@@ -217,8 +217,8 @@ TorApp::StartApplication (void)
                   m_triggerNewSocket(this, INBOUND, socket);
                 }
 
-              socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
-              // socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
+              // socket->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
+              socket->SetSendCallback(MakeCallback(&TorApp::ConnWriteCallback, this));
               socket->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
               conn->SetSocket (socket);
             }
@@ -478,8 +478,8 @@ TorApp::HandleAccept (Ptr<Socket> s, const Address& from)
   m_triggerNewSocket(this, INBOUND, s);
 
   s->SetRecvCallback (MakeCallback (&TorApp::ConnReadCallback, this));
-  // s->SetSendCallback (MakeCallback(&TorApp::ConnWriteCallback, this));
-  s->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
+  s->SetSendCallback (MakeCallback(&TorApp::ConnWriteCallback, this));
+  // s->SetDataSentCallback (MakeCallback (&TorApp::ConnWriteCallback, this));
   conn->ScheduleWrite();
   conn->ScheduleRead();
 }
