@@ -207,7 +207,7 @@ int main (int argc, char *argv[]) {
 
     cout << "=== Summary ===" << endl;
 
-    cout << "Total bytes completed (all circuits): ";
+    cout << "Total bytes completed (all circuits, ignoring a lead time of 4 seconds): ";
     uint64_t total_bytes_completed = 0;
 
     for (auto id = th.circuitIds.begin(); id != th.circuitIds.end(); ++id) {
