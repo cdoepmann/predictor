@@ -1,3 +1,0 @@
-PREDICTOR_PATH_OPTIMIZER="/home/christoph/forschung/paper-predictor/toropti_scheduler"
-PREDICTOR_PATH_COINHSL="/home/christoph/forschung/paper-predictor/casadi/hsl-bin/lib"
-PREDICTOR_PATH_CONDA="/home/christoph/anaconda3"
